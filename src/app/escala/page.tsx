@@ -304,7 +304,7 @@ export default function EscalaPage() {
       if (error) {
         alert('Erro ao limpar dia. Tente novamente.')
       } else {
-        alert('Dia limpo com sucesso!');
+        alert('Dia limpo com sucesso!')
       }
     } catch (error) {
       console.error('Error clearing day:', error)
