@@ -21,7 +21,7 @@ interface Despesa {
   valor: number
   data: string
   categoria: string
-  usuario_id: string
+  user_id: string
   recorrente?: boolean
 }
 
@@ -81,7 +81,7 @@ export default function FinanceiroPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
 
       if (error) {
         console.error('Error fetching plantões:', error)
@@ -101,7 +101,7 @@ export default function FinanceiroPage() {
       const { data, error } = await supabase
         .from('despesas')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) {
@@ -136,7 +136,7 @@ export default function FinanceiroPage() {
             data: expenseDate.toISOString().split('T')[0],
             categoria: newExpense.categoria,
             recorrente: true,
-            usuario_id: user.id
+            user_id: user.id
           })
         }
 
@@ -158,7 +158,7 @@ export default function FinanceiroPage() {
             data: newExpense.data,
             categoria: newExpense.categoria,
             recorrente: false,
-            usuario_id: user.id
+            user_id: user.id
           })
 
         if (error) {
@@ -236,7 +236,7 @@ export default function FinanceiroPage() {
         const { error } = await supabase
           .from('despesas')
           .delete()
-          .eq('usuario_id', user.id)
+          .eq('user_id', user.id)
           .like('descricao', `${baseDescription}%`)
           .eq('recorrente', true)
 
