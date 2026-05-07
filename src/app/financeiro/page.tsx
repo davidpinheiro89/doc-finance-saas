@@ -350,7 +350,7 @@ export default function FinanceiroPage() {
               
               {/* Intelligent Insight Card */}
               {selectedMonth !== 'todos' && (
-                <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-6 mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
@@ -364,7 +364,7 @@ export default function FinanceiroPage() {
                             return (
                               <div>
                                 <p className="text-red-600 font-medium">
-                                  ⚠️ Faltam <span className="font-bold">R$ {formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
+                                  ⚠️ Faltam <span className="font-bold">{formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
                                 </p>
                                 <p className="text-gray-600 text-sm">
                                   Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> plantões de 12h.
@@ -474,23 +474,31 @@ export default function FinanceiroPage() {
               </div>
               
               {/* Gráfico de Donut */}
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
                     data={[
-                      { name: 'Custos Fixos', value: totalDespesasFixas, fill: '#f97316' },
-                      { name: 'Despesas Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
+                      { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
+                      { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
                     ]}
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
+                    outerRadius={60}
                     fill="#8884d8"
                     dataKey="value"
-                    label={({ name, value }) => `${name}: R$ ${formatCurrency(value)}`}
-                    labelLine={false}
+                    label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
                   >
                     <Tooltip />
                   </Pie>
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value: any, entry: any) => {
+                      const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
+                      const entryValue = typeof value === 'number' ? value : 0
+                      return `${entryName}: ${formatCurrency(entryValue)}`
+                    }}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </div>
