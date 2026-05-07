@@ -29,11 +29,18 @@ export default function FinanceiroPage() {
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
-  const [newExpense, setNewExpense] = useState({
+  const [newExpense, setNewExpense] = useState<{
+    descricao: string;
+    valor: string;
+    data: string;
+    categoria: string;
+    recorrente: boolean;
+  }>({
     descricao: '',
     valor: '',
     data: '',
-    categoria: 'transporte'
+    categoria: 'transporte',
+    recorrente: false
   })
   const router = useRouter()
 
@@ -113,20 +120,49 @@ export default function FinanceiroPage() {
     }
 
     try {
-      const { error } = await supabase
-        .from('despesas')
-        .insert({
-          descricao: newExpense.descricao,
-          valor: parseFloat(newExpense.valor),
-          data: newExpense.data,
-          categoria: newExpense.categoria,
-          usuario_id: user.id
-        })
+      // If it's a recurring expense, create monthly expenses for the next 12 months
+      if (newExpense.recorrente && newExpense.data) {
+        const recurringDate = new Date(newExpense.data)
+        const expensesToInsert = []
+        
+        for (let i = 0; i < 12; i++) {
+          const expenseDate = new Date(recurringDate.getFullYear(), recurringDate.getMonth() + i, 1)
+          expensesToInsert.push({
+            descricao: `${newExpense.descricao} - ${expenseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
+            valor: parseFloat(newExpense.valor),
+            data: expenseDate.toISOString().split('T')[0],
+            categoria: 'recorrente',
+            usuario_id: user.id
+          })
+        }
 
-      if (error) {
-        console.error('Error adding despesa:', error)
-        alert('Erro ao adicionar despesa: ' + error.message)
-        return
+        // Insert all recurring expenses at once
+        const { error: recurringError } = await supabase
+          .from('despesas')
+          .insert(expensesToInsert)
+
+        if (recurringError) {
+          console.error('Error adding recurring expenses:', recurringError)
+          alert('Erro ao adicionar despesas recorrentes: ' + recurringError.message)
+          return
+        }
+      } else {
+        // Regular single expense
+        const { error } = await supabase
+          .from('despesas')
+          .insert({
+            descricao: newExpense.descricao,
+            valor: parseFloat(newExpense.valor),
+            data: newExpense.data,
+            categoria: newExpense.categoria,
+            usuario_id: user.id
+          })
+
+        if (error) {
+          console.error('Error adding despesa:', error)
+          alert('Erro ao adicionar despesa: ' + error.message)
+          return
+        }
       }
 
       // Reset form and refresh data
@@ -134,7 +170,8 @@ export default function FinanceiroPage() {
         descricao: '',
         valor: '',
         data: '',
-        categoria: 'transporte'
+        categoria: 'transporte',
+        recorrente: false
       })
       setShowAddExpense(false)
       await fetchDespesas(user.id)
@@ -372,6 +409,7 @@ export default function FinanceiroPage() {
                       <option value="alimentacao">Alimentação</option>
                       <option value="material">Material Médico</option>
                       <option value="outros">Outros</option>
+                      <option value="recorrente">Repetir mensalmente</option>
                     </select>
                   </div>
                 </div>
