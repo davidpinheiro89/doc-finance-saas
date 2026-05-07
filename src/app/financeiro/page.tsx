@@ -367,7 +367,7 @@ export default function FinanceiroPage() {
                                   ⚠️ Faltam <span className="font-bold">{formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
                                 </p>
                                 <p className="text-gray-600 text-sm">
-                                  Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> plantões de 12h.
+                                  Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
                                 </p>
                               </div>
                             )
