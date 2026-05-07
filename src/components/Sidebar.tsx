@@ -146,7 +146,7 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
 
       {/* Navigation */}
-      {!isMobile && (
+      {(!isMobile || (isMobile && !isCollapsed)) && (
         <nav className="p-4">
           <ul className="space-y-2">
             {menuItems.map((item) => {
