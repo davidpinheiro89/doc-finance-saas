@@ -245,7 +245,7 @@ export default function DashboardPage() {
       if (data && data[0]) {
         setFormData(prev => ({
           ...prev,
-          local_favorito_id: data[0].id
+          local_favorito_id: (data as any)?.[0]?.id || ''
         }))
         
         // Clear favorite location field
@@ -303,7 +303,7 @@ export default function DashboardPage() {
 
   const chartData = Object.entries(plantoesByUnit).map(([unit, count]) => ({
     unidade: unit,
-    quantidade: count
+    quantidade: (count as number) || 0
   })).sort((a, b) => b.quantidade - a.quantidade)
 
   // Prepare data for hours distribution chart
@@ -312,13 +312,13 @@ export default function DashboardPage() {
     if (!acc[unit]) {
       acc[unit] = 0
     }
-    acc[unit] += (plantao.horas || 0)
+    acc[unit] += (plantao.horas as number || 0)
     return acc
   }, {} as Record<string, number>)
 
   const hoursChartData = Object.entries(hoursByUnit).map(([unit, hours]) => ({
     unidade: unit,
-    horas: hours
+    horas: (hours as number) || 0
   })).sort((a, b) => b.horas - a.horas)
 
   const COLORS = ['#f97316', '#ea580c', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#22c55e']

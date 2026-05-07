@@ -53,8 +53,9 @@ interface Plantao {
 
 export default function EscalaPage() {
   const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [plantoes, setPlantoes] = useState<any[]>([])
+  const formatDateYYYYMMDD = (date: Date) => date.toISOString().split('T')[0]
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showDayMenu, setShowDayMenu] = useState(false)
   const [selectedDayEvents, setSelectedDayEvents] = useState<Plantao[]>([])
@@ -81,7 +82,7 @@ export default function EscalaPage() {
 
   const checkAuth = async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } }: any = await supabase.auth.getUser()
       if (!user) {
         router.push('/login')
         return
@@ -96,9 +97,14 @@ export default function EscalaPage() {
     }
   }
 
+  const getPlantoesByDate = (date: Date) => {
+    const dateStr = formatDateYYYYMMDD(date)
+    return plantoes.filter((plantao: any) => plantao.data === dateStr)
+  }
+
   const fetchPlantoes = async (userId: string) => {
     try {
-      const { data, error } = await supabase
+      const { data, error }: any = await supabase
         .from('plantoes')
         .select('*')
         .eq('usuario_id', userId)
@@ -131,10 +137,10 @@ export default function EscalaPage() {
     
     // If clicking on a day with existing plantões, check if it's a favorite location
     if (dayEvents.length > 0) {
-      const favoriteLocation = dayEvents.find(p => p.local_favorito_id)
+      const favoriteLocation = dayEvents.find((p: any) => p.local_favorito_id)
       if (favoriteLocation) {
         // Pre-select the favorite location in the form
-        setFormData(prev => ({
+        setFormData((prev: any) => ({
           ...prev,
           local_favorito_id: favoriteLocation.local_favorito_id,
           hospital: favoriteLocation.nome,
@@ -150,8 +156,8 @@ export default function EscalaPage() {
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target
-    setFormData(prev => ({
+    const { name, value }: any = e.target
+    setFormData((prev: any) => ({
       ...prev,
       [name]: value
     }))
@@ -164,7 +170,7 @@ export default function EscalaPage() {
     }
 
     try {
-      const { data, error } = await supabase
+      const { data, error }: any = await supabase
         .from('plantoes')
         .insert({
           usuario_id: user.id,
@@ -191,7 +197,7 @@ export default function EscalaPage() {
       alert('Plantão salvo com sucesso!')
       
       // Update local state immediately for visual feedback
-      setPlantoes(prev => {
+      setPlantoes((prev: any) => {
         const newPlantao = {
           id: data?.[0]?.id || '',
           usuario_id: user.id,
@@ -235,22 +241,7 @@ export default function EscalaPage() {
     }
   }
 
-  // Helper function to format date as pure YYYY-MM-DD without timezone issues
-  const formatDateYYYYMMDD = (date: Date): string => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-
-  // Helper function to format date as pure YYYY-MM-DD without timezone issues
-  const formatDateYYYYMMDD = (date: Date): string => {
-    const year = date.getFullYear()
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const day = String(date.getDate()).padStart(2, '0')
-    return `${year}-${month}-${day}`
-  }
-
+  
   // Shared delete function for both pages
   const deletePlantaoEvent = async (id: string, userId: string, setPlantoes: any) => {
     console.log('deletePlantaoEvent called with ID:', id)
@@ -276,9 +267,9 @@ export default function EscalaPage() {
       console.log('Plantão deleted successfully from database')
       
       // Update local state immediately for visual feedback
-      setPlantoes(prev => {
+      setPlantoes((prev: any) => {
         console.log('Previous plantões count:', prev.length)
-        const updated = prev.filter(p => p.id !== id)
+        const updated = prev.filter((p: any) => p.id !== id)
         console.log('After filtering plantões count:', updated.length)
         return updated
       })
@@ -295,8 +286,9 @@ export default function EscalaPage() {
       return
     }
 
-    const dateStr = formatDateYYYYMMDD(selectedDate)
-    const { data, error } = await supabase
+   try {
+      const dateStr = formatDateYYYYMMDD(selectedDate)
+    const { data, error }: any = await supabase
       .from('plantoes')
       .select('*')
       .eq('usuario_id', user.id)
@@ -310,12 +302,7 @@ export default function EscalaPage() {
       console.error('Error clearing day:', error)
       alert('Erro ao limpar dia. Tente novamente.')
     }
-  }
-
-  const getPlantoesByDate = (date: Date) => {
-    const dateStr = formatDateYYYYMMDD(date)
-    return plantoes.filter((plantao: any) => plantao.data === dateStr)
-  }
+  
 
   const getEventTypeColor = (tipo_evento?: string) => {
     switch (tipo_evento) {
@@ -591,4 +578,5 @@ export default function EscalaPage() {
         )}
     </div>
   )
+}
 }
