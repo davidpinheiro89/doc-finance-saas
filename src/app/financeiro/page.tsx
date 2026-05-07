@@ -33,6 +33,8 @@ export default function FinanceiroPage() {
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showEditExpense, setShowEditExpense] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Despesa | null>(null)
+  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)) // YYYY-MM format
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [newExpense, setNewExpense] = useState<{
     descricao: string;
     valor: string;
@@ -126,10 +128,13 @@ export default function FinanceiroPage() {
     try {
       if (newExpense.recorrente && newExpense.data) {
         const recurringDate = new Date(newExpense.data)
+        const currentMonth = recurringDate.getMonth()
+        const currentYear = recurringDate.getFullYear()
         const expensesToInsert = []
         
-        for (let i = 0; i < 12; i++) {
-          const expenseDate = new Date(recurringDate.getFullYear(), recurringDate.getMonth() + i, 1)
+        // Only create from current month forward (not retroactive)
+        for (let i = 0; i < (12 - currentMonth); i++) {
+          const expenseDate = new Date(currentYear, currentMonth + i, 1)
           expensesToInsert.push({
             descricao: `${newExpense.descricao} - ${expenseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
             valor: parseFloat(newExpense.valor),
@@ -265,18 +270,24 @@ export default function FinanceiroPage() {
     }
   }
 
-  const totalRecebido = plantoes
+  // Filter plantões by selected month/year
+  const filteredPlantoes = plantoes.filter(p => p.data.startsWith(selectedYear + '-' + selectedMonth.slice(5)))
+  
+  const totalRecebido = filteredPlantoes
     .filter(p => p.status === 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
   
-  const totalAReceber = plantoes
+  const totalAReceber = filteredPlantoes
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
   
-  const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  // Filter expenses by selected month
+  const filteredDespesas = despesas.filter(d => d.data.startsWith(selectedMonth))
   
-  const despesasFixas = despesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
-  const despesasVariaveis = despesas.filter(d => ['transporte'].includes(d.categoria))
+  const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  
+  const despesasFixas = filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
+  const despesasVariaveis = filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
   
   const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
@@ -319,10 +330,106 @@ export default function FinanceiroPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-800">
-              <span className="text-orange-500">Financeiro</span>
-            </h1>
-            <p className="text-gray-600 mt-2">Gestão financeira e controle de despesas</p>
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">
+                  <span className="text-orange-500">Financeiro</span>
+                </h1>
+                <p className="text-gray-600 mt-2">Gestão financeira e controle de despesas</p>
+              </div>
+              
+              {/* Month/Year Selector */}
+              <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => {
+                    const current = new Date(selectedYear, parseInt(selectedMonth) - 1, 1)
+                    const previous = new Date(current.getFullYear() - 1, parseInt(selectedMonth) - 1, 1)
+                    setSelectedYear(previous.getFullYear())
+                    setSelectedMonth(previous.toISOString().slice(0, 7))
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="Ano anterior"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
+                  </svg>
+                </button>
+                
+                <button
+                  onClick={() => {
+                    const current = new Date(selectedYear, parseInt(selectedMonth) - 1, 1)
+                    const previous = new Date(current.getFullYear(), parseInt(selectedMonth) - 1, 1)
+                    setSelectedMonth(previous.toISOString().slice(0, 7))
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="Mês anterior"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
+                  </svg>
+                </button>
+                
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                >
+                  {Array.from({length: 12}, (_, i) => {
+                    const date = new Date(selectedYear, i, 1)
+                    const value = date.toISOString().slice(0, 7)
+                    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
+                    return (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    )
+                  })}
+                </select>
+                
+                <button
+                  onClick={() => {
+                    const current = new Date(selectedYear, parseInt(selectedMonth), 1)
+                    const next = new Date(current.getFullYear() + 1, parseInt(selectedMonth), 1)
+                    setSelectedMonth(next.toISOString().slice(0, 7))
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="Próximo mês"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+                
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
+                >
+                  {Array.from({length: 5}, (_, i) => {
+                    const year = new Date().getFullYear() - 2 + i
+                    return (
+                      <option key={year} value={year}>
+                        {year}
+                      </option>
+                    )
+                  })}
+                </select>
+                
+                <button
+                  onClick={() => {
+                    const next = new Date(selectedYear + 1, parseInt(selectedMonth), 1)
+                    setSelectedYear(next.getFullYear())
+                    setSelectedMonth(next.toISOString().slice(0, 7))
+                  }}
+                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="Próximo ano"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
 
           {/* Cards de Resumo Financeiro */}
@@ -516,7 +623,7 @@ export default function FinanceiroPage() {
 
             {/* Lista de Despesas */}
             <div className="overflow-x-auto">
-              {despesas.length === 0 ? (
+              {filteredDespesas.length === 0 ? (
                 <div className="p-8 text-center">
                   <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
@@ -546,7 +653,7 @@ export default function FinanceiroPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {despesas.map((despesa) => (
+                    {filteredDespesas.map((despesa) => (
                       <tr key={despesa.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(despesa.data)}
