@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
@@ -10,8 +10,22 @@ interface SidebarProps {
 
 export default function Sidebar({ user }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 768)
+    }
+    
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    
+    return () => {
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -85,57 +99,77 @@ export default function Sidebar({ user }: SidebarProps) {
   ]
 
   return (
-    <div className={`bg-white border-r border-gray-200 transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <div className={`flex items-center ${isCollapsed ? 'justify-center' : ''}`}>
-            <div className="bg-orange-500 rounded-lg p-2">
-              <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
+    <>
+      {/* Mobile Menu Button */}
+      {isMobile && (
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg border border-gray-200 md:hidden"
+        >
+          <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      )}
+
+      {/* Desktop Sidebar */}
+      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative h-full z-40 ${
+        isMobile ? (isCollapsed ? 'translate-x-0' : '-translate-x-full') : ''
+      } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between">
+            <div className={`flex items-center ${isCollapsed && !isMobile ? 'justify-center' : ''}`}>
+              <div className="bg-orange-500 rounded-lg p-2">
+                <svg className="h-6 w-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+              </div>
+              {(!isCollapsed || isMobile) && (
+                <h1 className="ml-3 text-xl font-bold">
+                  <span className="text-orange-500">BEM</span>
+                  <span className="text-gray-800"> plantonista</span>
+                </h1>
+              )}
             </div>
-            {!isCollapsed && (
-              <h1 className="ml-3 text-xl font-bold">
-                <span className="text-orange-500">BEM</span>
-                <span className="text-gray-800"> plantonista</span>
-              </h1>
+            {!isMobile && (
+              <button
+                onClick={() => setIsCollapsed(!isCollapsed)}
+                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+              </button>
             )}
           </div>
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
-      </div>
 
       {/* Navigation */}
-      <nav className="p-4">
-        <ul className="space-y-2">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.href
-            return (
-              <li key={item.name}>
-                <button
-                  onClick={() => router.push(item.href)}
-                  className={`w-full flex items-center ${isCollapsed ? 'justify-center' : ''} px-3 py-2 rounded-lg transition-colors duration-200 ${
-                    isActive
-                      ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                  }`}
-                >
-                  <div className="flex-shrink-0">{item.icon}</div>
-                  {!isCollapsed && <span className="ml-3">{item.name}</span>}
-                </button>
-              </li>
-            )
-          })}
-        </ul>
-      </nav>
+      {!isMobile && (
+        <nav className="p-4">
+          <ul className="space-y-2">
+            {menuItems.map((item) => {
+              const isActive = pathname === item.href
+              return (
+                <li key={item.name}>
+                  <button
+                        onClick={() => router.push(item.href)}
+                        className={`w-full flex items-center ${isCollapsed ? 'justify-center' : ''} px-3 py-2 rounded-lg transition-colors duration-200 ${
+                          isActive
+                            ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
+                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                        }`}
+                      >
+                        <div className="flex-shrink-0">{item.icon}</div>
+                        {(!isCollapsed || isMobile) && <span className="ml-3">{item.name}</span>}
+                      </button>
+                    </li>
+                  )
+                })}
+          </ul>
+        </nav>
+      )}
 
       {/* User Section */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
@@ -145,7 +179,7 @@ export default function Sidebar({ user }: SidebarProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
           </div>
-          {!isCollapsed && (
+          {(!isCollapsed || isMobile) && (
             <div className="ml-3 flex-1">
               <p className="text-sm font-medium text-gray-700 truncate">
                 {user?.user_metadata?.full_name || 'Médico'}
@@ -156,7 +190,7 @@ export default function Sidebar({ user }: SidebarProps) {
             </div>
           )}
         </div>
-        {!isCollapsed && (
+        {(!isCollapsed || isMobile) && (
           <button
             onClick={handleLogout}
             className="mt-3 w-full flex items-center justify-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200"
@@ -169,5 +203,6 @@ export default function Sidebar({ user }: SidebarProps) {
         )}
       </div>
     </div>
+    </>
   )
 }
