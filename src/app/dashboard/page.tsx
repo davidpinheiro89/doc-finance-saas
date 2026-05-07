@@ -706,11 +706,32 @@ export default function DashboardPage() {
                   .sort(([,a]: any, [,b]: any) => b.hourlyRate - a.hourlyRate)
                   .slice(0, 3)
 
+                // Check for 70% concentration
+                const concentrationAlert = Object.entries(hospitalEfficiency).find(([, data]: any) => {
+                  const totalHours = Object.values(hospitalEfficiency).reduce((sum: number, [, hospitalData]: any) => sum + hospitalData.totalHours, 0)
+                  const concentrationPercentage = (data.totalHours / totalHours) * 100
+                  return concentrationPercentage >= 70
+                })
+
                 if (sortedHospitals.length === 0) {
                   return (
                     <p className="text-gray-600 text-sm">
                       Nenhum dado suficiente para calcular eficiência. Adicione plantões com horas registradas.
                     </p>
+                  )
+                }
+
+                // Display concentration alert if found
+                if (concentrationAlert) {
+                  return (
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                      <p className="text-orange-700 font-medium text-sm">
+                        ⚠️ Atenção: 70% da sua carga horária está concentrada no {concentrationAlert[0]}.
+                      </p>
+                      <p className="text-orange-600 text-xs mt-1">
+                        Considere diversificar suas unidades de trabalho para melhor distribuição.
+                      </p>
+                    </div>
                   )
                 }
 
@@ -729,6 +750,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-gray-800">{formatCurrency(data.hourlyRate)}/h</p>
+                        <p className="text-xs text-gray-500">R$/h</p>
                       <p className="text-xs text-gray-500">{data.totalHours}h totais</p>
                     </div>
                   </div>
@@ -794,7 +816,7 @@ export default function DashboardPage() {
                       <div className="bg-white rounded-lg p-3">
                         <p className="text-sm text-gray-600">Horas Semanais</p>
                         <p className={`text-xl font-bold ${healthWarning ? 'text-red-600' : 'text-gray-800'}`}>
-                          {weeklyHours.toFixed(1)}h
+                          {weeklyHours.toFixed(1)}h / 60h
                         </p>
                         <p className="text-xs text-gray-500">
                           {healthWarning ? '⚠️ Cuidado com a Saúde' : 'Carga segura'}
