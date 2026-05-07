@@ -34,7 +34,7 @@ export default function FinanceiroPage() {
   const [showEditExpense, setShowEditExpense] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Despesa | null>(null)
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)) // YYYY-MM format
-  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [selectedYear, setSelectedYear] = useState<number>(2026)
   const [newExpense, setNewExpense] = useState<{
     descricao: string;
     valor: string;
@@ -271,7 +271,12 @@ export default function FinanceiroPage() {
   }
 
   // Filter plantões by selected month/year
-  const filteredPlantoes = plantoes.filter(p => p.data.startsWith(selectedYear + '-' + selectedMonth.slice(5)))
+  const filteredPlantoes = plantoes.filter(p => {
+    if (selectedMonth === 'todos') {
+      return p.data.startsWith(selectedYear + '-')
+    }
+    return p.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
+  })
   
   const totalRecebido = filteredPlantoes
     .filter(p => p.status === 'pago')
@@ -281,8 +286,13 @@ export default function FinanceiroPage() {
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
   
-  // Filter expenses by selected month
-  const filteredDespesas = despesas.filter(d => d.data.startsWith(selectedMonth))
+  // Filter expenses by selected month/year
+  const filteredDespesas = despesas.filter(d => {
+    if (selectedMonth === 'todos') {
+      return d.data.startsWith(selectedYear + '-')
+    }
+    return d.data.startsWith(selectedMonth)
+  })
   
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
@@ -340,40 +350,12 @@ export default function FinanceiroPage() {
               
               {/* Month/Year Selector */}
               <div className="flex items-center space-x-4">
-                <button
-                  onClick={() => {
-                    const current = new Date(selectedYear, parseInt(selectedMonth) - 1, 1)
-                    const previous = new Date(current.getFullYear() - 1, parseInt(selectedMonth) - 1, 1)
-                    setSelectedYear(previous.getFullYear())
-                    setSelectedMonth(previous.toISOString().slice(0, 7))
-                  }}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="Ano anterior"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
-                  </svg>
-                </button>
-                
-                <button
-                  onClick={() => {
-                    const current = new Date(selectedYear, parseInt(selectedMonth) - 1, 1)
-                    const previous = new Date(current.getFullYear(), parseInt(selectedMonth) - 1, 1)
-                    setSelectedMonth(previous.toISOString().slice(0, 7))
-                  }}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="Mês anterior"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7 7" />
-                  </svg>
-                </button>
-                
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
                 >
+                  <option value="todos">Todos</option>
                   {Array.from({length: 12}, (_, i) => {
                     const date = new Date(selectedYear, i, 1)
                     const value = date.toISOString().slice(0, 7)
@@ -386,48 +368,15 @@ export default function FinanceiroPage() {
                   })}
                 </select>
                 
-                <button
-                  onClick={() => {
-                    const current = new Date(selectedYear, parseInt(selectedMonth), 1)
-                    const next = new Date(current.getFullYear() + 1, parseInt(selectedMonth), 1)
-                    setSelectedMonth(next.toISOString().slice(0, 7))
-                  }}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="Próximo mês"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-                
                 <select
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(parseInt(e.target.value))}
                   className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
                 >
-                  {Array.from({length: 5}, (_, i) => {
-                    const year = new Date().getFullYear() - 2 + i
-                    return (
-                      <option key={year} value={year}>
-                        {year}
-                      </option>
-                    )
-                  })}
+                  <option value={2024}>2024</option>
+                  <option value={2025}>2025</option>
+                  <option value={2026}>2026</option>
                 </select>
-                
-                <button
-                  onClick={() => {
-                    const next = new Date(selectedYear + 1, parseInt(selectedMonth), 1)
-                    setSelectedYear(next.getFullYear())
-                    setSelectedMonth(next.toISOString().slice(0, 7))
-                  }}
-                  className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-                  title="Próximo ano"
-                >
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
               </div>
             </div>
           </div>
