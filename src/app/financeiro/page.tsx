@@ -22,6 +22,7 @@ interface Despesa {
   data: string
   categoria: string
   usuario_id: string
+  recorrente?: boolean
 }
 
 export default function FinanceiroPage() {
@@ -30,6 +31,8 @@ export default function FinanceiroPage() {
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
+  const [showEditExpense, setShowEditExpense] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<Despesa | null>(null)
   const [newExpense, setNewExpense] = useState<{
     descricao: string;
     valor: string;
@@ -121,7 +124,6 @@ export default function FinanceiroPage() {
     }
 
     try {
-      // If it's a recurring expense, create monthly expenses for the next 12 months
       if (newExpense.recorrente && newExpense.data) {
         const recurringDate = new Date(newExpense.data)
         const expensesToInsert = []
@@ -132,12 +134,12 @@ export default function FinanceiroPage() {
             descricao: `${newExpense.descricao} - ${expenseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
             valor: parseFloat(newExpense.valor),
             data: expenseDate.toISOString().split('T')[0],
-            categoria: 'recorrente',
+            categoria: newExpense.categoria,
+            recorrente: true,
             usuario_id: user.id
           })
         }
 
-        // Insert all recurring expenses at once
         const { error: recurringError } = await supabase
           .from('despesas')
           .insert(expensesToInsert)
@@ -148,7 +150,6 @@ export default function FinanceiroPage() {
           return
         }
       } else {
-        // Regular single expense
         const { error } = await supabase
           .from('despesas')
           .insert({
@@ -156,6 +157,7 @@ export default function FinanceiroPage() {
             valor: parseFloat(newExpense.valor),
             data: newExpense.data,
             categoria: newExpense.categoria,
+            recorrente: false,
             usuario_id: user.id
           })
 
@@ -166,7 +168,6 @@ export default function FinanceiroPage() {
         }
       }
 
-      // Reset form and refresh data
       setNewExpense({
         descricao: '',
         valor: '',
@@ -182,21 +183,79 @@ export default function FinanceiroPage() {
     }
   }
 
-  const handleDeleteExpense = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta despesa?')) {
-      return
-    }
+  const handleEditExpense = (despesa: Despesa) => {
+    setEditingExpense(despesa)
+    setShowEditExpense(true)
+  }
+
+  const handleUpdateExpense = async () => {
+    if (!editingExpense) return
 
     try {
       const { error } = await supabase
         .from('despesas')
-        .delete()
-        .eq('id', id)
+        .update({
+          descricao: editingExpense.descricao,
+          valor: editingExpense.valor,
+          data: editingExpense.data,
+          categoria: editingExpense.categoria,
+          recorrente: editingExpense.recorrente
+        })
+        .eq('id', editingExpense.id)
 
       if (error) {
-        console.error('Error deleting despesa:', error)
-        alert('Erro ao excluir despesa: ' + error.message)
+        console.error('Error updating despesa:', error)
+        alert('Erro ao atualizar despesa: ' + error.message)
         return
+      }
+
+      setShowEditExpense(false)
+      setEditingExpense(null)
+      await fetchDespesas(user.id)
+    } catch (error) {
+      console.error('Error updating despesa:', error)
+      alert('Erro ao atualizar despesa. Tente novamente.')
+    }
+  }
+
+  const handleDeleteExpense = async (despesa: Despesa) => {
+    let deleteOption = 'single'
+    
+    if (despesa.recorrente) {
+      const selected = confirm(`Deseja:\n\n1. Excluir apenas esta despesa\n2. Excluir todas as despesas futuras semelhantes\n\nClique OK para excluir todas, ou CANCELAR para excluir apenas esta.`)
+      deleteOption = selected ? 'all' : 'single'
+    } else {
+      if (!confirm('Tem certeza que deseja excluir esta despesa?')) {
+        return
+      }
+    }
+
+    try {
+      if (deleteOption === 'all' && despesa.recorrente) {
+        const baseDescription = despesa.descricao.split(' - ')[0]
+        const { error } = await supabase
+          .from('despesas')
+          .delete()
+          .eq('usuario_id', user.id)
+          .like('descricao', `${baseDescription}%`)
+          .eq('recorrente', true)
+
+        if (error) {
+          console.error('Error deleting recurring expenses:', error)
+          alert('Erro ao excluir despesas recorrentes: ' + error.message)
+          return
+        }
+      } else {
+        const { error } = await supabase
+          .from('despesas')
+          .delete()
+          .eq('id', despesa.id)
+
+        if (error) {
+          console.error('Error deleting despesa:', error)
+          alert('Erro ao excluir despesa: ' + error.message)
+          return
+        }
       }
 
       await fetchDespesas(user.id)
@@ -206,7 +265,6 @@ export default function FinanceiroPage() {
     }
   }
 
-  // Calculate financial metrics
   const totalRecebido = plantoes
     .filter(p => p.status === 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
@@ -217,14 +275,12 @@ export default function FinanceiroPage() {
   
   const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  // Separate expenses by category
   const despesasFixas = despesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
   const despesasVariaveis = despesas.filter(d => ['transporte'].includes(d.categoria))
   
   const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  // Simple tax calculation (assuming 15% for medical services in Brazil)
   const impostos = totalRecebido * 0.15
   const lucroLiquido = totalRecebido - totalDespesas - impostos
 
@@ -342,24 +398,17 @@ export default function FinanceiroPage() {
             </div>
             
             {/* Cards de Resumo Financeiro */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-              <div className="bg-white rounded-xl border border-gray-200 p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Recebido</p>
-                    <p className="text-2xl font-bold text-green-600 mt-2">
-                      {formatCurrency(totalRecebido)}
-                    </p>
-                  </div>
-                  <div className="bg-green-100 rounded-full p-3">
-                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  </div>
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Recebido</p>
+                  <p className="text-2xl font-bold text-green-600 mt-2">
+                    {formatCurrency(totalRecebido)}
+                  </p>
                 </div>
-                <div className={`${lucroLiquido >= 0 ? 'bg-green-100' : 'bg-red-100'} rounded-full p-3`}>
-                  <svg className={`h-6 w-6 ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                <div className="bg-green-100 rounded-full p-3">
+                  <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                   </svg>
                 </div>
               </div>
@@ -431,10 +480,23 @@ export default function FinanceiroPage() {
                       <option value="alimentacao">Alimentação</option>
                       <option value="material">Material Médico</option>
                       <option value="outros">Outros</option>
-                      <option value="recorrente">Repetir mensalmente</option>
                     </select>
                   </div>
                 </div>
+                
+                {/* Checkbox for recurring expenses */}
+                <div className="mt-4">
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={newExpense.recorrente}
+                      onChange={(e) => setNewExpense({...newExpense, recorrente: e.target.checked})}
+                      className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                    />
+                    <span className="ml-2 text-sm text-gray-700">Repetir mensalmente (Custo Fixo)</span>
+                  </label>
+                </div>
+                
                 <div className="mt-4 flex justify-end space-x-3">
                   <button
                     onClick={() => setShowAddExpense(false)}
@@ -501,12 +563,24 @@ export default function FinanceiroPage() {
                           {formatCurrency(despesa.valor)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <button
-                            onClick={() => handleDeleteExpense(despesa.id)}
-                            className="text-red-600 hover:text-red-900 font-medium"
-                          >
-                            Excluir
-                          </button>
+                          <div className="flex space-x-2">
+                            <button
+                              onClick={() => handleEditExpense(despesa)}
+                              className="text-blue-600 hover:text-blue-900 font-medium"
+                            >
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                              </svg>
+                            </button>
+                            <button
+                              onClick={() => handleDeleteExpense(despesa)}
+                              className="text-red-600 hover:text-red-900 font-medium"
+                            >
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -515,6 +589,97 @@ export default function FinanceiroPage() {
               )}
             </div>
           </div>
+
+          {/* Edit Expense Modal */}
+          {showEditExpense && editingExpense && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-xl p-6 w-full max-w-md">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Editar Despesa</h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Descrição *
+                    </label>
+                    <input
+                      type="text"
+                      value={editingExpense.descricao}
+                      onChange={(e) => setEditingExpense({...editingExpense, descricao: e.target.value})}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Valor (R$) *
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingExpense.valor}
+                      onChange={(e) => setEditingExpense({...editingExpense, valor: parseFloat(e.target.value)})}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Data *
+                    </label>
+                    <input
+                      type="date"
+                      value={editingExpense.data}
+                      onChange={(e) => setEditingExpense({...editingExpense, data: e.target.value})}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Categoria
+                    </label>
+                    <select
+                      value={editingExpense.categoria}
+                      onChange={(e) => setEditingExpense({...editingExpense, categoria: e.target.value})}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    >
+                      <option value="transporte">Transporte</option>
+                      <option value="alimentacao">Alimentação</option>
+                      <option value="material">Material Médico</option>
+                      <option value="outros">Outros</option>
+                    </select>
+                  </div>
+                  
+                  {/* Checkbox for recurring expenses */}
+                  <div>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={editingExpense.recorrente || false}
+                        onChange={(e) => setEditingExpense({...editingExpense, recorrente: e.target.checked})}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      />
+                      <span className="ml-2 text-sm text-gray-700">Repetir mensalmente (Custo Fixo)</span>
+                    </label>
+                  </div>
+                </div>
+                
+                <div className="mt-6 flex justify-end space-x-3">
+                  <button
+                    onClick={() => {
+                      setShowEditExpense(false)
+                      setEditingExpense(null)
+                    }}
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={handleUpdateExpense}
+                    className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  >
+                    Atualizar Despesa
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
