@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 
 interface Plantao {
   id: string
@@ -216,6 +217,13 @@ export default function FinanceiroPage() {
   
   const totalDespesas = despesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
+  // Separate expenses by category
+  const despesasFixas = despesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
+  const despesasVariaveis = despesas.filter(d => ['transporte'].includes(d.categoria))
+  
+  const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
+  
   // Simple tax calculation (assuming 15% for medical services in Brazil)
   const impostos = totalRecebido * 0.15
   const lucroLiquido = totalRecebido - totalDespesas - impostos
@@ -262,29 +270,14 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Cards de Resumo Financeiro */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Custos Fixos/Recorrentes */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Recebido</p>
-                  <p className="text-2xl font-bold text-green-600 mt-2">
-                    {formatCurrency(totalRecebido)}
-                  </p>
-                </div>
-                <div className="bg-green-100 rounded-full p-3">
-                  <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">A Receber</p>
+                  <p className="text-sm font-medium text-gray-600">Custos Fixos/Recorrentes</p>
                   <p className="text-2xl font-bold text-orange-600 mt-2">
-                    {formatCurrency(totalAReceber)}
+                    {formatCurrency(totalDespesasFixas)}
                   </p>
                 </div>
                 <div className="bg-orange-100 rounded-full p-3">
@@ -294,46 +287,75 @@ export default function FinanceiroPage() {
                 </div>
               </div>
             </div>
-
+            
+            {/* Despesas Variáveis */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Despesas Totais</p>
+                  <p className="text-sm font-medium text-gray-600">Despesas Variáveis</p>
                   <p className="text-2xl font-bold text-red-600 mt-2">
-                    {formatCurrency(totalDespesas)}
+                    {formatCurrency(totalDespesasVariaveis)}
                   </p>
                 </div>
                 <div className="bg-red-100 rounded-full p-3">
                   <svg className="h-6 w-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5 2z" />
                   </svg>
                 </div>
               </div>
             </div>
-
+            
+            {/* Gráfico de Rosca */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Impostos (15%)</p>
-                  <p className="text-2xl font-bold text-yellow-600 mt-2">
-                    {formatCurrency(impostos)}
-                  </p>
+                  <p className="text-sm font-medium text-gray-600">Distribuição de Gastos</p>
+                  <p className="text-lg font-semibold text-gray-800">Fixos vs Variáveis</p>
                 </div>
-                <div className="bg-yellow-100 rounded-full p-3">
-                  <svg className="h-6 w-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v1a1 1 0 001 1h4a1 1 0 001-1v-1m3-2V8a2 2 0 00-2-2H8a2 2 0 00-2 2v6m12 0v-2a2 2 0 00-2-2H8a2 2 0 00-2 2v2m12 0H6" />
+                <div className="bg-blue-100 rounded-full p-3">
+                  <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.054a.054.054 0 00-7.071l8.485 8.485a.054.054 0 00-7.071 8.485 8.485a.054.054 0 00-7.071 8.485 8.485a.054.054 0 00-7.071z" />
                   </svg>
                 </div>
               </div>
+              
+              {/* Gráfico de Donut */}
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={[
+                      { name: 'Custos Fixos', value: totalDespesasFixas, fill: '#f97316' },
+                      { name: 'Despesas Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
+                    ]}
+                    cx="50%"
+                    cy="50%"
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                    label={({ name, value }) => `${name}: R$ ${formatCurrency(value)}`}
+                    labelLine={false}
+                  >
+                    <Tooltip />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Lucro Líquido</p>
-                  <p className={`text-2xl font-bold mt-2 ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatCurrency(lucroLiquido)}
-                  </p>
+            
+            {/* Cards de Resumo Financeiro */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+              <div className="bg-white rounded-xl border border-gray-200 p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Recebido</p>
+                    <p className="text-2xl font-bold text-green-600 mt-2">
+                      {formatCurrency(totalRecebido)}
+                    </p>
+                  </div>
+                  <div className="bg-green-100 rounded-full p-3">
+                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                 </div>
                 <div className={`${lucroLiquido >= 0 ? 'bg-green-100' : 'bg-red-100'} rounded-full p-3`}>
                   <svg className={`h-6 w-6 ${lucroLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
