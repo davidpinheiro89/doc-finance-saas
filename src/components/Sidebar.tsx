@@ -146,30 +146,28 @@ export default function Sidebar({ user }: SidebarProps) {
         </div>
 
       {/* Navigation */}
-      {(!isMobile || (isMobile && !isCollapsed)) && (
-        <nav className="p-4">
-          <ul className="space-y-2">
-            {menuItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <li key={item.name}>
-                  <button
-                        onClick={() => router.push(item.href)}
-                        className={`w-full flex items-center ${isCollapsed ? 'justify-center' : ''} px-3 py-2 rounded-lg transition-colors duration-200 ${
-                          isActive
-                            ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
-                            : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                        }`}
-                      >
-                        <div className="flex-shrink-0">{item.icon}</div>
-                        {(!isCollapsed || isMobile) && <span className="ml-3">{item.name}</span>}
-                      </button>
-                    </li>
-                  )
-                })}
-          </ul>
-        </nav>
-      )}
+      <nav className="p-4 flex flex-col">
+        <ul className="space-y-2">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.href
+            return (
+              <li key={item.name}>
+                <button
+                      onClick={() => router.push(item.href)}
+                      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-200 ${
+                        isActive
+                          ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
+                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                      }`}
+                    >
+                      <div className="flex-shrink-0">{item.icon}</div>
+                      <span className="ml-3">{item.name}</span>
+                    </button>
+                  </li>
+                )
+          })}
+        </ul>
+      </nav>
 
       {/* User Section */}
       <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
