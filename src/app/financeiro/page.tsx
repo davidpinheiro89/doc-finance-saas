@@ -348,6 +348,48 @@ export default function FinanceiroPage() {
                 <p className="text-gray-600 mt-2">Gestão financeira e controle de despesas</p>
               </div>
               
+              {/* Intelligent Insight Card */}
+              {selectedMonth !== 'todos' && (
+                <div className="bg-gradient-to-r from-blue-50 to-green-50 border border-blue-200 rounded-xl p-6 mb-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
+                      <div className="space-y-2">
+                        {(() => {
+                          const monthlyBalance = totalRecebido - totalDespesas
+                          const fixedCostsCoverage = totalRecebido > 0 ? (totalRecebido / totalDespesasFixas) * 100 : 0
+                          const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
+                          
+                          if (monthlyBalance < 0) {
+                            return (
+                              <div>
+                                <p className="text-red-600 font-medium">
+                                  ⚠️ Faltam <span className="font-bold">R$ {formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
+                                </p>
+                                <p className="text-gray-600 text-sm">
+                                  Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> plantões de 12h.
+                                </p>
+                              </div>
+                            )
+                          } else {
+                            return (
+                              <div>
+                                <p className="text-green-600 font-medium">
+                                  ✅ Custos fixos quitados! Você já garantiu seu 'break-even' este mês.
+                                </p>
+                                <p className="text-gray-600 text-sm">
+                                  Cobertura dos custos fixos: <span className="font-bold">{fixedCostsCoverage.toFixed(1)}%</span>
+                                </p>
+                              </div>
+                            )
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* Month/Year Selector */}
               <div className="flex items-center space-x-4">
                 <select
