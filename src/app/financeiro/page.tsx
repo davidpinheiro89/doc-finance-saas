@@ -277,16 +277,16 @@ export default function FinanceiroPage() {
     }
     return p.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
   })
-  
+
   const totalRecebido = filteredPlantoes
     .filter(p => p.status === 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
-  
+
   const totalAReceber = filteredPlantoes
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
-  
-  // Filter expenses by selected month/year
+
+    // Filter expenses by selected month/year
   const filteredDespesas = despesas.filter(d => {
     if (selectedMonth === 'todos') {
       return d.data.startsWith(selectedYear + '-')
@@ -321,17 +321,6 @@ export default function FinanceiroPage() {
     })
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar user={user} />
@@ -340,58 +329,61 @@ export default function FinanceiroPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
-            <div className="flex justify-between items-center mb-4">
-              <div>
+            <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
+              <div className="mb-4 md:mb-0">
                 <h1 className="text-3xl font-bold text-gray-800">
                   <span className="text-orange-500">Financeiro</span>
                 </h1>
                 <p className="text-gray-600 mt-2">Gestão financeira e controle de despesas</p>
               </div>
-              
-              {/* Intelligent Insight Card */}
-              {selectedMonth !== 'todos' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
-                      <div className="space-y-2">
-                        {(() => {
-                          const monthlyBalance = totalRecebido - totalDespesas
-                          const fixedCostsCoverage = totalRecebido > 0 ? (totalRecebido / totalDespesasFixas) * 100 : 0
-                          const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
-                          
-                          if (monthlyBalance < 0) {
-                            return (
-                              <div>
-                                <p className="text-red-600 font-medium">
-                                  ⚠️ Faltam <span className="font-bold">{formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
-                                </p>
-                                <p className="text-gray-600 text-sm">
-                                  Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
-                                </p>
-                              </div>
-                            )
-                          } else {
-                            return (
-                              <div>
-                                <p className="text-green-600 font-medium">
-                                  ✅ Custos fixos quitados! Você já garantiu seu 'break-even' este mês.
-                                </p>
-                                <p className="text-gray-600 text-sm">
-                                  Cobertura dos custos fixos: <span className="font-bold">{fixedCostsCoverage.toFixed(1)}%</span>
-                                </p>
-                              </div>
-                            )
-                          }
-                        })()}
-                      </div>
+            </div>
+            
+            {/* Intelligent Insight Card */}
+            {selectedMonth !== 'todos' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 w-full">
+                <div className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
+                    <div className="space-y-2">
+                      {(() => {
+                        const monthlyBalance = totalRecebido - totalDespesas
+                        const fixedCostsCoverage = totalRecebido > 0 ? (totalRecebido / totalDespesasFixas) * 100 : 0
+                        const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
+                        
+                        if (monthlyBalance < 0) {
+                          return (
+                            <div>
+                              <p className="text-red-600 font-medium">
+                                ⚠️ Faltam <span className="font-bold">{formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
+                              </p>
+                              <p className="text-gray-600 text-sm">
+                                Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
+                              </p>
+                            </div>
+                          )
+                        } else {
+                          return (
+                            <div>
+                              <p className="text-green-600 font-medium">
+                                ✅ Custos fixos quitados! Você já garantiu seu 'break-even' este mês.
+                              </p>
+                              <p className="text-gray-600 text-sm">
+                                Cobertura dos custos fixos: <span className="font-bold">{fixedCostsCoverage.toFixed(1)}%</span>
+                              </p>
+                            </div>
+                          )
+                        }
+                      })()}
                     </div>
                   </div>
                 </div>
-              )}
-              
-              {/* Month/Year Selector */}
-              <div className="flex items-center space-x-4">
+              </div>
+            )}
+          </div>
+
+          {/* Month/Year Selector */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+            <div className="flex items-center space-x-4">
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
@@ -777,10 +769,10 @@ export default function FinanceiroPage() {
                     Cancelar
                   </button>
                   <button
-                    onClick={handleUpdateExpense}
+                    onClick={handleAddExpense}
                     className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                   >
-                    Atualizar Despesa
+                    Salvar Despesa
                   </button>
                 </div>
               </div>
@@ -788,6 +780,5 @@ export default function FinanceiroPage() {
           )}
         </div>
       </div>
-    </div>
-  )
+    );
 }
