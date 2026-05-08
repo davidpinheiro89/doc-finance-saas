@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import jsPDF from 'jspdf'
+import { autoTable } from 'jspdf-autotable'
 
 interface Plantao {
   id: string
@@ -154,8 +156,79 @@ export default function ImpostoRendaPage() {
   }
 
   const generatePDFReport = () => {
-    // This would generate a PDF report
-    alert('Funcionalidade de geração de PDF será implementada em breve!')
+    try {
+      // Create new PDF document
+      const doc = new jsPDF()
+      
+      // Add title
+      doc.setFontSize(20)
+      doc.setFont('helvetica', 'bold')
+      doc.text('BEM Plantonista - Relatório Anual de Rendimentos', 105, 20, { align: 'center' })
+      
+      // Add year reference
+      doc.setFontSize(14)
+      doc.setFont('helvetica', 'normal')
+      doc.text(`Ano de Referência: ${selectedYear}`, 105, 35, { align: 'center' })
+      
+      // Add financial data table
+      const tableData = [
+        ['Descrição', 'Valor (R$)'],
+        ['Receita Total', formatCurrency(totalReceita)],
+        ['Total de Despesas', formatCurrency(totalDespesas)],
+        ['Base de Cálculo', formatCurrency(baseCalculo)],
+        ['Imposto Devido', formatCurrency(impostoDevido)]
+      ]
+      
+      // Add table using autoTable if available, otherwise manual formatting
+      if (typeof autoTable === 'function') {
+        autoTable(doc, {
+          head: [['Descrição', 'Valor (R$)']],
+          body: tableData.slice(1),
+          startY: 50,
+          theme: 'grid',
+          styles: {
+            font: 'helvetica',
+            fontSize: 12,
+            cellPadding: 3
+          },
+          headStyles: {
+            fillColor: [251, 146, 60],
+            textColor: 255,
+            fontStyle: 'bold'
+          }
+        })
+      } else {
+        // Fallback: manual table creation
+        let yPosition = 50
+        tableData.forEach((row, index) => {
+          if (index === 0) {
+            doc.setFont('helvetica', 'bold')
+            doc.setFontSize(12)
+          } else {
+            doc.setFont('helvetica', 'normal')
+            doc.setFontSize(11)
+          }
+          doc.text(row[0], 20, yPosition)
+          doc.text(row[1], 120, yPosition)
+          yPosition += 10
+        })
+      }
+      
+      // Add footer note
+      const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 20 : 140
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'italic')
+      doc.text('Nota: Este é um resumo para fins de conferência.', 105, finalY, { align: 'center' })
+      doc.text('Para valores oficiais, consulte sua declaração completa.', 105, finalY + 7, { align: 'center' })
+      
+      // Save the PDF
+      const fileName = `relatorio-rendimentos-${selectedYear}.pdf`
+      doc.save(fileName)
+      
+    } catch (error) {
+      console.error('Error generating PDF:', error)
+      alert('Erro ao gerar PDF. Tente novamente.')
+    }
   }
 
   const getYears = () => {
