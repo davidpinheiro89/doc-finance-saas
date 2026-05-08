@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import jsPDF from 'jspdf'
-import { autoTable } from 'jspdf-autotable'
 
 interface Plantao {
   id: string
@@ -179,43 +178,23 @@ export default function ImpostoRendaPage() {
         ['Imposto Devido', formatCurrency(impostoDevido)]
       ]
       
-      // Add table using autoTable if available, otherwise manual formatting
-      if (typeof autoTable === 'function') {
-        autoTable(doc, {
-          head: [['Descrição', 'Valor (R$)']],
-          body: tableData.slice(1),
-          startY: 50,
-          theme: 'grid',
-          styles: {
-            font: 'helvetica',
-            fontSize: 12,
-            cellPadding: 3
-          },
-          headStyles: {
-            fillColor: [251, 146, 60],
-            textColor: 255,
-            fontStyle: 'bold'
-          }
-        })
-      } else {
-        // Fallback: manual table creation
-        let yPosition = 50
-        tableData.forEach((row, index) => {
-          if (index === 0) {
-            doc.setFont('helvetica', 'bold')
-            doc.setFontSize(12)
-          } else {
-            doc.setFont('helvetica', 'normal')
-            doc.setFontSize(11)
-          }
-          doc.text(row[0], 20, yPosition)
-          doc.text(row[1], 120, yPosition)
-          yPosition += 10
-        })
-      }
+      // Manual table creation
+      let yPosition = 50
+      tableData.forEach((row, index) => {
+        if (index === 0) {
+          doc.setFont('helvetica', 'bold')
+          doc.setFontSize(12)
+        } else {
+          doc.setFont('helvetica', 'normal')
+          doc.setFontSize(11)
+        }
+        doc.text(row[0], 20, yPosition)
+        doc.text(row[1], 120, yPosition)
+        yPosition += 10
+      })
       
       // Add footer note
-      const finalY = (doc as any).lastAutoTable ? (doc as any).lastAutoTable.finalY + 20 : 140
+      const finalY = yPosition + 20
       doc.setFontSize(10)
       doc.setFont('helvetica', 'italic')
       doc.text('Nota: Este é um resumo para fins de conferência.', 105, finalY, { align: 'center' })
