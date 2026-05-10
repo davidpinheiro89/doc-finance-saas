@@ -101,6 +101,10 @@ export default function EscalaPage() {
         }
 
         console.log('Todos os dados carregados do Supabase:', allData)
+        if (allData && allData.length > 0) {
+          console.log('ESTRUTURA DO PRIMEIRO ITEM (ALL):', allData[0])
+          console.log('COLUNA DE DATA ENCONTRADA (ALL):', Object.keys(allData[0]).find(key => key.toLowerCase().includes('data')))
+        }
         setPlantoes(allData || [])
         return
       }
@@ -108,6 +112,7 @@ export default function EscalaPage() {
       console.log('Dados carregados do Supabase:', data)
       if (data && data.length > 0) {
         console.log('ESTRUTURA DO PRIMEIRO ITEM:', data[0])
+        console.log('COLUNA DE DATA ENCONTRADA:', Object.keys(data[0]).find(key => key.toLowerCase().includes('data')))
       }
       setPlantoes(data || [])
       
@@ -305,10 +310,9 @@ export default function EscalaPage() {
 
         console.log('Status salvo com sucesso:', data)
         alert(`✅ ${status === 'disponivel' ? 'Disponível' : 'Folga'} marcado com sucesso!`)
-      }
-      
-      setShowActionModal(false)
-      await fetchPlantoes(user.id)
+        setShowActionModal(false)
+        // Force immediate refresh of local plantoes array
+        await fetchPlantoes(user.id)
     } catch (error) {
       console.error('Erro ao salvar status:', error)
       alert('Erro ao salvar status. Tente novamente.')
