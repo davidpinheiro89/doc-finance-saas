@@ -16,7 +16,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR">
       <body className={inter.className}>
-        <h1 style={{ color: 'red', position: 'fixed', zIndex: 9999 }}>LAYOUT PAI ATIVO</h1>
         {children}
       </body>
     </html>

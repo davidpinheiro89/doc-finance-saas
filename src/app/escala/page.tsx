@@ -416,13 +416,18 @@ export default function EscalaPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-gray-50">
-        <div className="border-4 border-red-500">
-          <Sidebar user={user} />
-        </div>
+      <div className="flex" style={{ minHeight: '100vh', display: 'block', backgroundColor: '#f3f4f6' }}>
+        <Sidebar user={user} />
         
-        <div className="flex-1 overflow-auto border-4 border-blue-500">
+        <div className="flex-1 overflow-auto">
           <div className='p-6'>
+            <button 
+              onClick={() => alert('Botão de teste funcionando!')}
+              className="px-8 py-4 bg-blue-500 text-white text-xl font-bold rounded-lg hover:bg-blue-600 transition-colors mb-6"
+            >
+              BOTÃO DE TESTE
+            </button>
+            
             <h1 className="text-2xl font-bold mb-6 text-gray-800">Escala de Plantões</h1>
             
             {plantoes.length === 0 ? (
