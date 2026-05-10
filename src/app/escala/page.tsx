@@ -416,11 +416,13 @@ export default function EscalaPage() {
   return (
     <ErrorBoundary>
       <div className="flex h-screen bg-gray-50">
-        <Sidebar user={user} />
+        <div className="border-4 border-red-500">
+          <Sidebar user={user} />
+        </div>
         
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto border-4 border-blue-500">
           <div className='p-6'>
-            <h1 className="text-2xl font-bold mb-6">Escala de Plantões</h1>
+            <h1 className="text-2xl font-bold mb-6 text-gray-800">Escala de Plantões</h1>
             
             {plantoes.length === 0 ? (
               <div className="text-center py-8">
