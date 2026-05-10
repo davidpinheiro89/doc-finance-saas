@@ -234,7 +234,7 @@ export default function EscalaPage() {
         console.log('Status atualizado com sucesso:', data)
         alert(`✅ Status atualizado para ${status === 'disponivel' ? 'Disponível' : 'Folga'}!`)
       } else {
-        // Insert new status
+        // Insert new status - minimal fields to avoid database errors
         const statusData = {
           data: dateStr,
           tipo_evento: status,
@@ -248,6 +248,7 @@ export default function EscalaPage() {
           prazo_pagamento_dias: 0,
           classificacao: status,
           especialidade: ''
+          // Explicitly NOT sending usuario_id to avoid not-null constraint
         }
 
         const { data, error } = await supabase
@@ -256,7 +257,15 @@ export default function EscalaPage() {
           .select()
 
         if (error) {
-          console.error('Erro ao salvar status:', error)
+          console.error('=== ERRO DETALHADO SUPABASE ===')
+          console.error('Mensagem completa:', error)
+          console.error('Error message:', error.message)
+          console.error('Error details:', error.details)
+          console.error('Error hint:', error.hint)
+          console.error('Error code:', error.code)
+          console.error('StatusData enviado:', statusData)
+          console.error('=====================================')
+          
           // Silently handle usuario_id errors for testing
           if (error.message.includes('usuario_id') || error.message.includes('null value')) {
             console.log('Ignorando erro de usuario_id para testes')
