@@ -78,48 +78,35 @@ export default function EscalaPage() {
 
   const fetchPlantoes = async (userId: string) => {
     try {
-      // Try with usuario_id first (more common in Portuguese systems)
+      console.log('🔄 INICIANDO BUSCA DE PLANTÕES...')
+      
+      // Simplified query - remove .order() to fix 404 error
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
-        .order('data', { ascending: true })
 
       if (error) {
-        console.error('Error fetching plantões with usuario_id:', error)
-        
-        // Try without user filter for now to test basic functionality
-        const { data: allData, error: allError } = await supabase
-          .from('plantoes')
-          .select('*')
-          .order('data', { ascending: true })
-
-        if (allError) {
-          console.error('Error fetching all plantões:', allError)
-          setPlantoes([])
-          return
-        }
-
-        console.log('Todos os dados carregados do Supabase:', allData)
-        if (allData && allData.length > 0) {
-          console.log('ESTRUTURA DO PRIMEIRO ITEM (ALL):', allData[0])
-          console.log('COLUNA DE DATA ENCONTRADA (ALL):', Object.keys(allData[0]).find(key => key.toLowerCase().includes('data')))
-        }
-        setPlantoes(allData || [])
+        console.error('❌ ERRO EXATO DO SUPABASE:', error)
+        console.error('❌ Código do erro:', error.code)
+        console.error('❌ Mensagem:', error.message)
+        console.error('❌ Detalhes:', error.details)
+        console.error('❌ Hint:', error.hint)
+        setPlantoes([])
+        setLoading(false)
         return
       }
 
-      console.log('Dados carregados do Supabase:', data)
+      console.log('✅ Dados carregados do Supabase:', data)
       if (data && data.length > 0) {
-        console.log('ESTRUTURA DO PRIMEIRO ITEM:', data[0])
-        console.log('COLUNA DE DATA ENCONTRADA:', Object.keys(data[0]).find(key => key.toLowerCase().includes('data')))
+        console.log('📋 ESTRUTURA DO PRIMEIRO ITEM:', data[0])
+        console.log('📋 COLUNA DE DATA ENCONTRADA:', Object.keys(data[0]).find(key => key.toLowerCase().includes('data')))
+      } else {
+        console.log('📋 Nenhum plantão encontrado no banco')
       }
       setPlantoes(data || [])
-      
-      // Force loading state to false after data loads
       setLoading(false)
     } catch (error) {
-      console.error('Error fetching plantões:', error)
+      console.error('❌ ERRO GERAL NA BUSCA:', error)
       setPlantoes([])
       setLoading(false)
     }
