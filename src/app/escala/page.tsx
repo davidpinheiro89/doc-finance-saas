@@ -442,7 +442,7 @@ export default function EscalaPage() {
                         }`}
                       >
                         <div className="text-sm font-medium text-gray-700 mb-1">{day}</div>
-                        <div className="space-y-1">
+                        <div className="space-y-1 list-none">
                           {dayPlantoes.slice(0, 2).map((plantao: any, index: number) => (
                             <div
                               key={plantao.id || index}
@@ -453,9 +453,6 @@ export default function EscalaPage() {
                                 'bg-gray-100 text-gray-700'
                               }`}
                             >
-                              {plantao.tipo_evento === 'plantao' ? '🏥' : 
-                               plantao.tipo_evento === 'disponivel' ? '🟢' : 
-                               plantao.tipo_evento === 'folga' ? '🔴' : '📋'}
                               {plantao.hospital || plantao.tipo_evento}
                             </div>
                           ))}
