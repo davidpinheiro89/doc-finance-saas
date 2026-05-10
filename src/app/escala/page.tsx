@@ -1,3 +1,4 @@
+// Build final verificado
 'use client'
 
 import React, { useState, useEffect } from 'react'
@@ -646,42 +647,12 @@ export default function EscalaPage() {
                       className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
                     >
                       Cancelar
-}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
 
-const { data, error } = await supabase
-.from('plantoes')
-.insert([plantaoData])
-.select()
-
-if (error) {
-console.error('Erro ao salvar plantão:', error)
-alert('Erro ao salvar plantão: ' + error.message)
-return
-}
-
-console.log('Plantão salvo com sucesso:', data)
-alert('✅ Plantão agendado com sucesso!')
-setShowPlantaoForm(false)
-setFormData({
-hospital: '',
-data: '',
-valor: '',
-horas: '',
-endereco: '',
-cep: '',
-data_prevista_pagamento: '',
-prazo_pagamento_dias: '30',
-classificacao: '',
-especialidade: ''
-})
-  
-// Force immediate refresh
-await fetchPlantoes(user.id)
-  
-} catch (error) {
-console.error('Erro ao salvar plantão:', error)
-alert('Erro ao salvar plantão. Tente novamente.')
-}
 
 // If no user session, show expired message
 if (!user) {
@@ -724,309 +695,300 @@ className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
 <h2 className="text-xl font-semibold text-gray-800">
 {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
 </h2>
-<button 
-onClick={() => navigateMonth('next')}
-className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
->
-<span className="text-xl">▶</span>
-</button>
-</div>
-</div>
 
-{/* Calendar Grid */}
-<div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
-{/* Weekday Headers */}
-<div className="grid grid-cols-7 gap-1 mb-2">
-{['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
-<div key={day} className="text-center text-sm font-semibold text-gray-600 py-2">
-{day}
-</div>
-))}
-</div>
+          {/* Calendar Grid */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+            {/* Weekday Headers */}
+            <div className="grid grid-cols-7 gap-1 mb-2">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                <div key={day} className="text-center text-sm font-semibold text-gray-600 py-2">
+                  {day}
+                </div>
+              ))}
+            </div>
 
-{/* Calendar Days */}
-<div className="grid grid-cols-7 gap-1">
-{(() => {
-const daysInMonth = getDaysInMonth(currentMonth)
-const firstDay = getFirstDayOfMonth(currentMonth)
-const days = []
+            {/* Calendar Days */}
+            <div className="grid grid-cols-7 gap-1">
+              {(() => {
+                const daysInMonth = getDaysInMonth(currentMonth)
+                const firstDay = getFirstDayOfMonth(currentMonth)
+                const days = []
 
-// Empty cells for days before month starts
-for (let i = 0; i < firstDay; i++) {
-days.push(<div key={`empty-${i}`} className="h-20"></div>)
-}
+                // Empty cells for days before month starts
+                for (let i = 0; i < firstDay; i++) {
+                  days.push(<div key={`empty-${i}`} className="h-20"></div>)
+                }
 
-// Days of the month
-for (let day = 1; day <= daysInMonth; day++) {
-const dayPlantoes = getPlantoesForDay(day)
-const isToday = new Date().toDateString() === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toDateString()
+                // Days of month
+                for (let day = 1; day <= daysInMonth; day++) {
+                  const dayPlantoes = getPlantoesForDay(day)
+                  const isToday = new Date().toDateString() === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toDateString()
 
-days.push(
-<div
-key={day}
-onClick={() => handleDayClick(day)}
-className={`h-20 border rounded-lg p-2 cursor-pointer transition-colors ${
-isToday ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
-}`}
->
-<div className="text-sm font-medium text-gray-700 mb-1">{day}</div>
-<div className="space-y-1 list-none">
-{dayPlantoes.slice(0, 2).map((plantao: any, index: number) => (
-<div
-key={plantao.id || index}
-className={`text-xs px-2 py-0.5 rounded-full truncate ${
-plantao.tipo_evento === 'plantao' ? 'bg-blue-100 text-blue-700' :
-plantao.tipo_evento === 'disponivel' ? 'bg-green-100 text-green-700' :
-plantao.tipo_evento === 'folga' ? 'bg-red-100 text-red-700' :
-'bg-gray-100 text-gray-700'
-}`}
->
-{plantao.hospital || plantao.tipo_evento}
-</div>
-))}
-{dayPlantoes.length > 2 && (
-<div className="text-xs text-gray-500">+{dayPlantoes.length - 2} mais</div>
-)}
-</div>
-</div>
+                  days.push(
+                    <div
+                      key={day}
+                      onClick={() => handleDayClick(day)}
+                      className={`h-20 border rounded-lg p-2 cursor-pointer transition-colors ${
+                        isToday ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className="text-sm font-medium text-gray-700 mb-1">{day}</div>
+                      <div className="space-y-1 list-none">
+                        {dayPlantoes.slice(0, 2).map((plantao: any, index: number) => (
+                          <div
+                            key={plantao.id || index}
+                            className={`text-xs px-2 py-0.5 rounded-full truncate ${
+                              plantao.tipo_evento === 'plantao' ? 'bg-blue-100 text-blue-700' :
+                              plantao.tipo_evento === 'disponivel' ? 'bg-green-100 text-green-700' :
+                              plantao.tipo_evento === 'folga' ? 'bg-red-100 text-red-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}
+                          >
+                            {plantao.hospital || plantao.tipo_evento}
+                          </div>
+                        ))}
+                        {dayPlantoes.length > 2 && (
+                          <div className="text-xs text-gray-500">+{dayPlantoes.length - 2} mais</div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                }
+
+                return days
+              })()}
+            </div>
+          </div>
+
+          {/* Action Modal */}
+          {showActionModal && selectedDate && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+                <h3 className="text-lg font-semibold mb-4">
+                  {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </h3>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleAddStatus('disponivel')}
+                    className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>🟢</span>
+                    <span>Disponível</span>
+                  </button>
+                  <button
+                    onClick={() => handleAddStatus('folga')}
+                    className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>🔴</span>
+                    <span>Folga</span>
+                  </button>
+                  <button
+                    onClick={() => handleStatusChange('plantao')}
+                    className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>🏥</span>
+                    <span>Novo Plantão</span>
+                  </button>
+                  <button
+                    onClick={handleClearDay}
+                    className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>🗑️</span>
+                    <span>Limpar Dia</span>
+                  </button>
+                  <button
+                    onClick={() => setShowActionModal(false)}
+                    className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Plantão Form Modal */}
+          {showPlantaoForm && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">Agendar Novo Plantão</h3>
+                <form onSubmit={handlePlantaoFormSubmit} className="space-y-4">
+                  <div>
+                    <label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
+                      Hospital
+                    </label>
+                    <input
+                      type="text"
+                      id="hospital"
+                      value={formData.hospital}
+                      onChange={(e) => setFormData(prev => ({ ...prev, hospital: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Nome do hospital"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="data" className="block text-sm font-medium text-gray-700 mb-2">
+                      Data
+                    </label>
+                    <input
+                      type="date"
+                      id="data"
+                      value={formData.data}
+                      onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      required
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="valor" className="block text-sm font-medium text-gray-700 mb-2">
+                        Valor (R$)
+                      </label>
+                      <input
+                        type="number"
+                        id="valor"
+                        value={formData.valor}
+                        onChange={(e) => setFormData(prev => ({ ...prev, valor: e.target.value }))}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="0.00"
+                        step="0.01"
+                        min="0"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="horas" className="block text-sm font-medium text-gray-700 mb-2">
+                        Horas
+                      </label>
+                      <input
+                        type="number"
+                        id="horas"
+                        value={formData.horas}
+                        onChange={(e) => setFormData(prev => ({ ...prev, horas: e.target.value }))}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="12"
+                        step="0.5"
+                        min="0"
+                        max="24"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-2">
+                      Endereço
+                    </label>
+                    <input
+                      type="text"
+                      id="endereco"
+                      value={formData.endereco}
+                      onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Endereço completo"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="cep" className="block text-sm font-medium text-gray-700 mb-2">
+                        CEP
+                      </label>
+                      <input
+                        type="text"
+                        id="cep"
+                        value={formData.cep}
+                        onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="12345-678"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
+                        Prazo (dias)
+                      </label>
+                      <input
+                        type="number"
+                        id="prazo_pagamento_dias"
+                        value={formData.prazo_pagamento_dias}
+                        onChange={(e) => setFormData(prev => ({ ...prev, prazo_pagamento_dias: e.target.value }))}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="30"
+                        min="0"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label htmlFor="data_prevista_pagamento" className="block text-sm font-medium text-gray-700 mb-2">
+                      Data Prevista Pagamento
+                    </label>
+                    <input
+                      type="date"
+                      id="data_prevista_pagamento"
+                      value={formData.data_prevista_pagamento}
+                      onChange={(e) => setFormData(prev => ({ ...prev, data_prevista_pagamento: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+
+                  <div>
+                    <label htmlFor="classificacao" className="block text-sm font-medium text-gray-700 mb-2">
+                      Classificação
+                    </label>
+                    <select
+                      id="classificacao"
+                      value={formData.classificacao}
+                      onChange={(e) => setFormData(prev => ({ ...prev, classificacao: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="plantao">Plantão</option>
+                      <option value="extra">Extra</option>
+                      <option value="plantao_extra">Plantão Extra</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label htmlFor="especialidade" className="block text-sm font-medium text-gray-700 mb-2">
+                      Especialidade
+                    </label>
+                    <input
+                      type="text"
+                      id="especialidade"
+                      value={formData.especialidade}
+                      onChange={(e) => setFormData(prev => ({ ...prev, especialidade: e.target.value }))}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Ex: Clínica Geral"
+                    />
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                    >
+                      Agendar Plantão
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowPlantaoForm(false)}
+                      className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  </ErrorBoundary>
 )
-}
-
-return days
-})()}
-</div>
-</div>
-
-{/* Action Modal */}
-{showActionModal && selectedDate && (
-<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-<div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-<h3 className="text-lg font-semibold mb-4">
-{selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-</h3>
-<div className="space-y-2">
-<button
-onClick={() => handleAddStatus('disponivel')}
-className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
->
-<span>🟢</span>
-<span>Disponível</span>
-</button>
-<button
-onClick={() => handleAddStatus('folga')}
-className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
->
-<span>🔴</span>
-<span>Folga</span>
-</button>
-<button
-onClick={() => handleStatusChange('plantao')}
-className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
->
-<span>🏥</span>
-<span>Novo Plantão</span>
-</button>
-<button
-onClick={handleClearDay}
-className="w-full px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors flex items-center justify-center gap-2"
->
-<span>🗑️</span>
-<span>Limpar Dia</span>
-</button>
-<button
-onClick={() => setShowActionModal(false)}
-className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
->
-Cancelar
-</button>
-</div>
-</div>
-</div>
-)}
-
-{/* Plantão Form Modal */}
-{showPlantaoForm && (
-<div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-<div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
-<h3 className="text-lg font-semibold mb-4">Agendar Novo Plantão</h3>
-<form onSubmit={handlePlantaoFormSubmit} className="space-y-4">
-<div>
-<label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
-Hospital
-</label>
-<input
-type="text"
-id="hospital"
-value={formData.hospital}
-onChange={(e) => setFormData(prev => ({ ...prev, hospital: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="Nome do hospital"
-required
-/>
-</div>
-
-<div>
-<label htmlFor="data" className="block text-sm font-medium text-gray-700 mb-2">
-Data
-</label>
-<input
-type="date"
-id="data"
-value={formData.data}
-onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-required
-/>
-</div>
-
-<div className="grid grid-cols-2 gap-4">
-<div>
-<label htmlFor="valor" className="block text-sm font-medium text-gray-700 mb-2">
-Valor (R$)
-</label>
-<input
-type="number"
-id="valor"
-value={formData.valor}
-onChange={(e) => setFormData(prev => ({ ...prev, valor: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="0.00"
-step="0.01"
-min="0"
-required
-/>
-</div>
-
-<div>
-<label htmlFor="horas" className="block text-sm font-medium text-gray-700 mb-2">
-Horas
-</label>
-<input
-type="number"
-id="horas"
-value={formData.horas}
-onChange={(e) => setFormData(prev => ({ ...prev, horas: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="12"
-step="0.5"
-min="0"
-max="24"
-required
-/>
-</div>
-</div>
-
-<div>
-<label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-2">
-Endereço
-</label>
-<input
-type="text"
-id="endereco"
-value={formData.endereco}
-onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="Endereço completo"
-/>
-</div>
-
-<div className="grid grid-cols-2 gap-4">
-<div>
-<label htmlFor="cep" className="block text-sm font-medium text-gray-700 mb-2">
-CEP
-</label>
-<input
-type="text"
-id="cep"
-value={formData.cep}
-onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="12345-678"
-/>
-</div>
-
-<div>
-<label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
-Prazo (dias)
-</label>
-<input
-type="number"
-id="prazo_pagamento_dias"
-value={formData.prazo_pagamento_dias}
-onChange={(e) => setFormData(prev => ({ ...prev, prazo_pagamento_dias: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="30"
-min="0"
-/>
-</div>
-</div>
-
-<div>
-<label htmlFor="data_prevista_pagamento" className="block text-sm font-medium text-gray-700 mb-2">
-Data Prevista Pagamento
-</label>
-<input
-type="date"
-id="data_prevista_pagamento"
-value={formData.data_prevista_pagamento}
-onChange={(e) => setFormData(prev => ({ ...prev, data_prevista_pagamento: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-/>
-</div>
-
-<div>
-<label htmlFor="classificacao" className="block text-sm font-medium text-gray-700 mb-2">
-Classificação
-</label>
-<select
-id="classificacao"
-value={formData.classificacao}
-onChange={(e) => setFormData(prev => ({ ...prev, classificacao: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
->
-<option value="">Selecione...</option>
-<option value="plantao">Plantão</option>
-<option value="extra">Extra</option>
-<option value="plantao_extra">Plantão Extra</option>
-</select>
-</div>
-
-<div>
-<label htmlFor="especialidade" className="block text-sm font-medium text-gray-700 mb-2">
-Especialidade
-</label>
-<input
-type="text"
-id="especialidade"
-value={formData.especialidade}
-onChange={(e) => setFormData(prev => ({ ...prev, especialidade: e.target.value }))}
-className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-placeholder="Ex: Clínica Geral"
-/>
-</div>
-
-<div className="flex gap-3 pt-4">
-<button
-type="submit"
-className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
->
-Agendar Plantão
-</button>
-<button
-type="button"
-onClick={() => setShowPlantaoForm(false)}
-className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
->
-Cancelar
-</button>
-</div>
-</form>
-</div>
-</div>
-)}
-</div>
-</div>
-</div>
-</ErrorBoundary>
-)
-}
