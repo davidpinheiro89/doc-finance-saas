@@ -423,10 +423,9 @@ export default function EscalaPage() {
             <h1 className="text-2xl font-bold mb-6">Escala de Plantões</h1>
             
             {plantoes.length === 0 ? (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-                <span className="mx-auto h-12 w-12 text-blue-500 mb-4">📅</span>
-                <h2 className="text-xl font-semibold text-blue-800 mb-2">Nenhum plantão encontrado</h2>
-                <p className="text-blue-600">Comece adicionando seus plantões para visualizá-los aqui.</p>
+              <div className="text-center py-8">
+                <span className="text-4xl mb-2">📅</span>
+                <p className="text-gray-600">Nenhum plantão agendado para este período</p>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
