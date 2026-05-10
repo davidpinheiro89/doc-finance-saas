@@ -150,7 +150,25 @@ export default function EscalaPage() {
 
   const getPlantoesForDay = (day: number) => {
     const dateStr = formatDateYYYYMMDD(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
-    return plantoes.filter(plantao => plantao.data === dateStr)
+    console.log(`=== COMPARAÇÃO DE DATAS ===`)
+    console.log(`Dia do calendário: ${day} -> Data formatada: ${dateStr}`)
+    
+    const filteredPlantoes = plantoes.filter(plantao => {
+      console.log(`Comparando dia ${day} com registro:`, {
+        plantaoData: plantao.data,
+        plantaoTipo: plantao.tipo_evento,
+        plantaoHospital: plantao.hospital,
+        match: plantao.data === dateStr,
+        isDisponivel: plantao.tipo_evento === 'disponivel',
+        isFolga: plantao.tipo_evento === 'folga',
+        isPlantao: plantao.tipo_evento === 'plantao'
+      })
+      return plantao.data === dateStr
+    })
+    
+    console.log(`Resultado para dia ${day}: ${filteredPlantoes.length} registros encontrados`)
+    console.log('=====================================')
+    return filteredPlantoes
   }
 
   // Advanced status management handlers
