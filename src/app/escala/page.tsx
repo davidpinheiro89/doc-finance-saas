@@ -384,14 +384,15 @@ export default function EscalaPage() {
     }
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
-        <p className="mt-4 text-gray-600">Carregando...</p>
-      </div>
-    )
-  }
+  // Temporarily disable loading check for debugging
+  // if (loading) {
+  //   return (
+  //     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+  //       <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>
+  //       <p className="mt-4 text-gray-600">Carregando...</p>
+  //     </div>
+  //   )
+  // }
 
   console.log('Renderizando conteúdo final')
   
