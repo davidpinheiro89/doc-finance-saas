@@ -39,6 +39,9 @@ export default function EscalaPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [plantoes, setPlantoes] = useState<any[]>([])
+  const [currentMonth, setCurrentMonth] = useState(new Date())
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [showActionModal, setShowActionModal] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -114,6 +117,85 @@ export default function EscalaPage() {
     }
   }
 
+  // Calendar functions
+  const getDaysInMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+  }
+
+  const getFirstDayOfMonth = (date: Date) => {
+    return new Date(date.getFullYear(), date.getMonth(), 1).getDay()
+  }
+
+  const formatDateYYYYMMDD = (date: Date) => {
+    return date.toISOString().split('T')[0]
+  }
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    setCurrentMonth(prev => {
+      const newMonth = new Date(prev)
+      if (direction === 'prev') {
+        newMonth.setMonth(newMonth.getMonth() - 1)
+      } else {
+        newMonth.setMonth(newMonth.getMonth() + 1)
+      }
+      return newMonth
+    })
+  }
+
+  const handleDayClick = (day: number) => {
+    const clickedDate = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day)
+    setSelectedDate(clickedDate)
+    setShowActionModal(true)
+  }
+
+  const getPlantoesForDay = (day: number) => {
+    const dateStr = formatDateYYYYMMDD(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
+    return plantoes.filter(plantao => plantao.data === dateStr)
+  }
+
+  // Action handlers
+  const handleAddStatus = async (status: 'disponivel' | 'folga') => {
+    if (!selectedDate || !user) return
+
+    try {
+      const statusData = {
+        data: formatDateYYYYMMDD(selectedDate),
+        tipo_evento: status,
+        status: 'confirmado',
+        hospital: status === 'disponivel' ? '🟢 Disponível' : '🔴 Folga',
+        valor: 0,
+        horas: 0,
+        endereco: '',
+        cep: '',
+        data_prevista_pagamento: formatDateYYYYMMDD(selectedDate),
+        prazo_pagamento_dias: 0,
+        classificacao: status,
+        especialidade: ''
+      }
+
+      // Try without user field for now
+      const { data, error } = await supabase
+        .from('plantoes')
+        .insert([statusData])
+        .select()
+
+      if (error) {
+        console.error('Erro ao salvar status:', error)
+        alert('Erro ao salvar status: ' + error.message)
+        return
+      }
+
+      console.log('Status salvo com sucesso:', data)
+      alert(`✅ ${status === 'disponivel' ? 'Disponível' : 'Folga'} marcado com sucesso!`)
+      
+      setShowActionModal(false)
+      await fetchPlantoes(user.id)
+    } catch (error) {
+      console.error('Erro ao salvar status:', error)
+      alert('Erro ao salvar status. Tente novamente.')
+    }
+  }
+
   const handleAddPlantao = async () => {
     if (!user) {
       alert('Usuário não autenticado')
@@ -125,9 +207,8 @@ export default function EscalaPage() {
       const futureDate = new Date(today)
       futureDate.setDate(today.getDate() + 7) // 7 dias no futuro
 
-      // First try with usuario_id
+      // Try without user field for now
       const testPlantao = {
-        usuario_id: user.id,
         hospital: 'Hospital Teste 🏥',
         data: futureDate.toISOString().split('T')[0],
         valor: 500.00,
@@ -142,7 +223,7 @@ export default function EscalaPage() {
         tipo_evento: 'plantao'
       }
 
-      console.log('Inserindo plantão de teste com usuario_id:', testPlantao)
+      console.log('Inserindo plantão de teste:', testPlantao)
 
       const { data, error } = await supabase
         .from('plantoes')
@@ -150,42 +231,8 @@ export default function EscalaPage() {
         .select()
 
       if (error) {
-        console.error('Erro ao inserir plantão com usuario_id:', error)
-        
-        // If usuario_id fails, try without user field temporarily
-        const testPlantaoNoUser = {
-          hospital: 'Hospital Teste 🏥',
-          data: futureDate.toISOString().split('T')[0],
-          valor: 500.00,
-          status: 'pendente',
-          horas: 12,
-          endereco: 'Rua Teste, 123',
-          cep: '12345-678',
-          data_prevista_pagamento: futureDate.toISOString().split('T')[0],
-          prazo_pagamento_dias: 30,
-          classificacao: 'Sala Verde',
-          especialidade: 'Teste',
-          tipo_evento: 'plantao'
-        }
-
-        console.log('Tentando inserir sem campo de usuário:', testPlantaoNoUser)
-
-        const { data: dataNoUser, error: errorNoUser } = await supabase
-          .from('plantoes')
-          .insert([testPlantaoNoUser])
-          .select()
-
-        if (errorNoUser) {
-          console.error('Erro ao inserir plantão sem usuário:', errorNoUser)
-          alert('Erro ao inserir plantão: ' + errorNoUser.message)
-          return
-        }
-
-        console.log('Plantão inserido sem usuário com sucesso:', dataNoUser)
-        alert('✅ Plantão de teste inserido com sucesso (sem usuário)!')
-        
-        // Refresh the plantões list
-        await fetchPlantoes(user.id)
+        console.error('Erro ao inserir plantão:', error)
+        alert('Erro ao inserir plantão: ' + error.message)
         return
       }
 
@@ -235,46 +282,135 @@ export default function EscalaPage() {
                 <span>Inserir Plantão Teste</span>
               </button>
             </div>
-            
-            {plantoes.length === 0 ? (
-              <div className="text-center py-8">
-                <span className="text-4xl mb-2">📅</span>
-                <p className="text-gray-600 mb-4">Nenhum plantão agendado para este período</p>
-                <p className="text-sm text-gray-500">Clique no botão "Inserir Plantão Teste" acima para adicionar um plantão fictício</p>
-              </div>
-            ) : (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <h2 className="text-lg font-semibold mb-4 flex items-center">
-                  <span className="h-5 w-5 mr-2 text-blue-500">📅</span>
-                  {plantoes.length} plantão(s) carregado(s)
+
+            {/* Calendar Header */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
+              <div className="flex justify-between items-center">
+                <button 
+                  onClick={() => navigateMonth('prev')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="text-xl">◀</span>
+                </button>
+                <h2 className="text-xl font-semibold text-gray-800">
+                  {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
                 </h2>
-                <div className="space-y-3">
-                  {plantoes.map((plantao: any, index: number) => (
-                    <div key={plantao.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
-                            <span>🏥</span>
-                            {plantao.hospital}
-                          </h3>
-                          <p className="text-sm text-gray-600 mt-1">
-                            📅 {plantao.data} | ⏰ {plantao.horas}h | 💰 R$ {plantao.valor}
-                          </p>
-                          <p className="text-sm text-gray-500 mt-1">
-                            📍 {plantao.endereco} | 🏷️ {plantao.classificacao}
-                          </p>
+                <button 
+                  onClick={() => navigateMonth('next')}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  <span className="text-xl">▶</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+              {/* Weekday Headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(day => (
+                  <div key={day} className="text-center text-sm font-semibold text-gray-600 py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-1">
+                {(() => {
+                  const daysInMonth = getDaysInMonth(currentMonth)
+                  const firstDay = getFirstDayOfMonth(currentMonth)
+                  const days = []
+
+                  // Empty cells for days before month starts
+                  for (let i = 0; i < firstDay; i++) {
+                    days.push(<div key={`empty-${i}`} className="h-20"></div>)
+                  }
+
+                  // Days of the month
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const dayPlantoes = getPlantoesForDay(day)
+                    const isToday = new Date().toDateString() === new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day).toDateString()
+
+                    days.push(
+                      <div
+                        key={day}
+                        onClick={() => handleDayClick(day)}
+                        className={`h-20 border rounded-lg p-2 cursor-pointer transition-colors ${
+                          isToday ? 'bg-blue-50 border-blue-300' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <div className="text-sm font-medium text-gray-700 mb-1">{day}</div>
+                        <div className="space-y-1">
+                          {dayPlantoes.slice(0, 2).map((plantao: any, index: number) => (
+                            <div
+                              key={plantao.id || index}
+                              className={`text-xs px-1 py-0.5 rounded truncate ${
+                                plantao.tipo_evento === 'plantao' ? 'bg-blue-100 text-blue-700' :
+                                plantao.tipo_evento === 'disponivel' ? 'bg-green-100 text-green-700' :
+                                plantao.tipo_evento === 'folga' ? 'bg-red-100 text-red-700' :
+                                'bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {plantao.tipo_evento === 'plantao' ? '🏥' : 
+                               plantao.tipo_evento === 'disponivel' ? '🟢' : 
+                               plantao.tipo_evento === 'folga' ? '🔴' : '📋'} 
+                              {' '}{plantao.hospital || plantao.tipo_evento}
+                            </div>
+                          ))}
+                          {dayPlantoes.length > 2 && (
+                            <div className="text-xs text-gray-500">+{dayPlantoes.length - 2} mais</div>
+                          )}
                         </div>
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          plantao.status === 'pendente' ? 'bg-yellow-100 text-yellow-800' :
-                          plantao.status === 'confirmado' ? 'bg-blue-100 text-blue-800' :
-                          plantao.status === 'realizado' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {plantao.status}
-                        </span>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  }
+
+                  return days
+                })()}
+              </div>
+            </div>
+
+            {/* Action Modal */}
+            {showActionModal && selectedDate && (
+              <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
+                  <h3 className="text-lg font-semibold mb-4">
+                    {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                  </h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => handleAddStatus('disponivel')}
+                      className="w-full px-4 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>🟢</span>
+                      <span>Disponível</span>
+                    </button>
+                    <button
+                      onClick={() => handleAddStatus('folga')}
+                      className="w-full px-4 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>🔴</span>
+                      <span>Folga</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowActionModal(false)
+                        // TODO: Open plantão creation modal
+                        alert('Modal de criação de plantão em desenvolvimento!')
+                      }}
+                      className="w-full px-4 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+                    >
+                      <span>🏥</span>
+                      <span>Novo Plantão</span>
+                    </button>
+                    <button
+                      onClick={() => setShowActionModal(false)}
+                      className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
