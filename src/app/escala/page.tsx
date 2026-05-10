@@ -418,15 +418,10 @@ export default function EscalaPage() {
   return (
     <ErrorBoundary>
       <div style={{ backgroundColor: 'yellow', minHeight: '100vh' }}>
-        <div className="flex h-screen bg-gray-50">
-          <Sidebar user={user} />
-          
-          <div className="flex-1 overflow-auto" style={{border: '5px solid red', minHeight: '100vh'}}>
-            <div className='p-10'>
-              <h1>Escala em Manutenção</h1>
-              <pre>{JSON.stringify(plantoes?.length || 0, null, 2)}</pre>
-            </div>
-          </div>
+        <div className='p-10'>
+          <h1>Escala - Isolamento de SVG</h1>
+          <pre>Plantões carregados: {JSON.stringify(plantoes?.length || 0, null, 2)}</pre>
+          <p>Componentes de ícones comentados para identificar erro de SVG</p>
         </div>
       </div>
     </ErrorBoundary>
