@@ -2,7 +2,7 @@ console.log('ESTOU NO TOPO DO ARQUIVO')
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
@@ -53,10 +53,43 @@ interface Plantao {
   local_favorito_id?: string | null
 }
 
+// Error boundary component
+interface ErrorBoundaryState {
+  hasError: boolean
+}
+
+class ErrorBoundary extends React.Component<any, any> {
+  constructor(props: any) {
+    super(props)
+    this.state = { hasError: false }
+  }
+
+  static getDerivedStateFromError(error: any) {
+    console.error('ErrorBoundary caught error:', error)
+    return { hasError: true }
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ backgroundColor: 'red', color: 'white', padding: '20px', minHeight: '100vh' }}>
+          <h1>Erro na Aplicação</h1>
+          <p>Ocorreu um erro ao carregar a página de escala.</p>
+          <pre>{JSON.stringify(this.state.hasError, null, 2)}</pre>
+        </div>
+      )
+    }
+
+    return this.props.children
+  }
+}
+
 export default function EscalaPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [plantoes, setPlantoes] = useState<any[]>([])
+  const [error, setError] = useState<any>(null)
+  const router = useRouter()
   const formatDateYYYYMMDD = (date: Date) => date.toISOString().split('T')[0]
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [showDayMenu, setShowDayMenu] = useState(false)
@@ -76,8 +109,6 @@ export default function EscalaPage() {
     especialidade: '',
     local_favorito_id: null as string | null
   })
-  const router = useRouter()
-
   useEffect(() => {
     checkAuth()
     console.log('Componente montado com sucesso')
@@ -385,18 +416,20 @@ export default function EscalaPage() {
   }
 
   return (
-    <div style={{ backgroundColor: 'yellow', minHeight: '100vh' }}>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar user={user} />
-        
-        <div className="flex-1 overflow-auto" style={{border: '5px solid red', minHeight: '100vh'}}>
-          <div className='p-10'>
-            <h1>Escala em Manutenção</h1>
-            <pre>{JSON.stringify(plantoes?.length || 0, null, 2)}</pre>
+    <ErrorBoundary>
+      <div style={{ backgroundColor: 'yellow', minHeight: '100vh' }}>
+        <div className="flex h-screen bg-gray-50">
+          <Sidebar user={user} />
+          
+          <div className="flex-1 overflow-auto" style={{border: '5px solid red', minHeight: '100vh'}}>
+            <div className='p-10'>
+              <h1>Escala em Manutenção</h1>
+              <pre>{JSON.stringify(plantoes?.length || 0, null, 2)}</pre>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ErrorBoundary>
   )
 }
 }
