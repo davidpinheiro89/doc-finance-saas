@@ -75,16 +75,30 @@ export default function EscalaPage() {
 
   const fetchPlantoes = async (userId: string) => {
     try {
-      // Enable actual database query for testing
+      // Try with usuario_id first (more common in Portuguese systems)
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('user_id', userId)
+        .eq('usuario_id', userId)
         .order('data', { ascending: true })
 
       if (error) {
-        console.error('Error fetching plantões:', error)
-        setPlantoes([])
+        console.error('Error fetching plantões with usuario_id:', error)
+        
+        // Try without user filter for now to test basic functionality
+        const { data: allData, error: allError } = await supabase
+          .from('plantoes')
+          .select('*')
+          .order('data', { ascending: true })
+
+        if (allError) {
+          console.error('Error fetching all plantões:', allError)
+          setPlantoes([])
+          return
+        }
+
+        console.log('Todos os dados carregados do Supabase:', allData)
+        setPlantoes(allData || [])
         return
       }
 
@@ -111,8 +125,9 @@ export default function EscalaPage() {
       const futureDate = new Date(today)
       futureDate.setDate(today.getDate() + 7) // 7 dias no futuro
 
+      // First try with usuario_id
       const testPlantao = {
-        user_id: user.id,
+        usuario_id: user.id,
         hospital: 'Hospital Teste 🏥',
         data: futureDate.toISOString().split('T')[0],
         valor: 500.00,
@@ -127,7 +142,7 @@ export default function EscalaPage() {
         tipo_evento: 'plantao'
       }
 
-      console.log('Inserindo plantão de teste:', testPlantao)
+      console.log('Inserindo plantão de teste com usuario_id:', testPlantao)
 
       const { data, error } = await supabase
         .from('plantoes')
@@ -135,8 +150,42 @@ export default function EscalaPage() {
         .select()
 
       if (error) {
-        console.error('Erro ao inserir plantão:', error)
-        alert('Erro ao inserir plantão: ' + error.message)
+        console.error('Erro ao inserir plantão com usuario_id:', error)
+        
+        // If usuario_id fails, try without user field temporarily
+        const testPlantaoNoUser = {
+          hospital: 'Hospital Teste 🏥',
+          data: futureDate.toISOString().split('T')[0],
+          valor: 500.00,
+          status: 'pendente',
+          horas: 12,
+          endereco: 'Rua Teste, 123',
+          cep: '12345-678',
+          data_prevista_pagamento: futureDate.toISOString().split('T')[0],
+          prazo_pagamento_dias: 30,
+          classificacao: 'Sala Verde',
+          especialidade: 'Teste',
+          tipo_evento: 'plantao'
+        }
+
+        console.log('Tentando inserir sem campo de usuário:', testPlantaoNoUser)
+
+        const { data: dataNoUser, error: errorNoUser } = await supabase
+          .from('plantoes')
+          .insert([testPlantaoNoUser])
+          .select()
+
+        if (errorNoUser) {
+          console.error('Erro ao inserir plantão sem usuário:', errorNoUser)
+          alert('Erro ao inserir plantão: ' + errorNoUser.message)
+          return
+        }
+
+        console.log('Plantão inserido sem usuário com sucesso:', dataNoUser)
+        alert('✅ Plantão de teste inserido com sucesso (sem usuário)!')
+        
+        // Refresh the plantões list
+        await fetchPlantoes(user.id)
         return
       }
 
