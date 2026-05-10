@@ -96,7 +96,7 @@ export default function EscalaPage() {
         return
       }
 
-      console.log('✅ Dados carregados do Supabase:', data)
+      console.log('✅ Dados carregados do Supabase:', data?.length || 0, 'registros')
       if (data && data.length > 0) {
         console.log('📋 ESTRUTURA DO PRIMEIRO ITEM:', data[0])
         console.log('📋 COLUNA DE DATA ENCONTRADA:', Object.keys(data[0]).find(key => key.toLowerCase().includes('data')))
@@ -145,28 +145,13 @@ export default function EscalaPage() {
 
   const getPlantoesForDay = (day: number) => {
     const dateStr = formatDateYYYYMMDD(new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day))
-    console.log(`=== COMPARAÇÃO DE DATAS ===`)
-    console.log(`Dia do calendário: ${day} -> Data formatada: ${dateStr}`)
-    
+        
     const filteredPlantoes = plantoes.filter(plantao => {
       // Normalize database date to ignore time component
       const dbDateStr = plantao.data ? plantao.data.split('T')[0] : plantao.data
-      
-      console.log(`Comparando dia ${day} com registro:`, {
-        plantaoData: plantao.data,
-        plantaoDataNormalized: dbDateStr,
-        plantaoTipo: plantao.tipo_evento,
-        plantaoHospital: plantao.hospital,
-        match: dbDateStr === dateStr,
-        isDisponivel: plantao.tipo_evento === 'disponivel',
-        isFolga: plantao.tipo_evento === 'folga',
-        isPlantao: plantao.tipo_evento === 'plantao'
-      })
       return dbDateStr === dateStr
     })
     
-    console.log(`Resultado para dia ${day}: ${filteredPlantoes.length} registros encontrados`)
-    console.log('=====================================')
     return filteredPlantoes
   }
 
@@ -461,7 +446,7 @@ export default function EscalaPage() {
                           {dayPlantoes.slice(0, 2).map((plantao: any, index: number) => (
                             <div
                               key={plantao.id || index}
-                              className={`text-xs px-1 py-0.5 rounded truncate ${
+                              className={`text-xs px-2 py-0.5 rounded-full truncate ${
                                 plantao.tipo_evento === 'plantao' ? 'bg-blue-100 text-blue-700' :
                                 plantao.tipo_evento === 'disponivel' ? 'bg-green-100 text-green-700' :
                                 plantao.tipo_evento === 'folga' ? 'bg-red-100 text-red-700' :
@@ -470,8 +455,8 @@ export default function EscalaPage() {
                             >
                               {plantao.tipo_evento === 'plantao' ? '🏥' : 
                                plantao.tipo_evento === 'disponivel' ? '🟢' : 
-                               plantao.tipo_evento === 'folga' ? '🔴' : '📋'} 
-                              {' '}{plantao.hospital || plantao.tipo_evento}
+                               plantao.tipo_evento === 'folga' ? '🔴' : '📋'}
+                              {plantao.hospital || plantao.tipo_evento}
                             </div>
                           ))}
                           {dayPlantoes.length > 2 && (
