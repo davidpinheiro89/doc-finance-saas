@@ -106,6 +106,9 @@ export default function EscalaPage() {
       }
 
       console.log('Dados carregados do Supabase:', data)
+      if (data && data.length > 0) {
+        console.log('ESTRUTURA DO PRIMEIRO ITEM:', data[0])
+      }
       setPlantoes(data || [])
       
       // Force loading state to false after data loads
@@ -154,16 +157,20 @@ export default function EscalaPage() {
     console.log(`Dia do calendário: ${day} -> Data formatada: ${dateStr}`)
     
     const filteredPlantoes = plantoes.filter(plantao => {
+      // Normalize database date to ignore time component
+      const dbDateStr = plantao.data ? plantao.data.split('T')[0] : plantao.data
+      
       console.log(`Comparando dia ${day} com registro:`, {
         plantaoData: plantao.data,
+        plantaoDataNormalized: dbDateStr,
         plantaoTipo: plantao.tipo_evento,
         plantaoHospital: plantao.hospital,
-        match: plantao.data === dateStr,
+        match: dbDateStr === dateStr,
         isDisponivel: plantao.tipo_evento === 'disponivel',
         isFolga: plantao.tipo_evento === 'folga',
         isPlantao: plantao.tipo_evento === 'plantao'
       })
-      return plantao.data === dateStr
+      return dbDateStr === dateStr
     })
     
     console.log(`Resultado para dia ${day}: ${filteredPlantoes.length} registros encontrados`)
