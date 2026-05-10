@@ -415,11 +415,31 @@ export default function EscalaPage() {
 
   return (
     <ErrorBoundary>
-      <div style={{ backgroundColor: 'yellow', minHeight: '100vh' }}>
-        <div className='p-10'>
-          <h1>Escala - Isolamento de SVG</h1>
-          <pre>Plantões carregados: {JSON.stringify(plantoes?.length || 0, null, 2)}</pre>
-          <p>Componentes de ícones comentados para identificar erro de SVG</p>
+      <div className="flex h-screen bg-gray-50">
+        <Sidebar user={user} />
+        
+        <div className="flex-1 overflow-auto">
+          <div className='p-6'>
+            <h1 className="text-2xl font-bold mb-6">Escala de Plantões</h1>
+            
+            {plantoes.length === 0 ? (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
+                <span className="mx-auto h-12 w-12 text-blue-500 mb-4">📅</span>
+                <h2 className="text-xl font-semibold text-blue-800 mb-2">Nenhum plantão encontrado</h2>
+                <p className="text-blue-600">Comece adicionando seus plantões para visualizá-los aqui.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold mb-4 flex items-center">
+                  <span className="h-5 w-5 mr-2 text-blue-500">📅</span>
+                  {plantoes.length} plantão(s) carregado(s)
+                </h2>
+                <pre className="text-sm text-gray-600 bg-gray-50 p-4 rounded overflow-auto max-h-96">
+                  {JSON.stringify(plantoes, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </ErrorBoundary>
