@@ -75,9 +75,12 @@ export default function EscalaPage() {
 
   const fetchPlantoes = async (userId: string) => {
     try {
-      // Force return empty array immediately to prevent any 404 errors
-      const data: any[] = []
-      const error = null
+      // Enable actual database query for testing
+      const { data, error } = await supabase
+        .from('plantoes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('data', { ascending: true })
 
       if (error) {
         console.error('Error fetching plantões:', error)
@@ -94,6 +97,57 @@ export default function EscalaPage() {
       console.error('Error fetching plantões:', error)
       setPlantoes([])
       setLoading(false)
+    }
+  }
+
+  const handleAddPlantao = async () => {
+    if (!user) {
+      alert('Usuário não autenticado')
+      return
+    }
+
+    try {
+      const today = new Date()
+      const futureDate = new Date(today)
+      futureDate.setDate(today.getDate() + 7) // 7 dias no futuro
+
+      const testPlantao = {
+        user_id: user.id,
+        hospital: 'Hospital Teste 🏥',
+        data: futureDate.toISOString().split('T')[0],
+        valor: 500.00,
+        status: 'pendente',
+        horas: 12,
+        endereco: 'Rua Teste, 123',
+        cep: '12345-678',
+        data_prevista_pagamento: futureDate.toISOString().split('T')[0],
+        prazo_pagamento_dias: 30,
+        classificacao: 'Sala Verde',
+        especialidade: 'Teste',
+        tipo_evento: 'plantao'
+      }
+
+      console.log('Inserindo plantão de teste:', testPlantao)
+
+      const { data, error } = await supabase
+        .from('plantoes')
+        .insert([testPlantao])
+        .select()
+
+      if (error) {
+        console.error('Erro ao inserir plantão:', error)
+        alert('Erro ao inserir plantão: ' + error.message)
+        return
+      }
+
+      console.log('Plantão inserido com sucesso:', data)
+      alert('✅ Plantão de teste inserido com sucesso!')
+      
+      // Refresh the plantões list
+      await fetchPlantoes(user.id)
+    } catch (error) {
+      console.error('Erro ao inserir plantão:', error)
+      alert('Erro ao inserir plantão. Tente novamente.')
     }
   }
 
@@ -122,12 +176,22 @@ export default function EscalaPage() {
         
         <div className="flex-1 overflow-auto">
           <div className='p-6'>
-            <h1 className="text-2xl font-bold mb-6 text-gray-800">Escala de Plantões</h1>
+            <div className="flex justify-between items-center mb-6">
+              <h1 className="text-2xl font-bold text-gray-800">Escala de Plantões</h1>
+              <button 
+                onClick={handleAddPlantao}
+                className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors flex items-center gap-2"
+              >
+                <span>➕</span>
+                <span>Inserir Plantão Teste</span>
+              </button>
+            </div>
             
             {plantoes.length === 0 ? (
               <div className="text-center py-8">
                 <span className="text-4xl mb-2">📅</span>
-                <p className="text-gray-600">Nenhum plantão agendado para este período</p>
+                <p className="text-gray-600 mb-4">Nenhum plantão agendado para este período</p>
+                <p className="text-sm text-gray-500">Clique no botão "Inserir Plantão Teste" acima para adicionar um plantão fictício</p>
               </div>
             ) : (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -135,9 +199,34 @@ export default function EscalaPage() {
                   <span className="h-5 w-5 mr-2 text-blue-500">📅</span>
                   {plantoes.length} plantão(s) carregado(s)
                 </h2>
-                <pre className="text-sm text-gray-600 bg-gray-50 p-4 rounded overflow-auto max-h-96">
-                  {JSON.stringify(plantoes, null, 2)}
-                </pre>
+                <div className="space-y-3">
+                  {plantoes.map((plantao: any, index: number) => (
+                    <div key={plantao.id || index} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <h3 className="font-semibold text-gray-800 flex items-center gap-2">
+                            <span>🏥</span>
+                            {plantao.hospital}
+                          </h3>
+                          <p className="text-sm text-gray-600 mt-1">
+                            📅 {plantao.data} | ⏰ {plantao.horas}h | 💰 R$ {plantao.valor}
+                          </p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            📍 {plantao.endereco} | 🏷️ {plantao.classificacao}
+                          </p>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${
+                          plantao.status === 'pendente' ? 'bg-yellow-100 text-yellow-800' :
+                          plantao.status === 'confirmado' ? 'bg-blue-100 text-blue-800' :
+                          plantao.status === 'realizado' ? 'bg-green-100 text-green-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {plantao.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
