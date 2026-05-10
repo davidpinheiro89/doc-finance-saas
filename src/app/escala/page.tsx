@@ -1,5 +1,3 @@
-console.log('ESTOU NO TOPO DO ARQUIVO')
-
 'use client'
 
 import React, { useState, useEffect } from 'react'
