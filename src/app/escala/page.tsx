@@ -265,28 +265,29 @@ export default function EscalaPage() {
         alert(`✅ Status atualizado para ${status === 'disponivel' ? 'Disponível' : 'Folga'}!`)
       } else {
         // Insert new status - minimal fields to avoid database errors
-        const statusData = {
-          data: dateStr,
-          tipo_evento: status,
-          status: 'confirmado',
-          hospital: status === 'disponivel' ? '🟢 Disponível' : '🔴 Folga',
-          valor: 0,
-          horas: 0,
-          endereco: '',
-          cep: '',
-          data_prevista_pagamento: dateStr,
-          prazo_pagamento_dias: 0,
-          classificacao: status,
-          especialidade: ''
-          // Explicitly NOT sending usuario_id to avoid not-null constraint
-        }
+        try {
+          const statusData = {
+            data: dateStr,
+            tipo_evento: status,
+            status: 'confirmado',
+            hospital: status === 'disponivel' ? '🟢 Disponível' : '🔴 Folga',
+            valor: 0,
+            horas: 0,
+            endereco: '',
+            cep: '',
+            data_prevista_pagamento: dateStr,
+            prazo_pagamento_dias: 0,
+            classificacao: status,
+            especialidade: ''
+            // Explicitly NOT sending usuario_id to avoid not-null constraint
+          }
 
-        const { data, error } = await supabase
-          .from('plantoes')
-          .insert([statusData])
-          .select()
+          const { data, error } = await supabase
+            .from('plantoes')
+            .insert([statusData])
+            .select()
 
-        if (error) {
+          if (error) {
           console.error('=== ERRO DETALHADO SUPABASE ===')
           console.error('Mensagem completa:', error)
           console.error('Error message:', error.message)
@@ -313,6 +314,11 @@ export default function EscalaPage() {
         setShowActionModal(false)
         // Force immediate refresh of local plantoes array
         await fetchPlantoes(user.id)
+        } catch (error) {
+          console.error('Erro ao salvar status:', error)
+          alert('Erro ao salvar status. Tente novamente.')
+        }
+      }
     } catch (error) {
       console.error('Erro ao salvar status:', error)
       alert('Erro ao salvar status. Tente novamente.')
