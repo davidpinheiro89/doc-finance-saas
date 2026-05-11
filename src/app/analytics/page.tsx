@@ -135,16 +135,7 @@ export default function AnalyticsPage() {
       percentage: (hours / totalHours) * 100
     })).sort((a, b) => b.percentage - a.percentage)
     
-    const topConcentration = concentrationData[0]
-    console.log('🔍 Workload Concentration Debug:', {
-      totalHours,
-      hoursByUnit,
-      topUnit: topConcentration?.unit,
-      topPercentage: topConcentration?.percentage,
-      thresholdMet: topConcentration?.percentage >= 70
-    })
-    
-    return topConcentration
+    return concentrationData[0] // Return the unit with highest concentration
   }
 
   const workloadConcentration = getWorkloadConcentration()
@@ -364,19 +355,20 @@ export default function AnalyticsPage() {
           </div>
         </div>
 
-        {/* Alerta de Concentração */}
-        {workloadConcentration && workloadConcentration.percentage >= 70 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-8" style={{ display: 'block' }}>
-            <p className="text-sm font-medium text-orange-800">
-              ⚠️ Atenção: {workloadConcentration.percentage.toFixed(1)}% da sua carga horária está concentrada no <span className="font-bold">{workloadConcentration.unit}</span>.
-            </p>
-          </div>
-        )}
-        
-        {/* Debug Info - Temporarily visible */}
+        {/* Informação Estratégica de Concentração */}
         {workloadConcentration && (
-          <div className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 mb-4 text-xs">
-            <strong>Debug:</strong> {workloadConcentration.unit} = {workloadConcentration.percentage.toFixed(1)}% {workloadConcentration.percentage >= 70 ? '🚨 ALERTA ATIVO' : '✅ Abaixo do limite'}
+          <div className={`${
+            workloadConcentration.percentage >= 70 
+              ? 'bg-orange-50 border border-orange-200' 
+              : 'bg-blue-50 border border-blue-200'
+          } rounded-lg px-4 py-3 mb-8`}>
+            <p className={`text-sm font-medium ${
+              workloadConcentration.percentage >= 70 
+                ? 'text-orange-800' 
+                : 'text-blue-800'
+            }`}>
+              {workloadConcentration.percentage >= 70 ? '⚠️' : 'ℹ️'} Unidade de maior concentração no período: <span className="font-bold">{workloadConcentration.unit}</span> ({workloadConcentration.percentage.toFixed(1)}% da carga horária total).
+            </p>
           </div>
         )}
 
