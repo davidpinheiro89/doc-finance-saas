@@ -112,7 +112,33 @@ export default function AnalyticsPage() {
     cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
 
-  // Prepare data for productivity charts
+  // Calculate workload concentration by unit
+  const getWorkloadConcentration = () => {
+    if (filteredPlantoes.length === 0) return null
+    
+    const hoursByUnit = filteredPlantoes.reduce((acc, plantao) => {
+      const unit = plantao.hospital
+      if (!acc[unit]) {
+        acc[unit] = 0
+      }
+      acc[unit] += plantao.horas || 0
+      return acc
+    }, {} as Record<string, number>)
+    
+    const totalHours = Object.values(hoursByUnit).reduce((sum, hours) => sum + hours, 0)
+    
+    if (totalHours === 0) return null
+    
+    const concentrationData = Object.entries(hoursByUnit).map(([unit, hours]) => ({
+      unit,
+      hours,
+      percentage: (hours / totalHours) * 100
+    })).sort((a, b) => b.percentage - a.percentage)
+    
+    return concentrationData[0] // Return the unit with highest concentration
+  }
+
+  const workloadConcentration = getWorkloadConcentration()
   
   // 1. Volume Chart - Quantidade de Plantões por Unidade (filtered by date range)
   const plantoesByUnit = filteredPlantoes.reduce((acc, plantao) => {
@@ -330,9 +356,13 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Alerta de Concentração */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-8">
-          <p className="text-sm font-medium text-orange-800">⚠️ Atenção: 70% da sua carga horária está concentrada em uma única unidade.</p>
-        </div>
+        {workloadConcentration && workloadConcentration.percentage >= 70 && (
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-8">
+            <p className="text-sm font-medium text-orange-800">
+              ⚠️ Atenção: {workloadConcentration.percentage.toFixed(1)}% da sua carga horária está concentrada no <span className="font-bold">{workloadConcentration.unit}</span>.
+            </p>
+          </div>
+        )}
 
         {/* Filtro de Período */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
