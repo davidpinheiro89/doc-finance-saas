@@ -167,6 +167,7 @@ export default function FinanceiroPage() {
         }
       }
 
+      // Reset form immediately to show user action completed
       setNewExpense({
         descricao: '',
         valor: '',
@@ -175,8 +176,11 @@ export default function FinanceiroPage() {
         recorrente: false
       })
       setShowAddExpense(false)
+      
+      // Sync with database immediately
       await fetchDespesas(user.id)
       console.log('Despesa adicionada com sucesso:', newExpense)
+      
       // Force immediate refresh to ensure new expense appears in list
       setTimeout(() => fetchDespesas(user.id), 500)
     } catch (error) {
@@ -296,7 +300,14 @@ export default function FinanceiroPage() {
     if (selectedMonth === 'todos') {
       return d.data.startsWith(selectedYear + '-')
     }
-    return d.data.startsWith(selectedMonth.slice(5))
+    // Extract month and year from both dates to compare properly
+    const expenseDate = new Date(d.data)
+    const filterDate = new Date(selectedMonth + '-01')
+    const matches = expenseDate.getMonth() === filterDate.getMonth() && expenseDate.getFullYear() === filterDate.getFullYear()
+    if (!matches) {
+      console.log(`Item ignorado por data divergente: ${d.data} (despesa) vs ${selectedMonth} (filtro)`)
+    }
+    return matches
   })
 
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
