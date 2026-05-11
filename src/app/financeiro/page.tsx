@@ -368,7 +368,7 @@ export default function FinanceiroPage() {
     <div className="flex h-screen bg-gray-50 pointer-events-none">
       <Sidebar user={user} />
       
-      <div className="flex-1 overflow-auto pointer-events-none">
+      <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
@@ -383,7 +383,7 @@ export default function FinanceiroPage() {
             
             {/* Intelligent Insight Card */}
             {selectedMonth !== 'todos' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 w-full">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 w-full relative z-0">
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
@@ -534,7 +534,7 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Seção de Despesas */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 pointer-events-none">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Gerenciar Despesas</h3>
               <button
@@ -557,7 +557,7 @@ export default function FinanceiroPage() {
                       type="text"
                       value={newExpense.descricao}
                       onChange={(e) => setNewExpense({...newExpense, descricao: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                       placeholder="Ex: Uber para hospital"
                     />
                   </div>
@@ -570,7 +570,7 @@ export default function FinanceiroPage() {
                       step="0.01"
                       value={newExpense.valor}
                       onChange={(e) => setNewExpense({...newExpense, valor: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                       placeholder="0.00"
                     />
                   </div>
@@ -582,7 +582,7 @@ export default function FinanceiroPage() {
                       type="date"
                       value={newExpense.data}
                       onChange={(e) => setNewExpense({...newExpense, data: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
                   <div>
@@ -592,7 +592,7 @@ export default function FinanceiroPage() {
                     <select
                       value={newExpense.categoria}
                       onChange={(e) => setNewExpense({...newExpense, categoria: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
                       <option value="transporte">Transporte</option>
                       <option value="alimentacao">Alimentação</option>
@@ -722,7 +722,7 @@ export default function FinanceiroPage() {
                       type="text"
                       value={editingExpense.descricao}
                       onChange={(e) => setEditingExpense({...editingExpense, descricao: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
                   <div>
@@ -734,7 +734,7 @@ export default function FinanceiroPage() {
                       step="0.01"
                       value={editingExpense.valor}
                       onChange={(e) => setEditingExpense({...editingExpense, valor: parseFloat(e.target.value)})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
                   <div>
@@ -745,7 +745,7 @@ export default function FinanceiroPage() {
                       type="date"
                       value={editingExpense.data}
                       onChange={(e) => setEditingExpense({...editingExpense, data: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
                   <div>
@@ -755,7 +755,7 @@ export default function FinanceiroPage() {
                     <select
                       value={editingExpense.categoria}
                       onChange={(e) => setEditingExpense({...editingExpense, categoria: e.target.value})}
-                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
                       <option value="transporte">Transporte</option>
                       <option value="alimentacao">Alimentação</option>
