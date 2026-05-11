@@ -329,43 +329,11 @@ export default function FinanceiroPage() {
     })
   }
 
-  // Memoized PieChart component to prevent re-renders - COMPLETELY DISABLED
-  /*
-  const MemoizedPieChart = memo(() => (
-    <div className="pointer-events-none">
-      <ResponsiveContainer width="100%" height={250}>
-        <PieChart>
-          <Pie
-            data={[
-              { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
-              { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
-            ]}
-            cx="50%"
-            cy="50%"
-            outerRadius={60}
-            fill="#8884d8"
-            dataKey="value"
-            label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
-          >
-            <Tooltip />
-          </Pie>
-          <Legend 
-            verticalAlign="bottom" 
-            height={36}
-            formatter={(value: any, entry: any) => {
-              const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
-              const entryValue = typeof value === 'number' ? value : 0
-              return `${entryName}: ${formatCurrency(entryValue)}`
-            }}
-          />
-        </PieChart>
-      </ResponsiveContainer>
-    </div>
-  ))
-  */
+  // Chart components completely removed to prevent blocking
+  // All PieChart and ResponsiveContainer code deleted
 
   return (
-    <div className="flex h-screen bg-gray-50 pointer-events-none">
+    <div className="flex h-screen bg-gray-50">
       <Sidebar user={user} />
       
       <div className="flex-1 overflow-auto">
@@ -534,7 +502,7 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Seção de Despesas */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10 pointer-events-auto">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Gerenciar Despesas</h3>
               <button
@@ -609,16 +577,16 @@ export default function FinanceiroPage() {
                       type="checkbox"
                       checked={newExpense.recorrente}
                       onChange={(e) => setNewExpense({...newExpense, recorrente: e.target.checked})}
-                      className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-gray-300 rounded pointer-events-auto"
                     />
                     <span className="ml-2 text-sm text-gray-700">Repetir mensalmente (Custo Fixo)</span>
                   </label>
                 </div>
                 
-                <div className="mt-4 flex justify-end space-x-3">
+                <div className="mt-4 flex justify-end space-x-3 relative z-[50]">
                   <button
                     onClick={() => setShowAddExpense(false)}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200 pointer-events-auto"
                   >
                     Cancelar
                   </button>
@@ -784,7 +752,7 @@ export default function FinanceiroPage() {
                       setShowEditExpense(false)
                       setEditingExpense(null)
                     }}
-                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                    className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200 pointer-events-auto"
                   >
                     Cancelar
                   </button>
