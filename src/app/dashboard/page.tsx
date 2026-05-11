@@ -296,12 +296,19 @@ export default function DashboardPage() {
   // useEffect to calculate efficiency data when listagemPlantoes changes
   useEffect(() => {
     if (listagemPlantoes.length > 0) {
+      console.log('Processando dados para gráfico:', listagemPlantoes)
+      
       const hospitalEfficiency = listagemPlantoes
-        .filter((p: any) => p.status === 'pago' && (p.horas || p.carga_horaria || p.duration) && (p.horas || p.carga_horaria || p.duration) > 0)
+        .filter((p: any) => (p.status === 'pago' || p.status === 'realizado') && (p.horas || p.carga_horaria || p.duration))
         .reduce((acc: any, plantao: any) => {
-          const hospital = plantao.hospital
-          const hours = plantao.horas || plantao.carga_horaria || plantao.duration || 0
-          const hourlyRate = plantao.valor / hours
+          // Mapeamento de chaves exato do Supabase
+          const hospital = plantao.hospital || plantao.local || 'Desconhecido'
+          const h = Number(plantao.horas || plantao.carga_horaria || plantao.duration || 0)
+          
+          // Skip se horas for 0 ou inválido
+          if (h <= 0) return acc
+          
+          const hourlyRate = plantao.valor / h
           
           if (!acc[hospital]) {
             acc[hospital] = {
@@ -312,17 +319,21 @@ export default function DashboardPage() {
             }
           }
           
-          acc[hospital].totalValue += plantao.valor
-          acc[hospital].totalHours += hours
+          acc[hospital].totalValue += Number(plantao.valor || 0)
+          acc[hospital].totalHours += h
           acc[hospital].count += 1
           acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
           
           return acc
         }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
 
+      console.log('Dados processados pelo gráfico:', hospitalEfficiency)
+
       const sortedHospitals = Object.entries(hospitalEfficiency)
         .sort(([,a]: any, [,b]: any) => b.hourlyRate - a.hourlyRate)
         .slice(0, 3)
+
+      console.log('Dados finais para renderização:', sortedHospitals)
 
       setEfficiencyData(sortedHospitals)
       setChartReady(true)
