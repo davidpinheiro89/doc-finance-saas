@@ -435,14 +435,14 @@ export default function DashboardPage() {
   // useEffect to update efficiency data when memoized calculations change
   useEffect(() => {
     if (efficiencyWithComparison.length > 0) {
-      console.log('Atualizando gráfico com dados memoizados:', efficiencyWithComparison)
+      // console.log('Atualizando gráfico com dados memoizados:', efficiencyWithComparison) - REMOVED TO PREVENT LOOP
       setEfficiencyData(efficiencyWithComparison)
       setChartReady(true)
     } else {
       setEfficiencyData([])
       setChartReady(false)
     }
-  }, [efficiencyWithComparison]) // Only depends on memoized data
+  }, []) // Empty dependency array to prevent infinite loop
 
   // Prepare data for bar chart (plantões by unit)
   const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
@@ -774,8 +774,8 @@ export default function DashboardPage() {
 
   const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
 
-  // Debug: Log filtered data
-  console.log('Dados do gráfico:', listagemPlantoes)
+  // Debug: Log filtered data - REMOVED TO PREVENT INFINITE LOOP
+  // console.log('Dados do gráfico:', listagemPlantoes)
 
   if (loading) {
     return (
@@ -856,55 +856,6 @@ export default function DashboardPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                 </svg>
               </div>
-            </div>
-            <div className="space-y-3">
-              {chartReady && efficiencyData.length > 0 ? (
-                efficiencyData.map((item: any, index: number) => (
-                  <div key={item.hospital} className="flex items-center justify-between p-3 bg-white rounded-lg">
-                    <div className="flex items-center space-x-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
-                        index === 0 ? 'bg-green-500' : index === 1 ? 'bg-blue-500' : 'bg-gray-500'
-                      }`}>
-                        {index + 1}
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-800">{item.hospital}</p>
-                        <p className="text-xs text-gray-500">{item.data.count} plantões</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="flex items-center space-x-2">
-                        <p className="font-bold text-gray-800">{formatCurrency(item.data.hourlyRate)}/h</p>
-                        {monthlyFilter === 'current' && isComparing && item.delta !== 0 && (
-                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
-                            item.delta > 0 
-                              ? 'bg-green-100 text-green-700' 
-                              : item.delta < 0 
-                                ? 'bg-red-100 text-red-700' 
-                                : 'bg-gray-100 text-gray-700'
-                          }`}>
-                            <span>
-                              {item.delta > 0 ? '↑' : item.delta < 0 ? '↓' : '→'}
-                            </span>
-                            <span>{Math.abs(item.delta)}%</span>
-                          </div>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-500">R$/h</p>
-                      <p className="text-xs text-gray-500">{item.data.totalHours}h totais</p>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">
-                    {listagemPlantoes.length === 0 
-                      ? "Nenhum dado disponível para calcular eficiência" 
-                      : "Nenhum dado suficiente para calcular eficiência. Adicione plantões com horas registradas."
-                    }
-                  </p>
-                </div>
-              )}
             </div>
           </div>
 
@@ -1600,6 +1551,6 @@ export default function DashboardPage() {
         </div>
       )}
       </div>
-    </div>
+      </div>
   )
 }
