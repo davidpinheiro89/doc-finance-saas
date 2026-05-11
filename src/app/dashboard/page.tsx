@@ -76,6 +76,8 @@ export default function DashboardPage() {
     end: ''
   })
   const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([]) // Add favorite locations state
+  const [efficiencyData, setEfficiencyData] = useState<any[]>([])
+  const [chartReady, setChartReady] = useState(false)
   const [formData, setFormData] = useState({
     hospital: '',
     data: '',
@@ -290,6 +292,45 @@ export default function DashboardPage() {
     valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
     cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
   }
+
+  // useEffect to calculate efficiency data when listagemPlantoes changes
+  useEffect(() => {
+    if (listagemPlantoes.length > 0) {
+      const hospitalEfficiency = listagemPlantoes
+        .filter((p: any) => p.status === 'pago' && (p.horas || p.carga_horaria || p.duration) && (p.horas || p.carga_horaria || p.duration) > 0)
+        .reduce((acc: any, plantao: any) => {
+          const hospital = plantao.hospital
+          const hours = plantao.horas || plantao.carga_horaria || plantao.duration || 0
+          const hourlyRate = plantao.valor / hours
+          
+          if (!acc[hospital]) {
+            acc[hospital] = {
+              totalValue: 0,
+              totalHours: 0,
+              hourlyRate: 0,
+              count: 0
+            }
+          }
+          
+          acc[hospital].totalValue += plantao.valor
+          acc[hospital].totalHours += hours
+          acc[hospital].count += 1
+          acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
+          
+          return acc
+        }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
+
+      const sortedHospitals = Object.entries(hospitalEfficiency)
+        .sort(([,a]: any, [,b]: any) => b.hourlyRate - a.hourlyRate)
+        .slice(0, 3)
+
+      setEfficiencyData(sortedHospitals)
+      setChartReady(true)
+    } else {
+      setEfficiencyData([])
+      setChartReady(false)
+    }
+  }, [listagemPlantoes])
 
   // Prepare data for bar chart (plantões by unit)
   const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
@@ -680,67 +721,8 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="space-y-3">
-              {listagemPlantoes.length > 0 ? (() => {
-                // Cache-breaking comment: Force Vercel rebuild - 2024-05-11
-                // Calculate efficiency by hospital using FILTERED data
-                const hospitalEfficiency = listagemPlantoes
-                  .filter((p: any) => p.status === 'pago' && (p.horas || p.carga_horaria || p.duration) && (p.horas || p.carga_horaria || p.duration) > 0)
-                  .reduce((acc: any, plantao: any) => {
-                    const hospital = plantao.hospital
-                    const hours = plantao.horas || plantao.carga_horaria || plantao.duration || 0
-                    const hourlyRate = plantao.valor / hours
-                    
-                    if (!acc[hospital]) {
-                      acc[hospital] = {
-                        totalValue: 0,
-                        totalHours: 0,
-                        hourlyRate: 0,
-                        count: 0
-                      }
-                    }
-                    
-                    acc[hospital].totalValue += plantao.valor
-                    acc[hospital].totalHours += hours
-                    acc[hospital].count += 1
-                    acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
-                    
-                    return acc
-                  }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
-
-                const sortedHospitals = Object.entries(hospitalEfficiency)
-                  .sort(([,a]: any, [,b]: any) => b.hourlyRate - a.hourlyRate)
-                  .slice(0, 3)
-
-                // Check for 70% concentration
-                const concentrationAlert = Object.entries(hospitalEfficiency).find(([, data]: any) => {
-                  const totalHours = Object.values(hospitalEfficiency).reduce((sum: number, [, hospitalData]: any) => sum + hospitalData.totalHours, 0)
-                  const concentrationPercentage = (data.totalHours / totalHours) * 100
-                  return concentrationPercentage >= 70
-                })
-
-                if (sortedHospitals.length === 0) {
-                  return (
-                    <p className="text-gray-600 text-sm">
-                      Nenhum dado suficiente para calcular eficiência. Adicione plantões com horas registradas.
-                    </p>
-                  )
-                }
-
-                // Display concentration alert if found
-                if (concentrationAlert) {
-                  return (
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
-                      <p className="text-orange-700 font-medium text-sm">
-                        ⚠️ Atenção: 70% da sua carga horária está concentrada no {concentrationAlert[0]}.
-                      </p>
-                      <p className="text-orange-600 text-xs mt-1">
-                        Considere diversificar suas unidades de trabalho para melhor distribuição.
-                      </p>
-                    </div>
-                  )
-                }
-
-                return sortedHospitals.map(([hospital, data]: any, index: number) => (
+              {chartReady && efficiencyData.length > 0 ? (
+                efficiencyData.map(([hospital, data]: any, index: number) => (
                   <div key={hospital} className="flex items-center justify-between p-3 bg-white rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
@@ -760,9 +742,14 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))
-              })() : (
+              ) : (
                 <div className="text-center py-8">
-                  <p className="text-gray-500">Nenhum dado disponível para calcular eficiência</p>
+                  <p className="text-gray-500">
+                    {listagemPlantoes.length === 0 
+                      ? "Nenhum dado disponível para calcular eficiência" 
+                      : "Nenhum dado suficiente para calcular eficiência. Adicione plantões com horas registradas."
+                    }
+                  </p>
                 </div>
               )}
             </div>
