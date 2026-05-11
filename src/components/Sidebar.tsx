@@ -83,7 +83,7 @@ export default function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Desktop Sidebar */}
-      <div className={`bg-red-500 border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[9999] ${
+      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
         isMobile ? (isCollapsed ? 'translate-x-0' : '-translate-x-full') : ''
       } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
@@ -103,7 +103,7 @@ export default function Sidebar({ user }: SidebarProps) {
             {!isMobile && (
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100"
+                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
               >
                 <span className="h-5 w-5">❌</span>
               </button>

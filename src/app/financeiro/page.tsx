@@ -496,7 +496,7 @@ export default function FinanceiroPage() {
             </div>
             
             {/* Gráfico de Rosca */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <div className="bg-white rounded-xl border border-gray-200 p-6 pointer-events-none">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600">Distribuição de Gastos</p>
@@ -532,7 +532,7 @@ export default function FinanceiroPage() {
           </div>
 
           {/* Seção de Despesas */}
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 pointer-events-none">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
               <h3 className="text-lg font-semibold text-gray-800">Gerenciar Despesas</h3>
               <button
