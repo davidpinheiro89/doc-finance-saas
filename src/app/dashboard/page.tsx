@@ -679,8 +679,9 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-3">
               {(() => {
-                // Calculate efficiency by hospital
-                const hospitalEfficiency = plantoes
+                // Cache-breaking comment: Force Vercel rebuild - 2024-05-11
+                // Calculate efficiency by hospital using FILTERED data
+                const hospitalEfficiency = filteredPlantoes
                   .filter((p: any) => p.status === 'pago' && p.horas && p.horas > 0)
                   .reduce((acc: any, plantao: any) => {
                     const hospital = plantao.hospital

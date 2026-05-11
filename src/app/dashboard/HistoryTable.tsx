@@ -1,5 +1,6 @@
 'use client'
 
+// Cache-breaking comment: Force Vercel rebuild - 2024-05-11
 interface Plantao {
   id: string
   usuario_id: string
