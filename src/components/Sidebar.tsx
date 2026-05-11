@@ -83,7 +83,7 @@ export default function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Desktop Sidebar */}
-      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative h-full relative z-[9999] ${
+      <div className={`bg-red-500 border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[9999] ${
         isMobile ? (isCollapsed ? 'translate-x-0' : '-translate-x-full') : ''
       } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
@@ -120,7 +120,7 @@ export default function Sidebar({ user }: SidebarProps) {
               <li key={item.name}>
                 <button
                       onClick={() => router.push(item.href)}
-                      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-200 pointer-events-auto ${
+                      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-200 pointer-events-auto cursor-pointer ${
                         isActive
                           ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
                           : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
@@ -155,7 +155,7 @@ export default function Sidebar({ user }: SidebarProps) {
         {(!isCollapsed || isMobile) && (
           <button
             onClick={handleLogout}
-            className="mt-3 w-full flex items-center justify-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200 pointer-events-auto"
+            className="mt-3 w-full flex items-center justify-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200 pointer-events-auto cursor-pointer"
           >
             <span className="h-4 w-4">🚪</span>
             <span className="ml-2">Sair</span>
