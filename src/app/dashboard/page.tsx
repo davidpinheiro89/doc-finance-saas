@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Sidebar from '@/components/Sidebar'
-import HistoryTable from './HistoryTable'
 
 // Shared delete function for both pages
 const deletePlantaoEvent = async (id: string, userId: string) => {
@@ -266,7 +265,7 @@ export default function DashboardPage() {
   }
 
   // Filter plantões based on date range
-  const getFilteredPlantoes = () => {
+  const getListagemPlantoes = () => {
     if (!dateRange.start && !dateRange.end) {
       return plantoes // Return all if no filter
     }
@@ -284,16 +283,16 @@ export default function DashboardPage() {
   }
 
   // Calculate filtered metrics
-  const filteredPlantoes = getFilteredPlantoes()
+  const listagemPlantoes = getListagemPlantoes()
   
   const filteredMetrics = {
-    quantidade: filteredPlantoes.length,
-    valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
+    quantidade: listagemPlantoes.length,
+    valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
+    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
 
   // Prepare data for bar chart (plantões by unit)
-  const plantoesByUnit = filteredPlantoes.reduce((acc, plantao) => {
+  const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
     const unit = plantao.hospital
     if (!acc[unit]) {
       acc[unit] = 0
@@ -308,7 +307,7 @@ export default function DashboardPage() {
   })).sort((a, b) => b.quantidade - a.quantidade)
 
   // Prepare data for hours distribution chart
-  const hoursByUnit = filteredPlantoes.reduce((acc, plantao) => {
+  const hoursByUnit = listagemPlantoes.reduce((acc, plantao) => {
     const unit = plantao.hospital
     if (!acc[unit]) {
       acc[unit] = 0
@@ -622,6 +621,9 @@ export default function DashboardPage() {
 
   const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
 
+  // Debug: Log filtered data
+  console.log('Dados do gráfico:', listagemPlantoes)
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -681,7 +683,7 @@ export default function DashboardPage() {
               {(() => {
                 // Cache-breaking comment: Force Vercel rebuild - 2024-05-11
                 // Calculate efficiency by hospital using FILTERED data
-                const hospitalEfficiency = filteredPlantoes
+                const hospitalEfficiency = listagemPlantoes
                   .filter((p: any) => p.status === 'pago' && p.horas && p.horas > 0)
                   .reduce((acc: any, plantao: any) => {
                     const hospital = plantao.hospital
@@ -973,15 +975,103 @@ export default function DashboardPage() {
               <p className="text-gray-500">Nenhum plantão agendado</p>
             </div>
           ) : (
-            <HistoryTable
-                upcomingPlantoes={upcomingPlantoes}
-                formatCurrency={formatCurrency}
-                formatDate={formatDate}
-                getStatusColor={getStatusColor}
-                handleEditPlantao={handleEditPlantao}
-                handleDeletePlantao={handleDeletePlantao}
-                deletingId={deletingId}
-              />
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead>
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Data
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Hospital
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Valor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Horas
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
+                      Ações
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {upcomingPlantoes.map((plantao) => (
+                    <tr key={plantao.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="font-semibold text-orange-600">
+                          {formatDate(plantao.data)}
+                        </div>
+                        {plantao.horas && (
+                          <div className="text-xs text-gray-500">{plantao.horas}h</div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div>
+                          <button
+                            onClick={() => {
+                              const query = plantao.endereco || plantao.hospital
+                              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
+                              window.open(mapsUrl, '_blank')
+                            }}
+                            className="text-gray-900 hover:text-orange-500 font-medium underline underline-offset-2 hover:underline-offset-4 transition-all duration-200"
+                          >
+                            {plantao.hospital}
+                          </button>
+                        </div>
+                        {plantao.endereco && (
+                          <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
+                            {plantao.endereco}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                        {formatCurrency(plantao.valor)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {plantao.horas}h
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
+                          {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleEditPlantao(plantao)}
+                            className="text-orange-500 hover:text-orange-600 p-1 rounded hover:bg-orange-50 transition-colors duration-200"
+                            title="Editar plantão"
+                          >
+                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeletePlantao(plantao.id)}
+                            disabled={deletingId === plantao.id}
+                            className="text-red-500 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                            title="Excluir plantão"
+                          >
+                            {deletingId === plantao.id ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-b border-red-500"></div>
+                            ) : (
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                            )}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
 
