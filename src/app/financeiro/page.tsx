@@ -369,7 +369,7 @@ export default function FinanceiroPage() {
     <div className="flex h-screen bg-gray-50">
       <Sidebar user={user} />
       
-      <div className="flex-1 overflow-auto pointer-events-auto">
+      <div className="flex-1 overflow-auto pointer-events-none">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">
@@ -537,7 +537,7 @@ export default function FinanceiroPage() {
               <h3 className="text-lg font-semibold text-gray-800">Gerenciar Despesas</h3>
               <button
                 onClick={() => setShowAddExpense(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 pointer-events-auto"
               >
                 + Nova Despesa
               </button>
