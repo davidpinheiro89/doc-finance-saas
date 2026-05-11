@@ -288,7 +288,7 @@ export default function DashboardPage() {
   const filteredMetrics = {
     quantidade: listagemPlantoes.length,
     valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
+    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
   }
 
   // Prepare data for bar chart (plantões by unit)
@@ -312,7 +312,7 @@ export default function DashboardPage() {
     if (!acc[unit]) {
       acc[unit] = 0
     }
-    acc[unit] += (plantao.horas as number || 0)
+    acc[unit] += (plantao.horas || plantao.carga_horaria || plantao.duration || 0) as number
     return acc
   }, {} as Record<string, number>)
 
@@ -616,8 +616,8 @@ export default function DashboardPage() {
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
   const horasTotais = plantoes
-    .filter(p => p.horas)
-    .reduce((sum, p) => sum + (p.horas || 0), 0)
+    .filter(p => p.horas || p.carga_horaria || p.duration)
+    .reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
 
   const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
 
@@ -680,14 +680,15 @@ export default function DashboardPage() {
               </div>
             </div>
             <div className="space-y-3">
-              {(() => {
+              {listagemPlantoes.length > 0 ? (() => {
                 // Cache-breaking comment: Force Vercel rebuild - 2024-05-11
                 // Calculate efficiency by hospital using FILTERED data
                 const hospitalEfficiency = listagemPlantoes
-                  .filter((p: any) => p.status === 'pago' && p.horas && p.horas > 0)
+                  .filter((p: any) => p.status === 'pago' && (p.horas || p.carga_horaria || p.duration) && (p.horas || p.carga_horaria || p.duration) > 0)
                   .reduce((acc: any, plantao: any) => {
                     const hospital = plantao.hospital
-                    const hourlyRate = plantao.valor / plantao.horas
+                    const hours = plantao.horas || plantao.carga_horaria || plantao.duration || 0
+                    const hourlyRate = plantao.valor / hours
                     
                     if (!acc[hospital]) {
                       acc[hospital] = {
@@ -699,7 +700,7 @@ export default function DashboardPage() {
                     }
                     
                     acc[hospital].totalValue += plantao.valor
-                    acc[hospital].totalHours += plantao.horas
+                    acc[hospital].totalHours += hours
                     acc[hospital].count += 1
                     acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
                     
@@ -759,7 +760,11 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 ))
-              })()}
+              })() : (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">Nenhum dado disponível para calcular eficiência</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -1006,8 +1011,8 @@ export default function DashboardPage() {
                         <div className="font-semibold text-orange-600">
                           {formatDate(plantao.data)}
                         </div>
-                        {plantao.horas && (
-                          <div className="text-xs text-gray-500">{plantao.horas}h</div>
+                        {(plantao.horas || plantao.carga_horaria || plantao.duration) && (
+                          <div className="text-xs text-gray-500">{plantao.horas || plantao.carga_horaria || plantao.duration}h</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1033,7 +1038,7 @@ export default function DashboardPage() {
                         {formatCurrency(plantao.valor)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {plantao.horas}h
+                        {(plantao.horas || plantao.carga_horaria || plantao.duration || 0)}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
