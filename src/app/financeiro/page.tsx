@@ -267,21 +267,6 @@ export default function FinanceiroPage() {
   }
 
   // Declare missing variables to fix build errors
-  const totalRecebido = 0
-  const totalDespesas = 0
-  const totalDespesasFixas = 0
-  const totalDespesasVariaveis = 0
-  const totalGeralDespesas = 0
-  const totalAReceber = 0
-  const filteredDespesas: any[] = []
-  const filteredPlantoes: any[] = []
-  const despesasFixas: any[] = []
-  const despesasVariaveis: any[] = []
-  const impostos = 0
-  const lucroLiquido = 0
-
-  // ALL CALCULATIONS REMOVED TO PREVENT INFINITE LOOPS
-  /*
   const filteredPlantoes = plantoes.filter(p => {
     if (selectedMonth === 'todos') {
       return p.data.startsWith(selectedYear + '-')
@@ -300,6 +285,7 @@ export default function FinanceiroPage() {
   const filteredDespesas = despesas
   console.log('Lista atualizada:', despesas.length, 'itens')
 
+  // Reactivated calculations for Insight card
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
   const despesasFixas = filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
@@ -311,11 +297,6 @@ export default function FinanceiroPage() {
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
   const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
-  
-  const impostos = totalRecebido * 0.15
-  
-  const lucroLiquido = totalRecebido - totalDespesas - impostos
-  */
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -376,7 +357,7 @@ export default function FinanceiroPage() {
                               </p>
                             </div>
                           )
-                        } else {
+                        } else if (totalRecebido > totalDespesasFixas) {
                           return (
                             <div>
                               <p className="text-green-600 font-medium">
