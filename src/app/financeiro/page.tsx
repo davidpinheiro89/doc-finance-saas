@@ -302,6 +302,8 @@ export default function FinanceiroPage() {
   const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
+  const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
+  
   const impostos = totalRecebido * 0.15
   const lucroLiquido = totalRecebido - totalDespesas - impostos
 
@@ -466,33 +468,35 @@ export default function FinanceiroPage() {
               </div>
               
               {/* Gráfico de Donut */}
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={[
-                      { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
-                      { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
-                    ]}
-                    cx="50%"
-                    cy="50%"
-                    outerRadius={60}
-                    fill="#8884d8"
-                    dataKey="value"
-                    label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
-                  >
-                    <Tooltip />
-                  </Pie>
-                  <Legend 
-                    verticalAlign="bottom" 
-                    height={36}
-                    formatter={(value: any, entry: any) => {
+              {totalGeralDespesas > 0 && (
+                <ResponsiveContainer width="100%" height={250}>
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
+                        { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={60}
+                      fill="#8884d8"
+                      dataKey="value"
+                      label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
+                    >
+                      <Tooltip />
+                    </Pie>
+                    <Legend 
+                      verticalAlign="bottom" 
+                      height={36}
+                      formatter={(value: any, entry: any) => {
                       const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
                       const entryValue = typeof value === 'number' ? value : 0
                       return `${entryName}: ${formatCurrency(entryValue)}`
                     }}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
             
             {/* Cards de Resumo Financeiro */}
