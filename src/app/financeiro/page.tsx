@@ -296,19 +296,8 @@ export default function FinanceiroPage() {
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
-  const filteredDespesas = despesas.filter(d => {
-    if (selectedMonth === 'todos') {
-      return d.data.startsWith(selectedYear + '-')
-    }
-    // Extract month and year from both dates to compare properly
-    const expenseDate = new Date(d.data)
-    const filterDate = new Date(selectedMonth + '-01')
-    const matches = expenseDate.getMonth() === filterDate.getMonth() && expenseDate.getFullYear() === filterDate.getFullYear()
-    if (!matches) {
-      console.log(`Item ignorado por data divergente: ${d.data} (despesa) vs ${selectedMonth} (filtro)`)
-    }
-    return matches
-  })
+  const filteredDespesas = despesas
+  console.log('Lista atualizada:', despesas.length, 'itens')
 
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
