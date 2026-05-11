@@ -135,7 +135,16 @@ export default function AnalyticsPage() {
       percentage: (hours / totalHours) * 100
     })).sort((a, b) => b.percentage - a.percentage)
     
-    return concentrationData[0] // Return the unit with highest concentration
+    const topConcentration = concentrationData[0]
+    console.log('🔍 Workload Concentration Debug:', {
+      totalHours,
+      hoursByUnit,
+      topUnit: topConcentration?.unit,
+      topPercentage: topConcentration?.percentage,
+      thresholdMet: topConcentration?.percentage >= 70
+    })
+    
+    return topConcentration
   }
 
   const workloadConcentration = getWorkloadConcentration()
@@ -357,10 +366,17 @@ export default function AnalyticsPage() {
 
         {/* Alerta de Concentração */}
         {workloadConcentration && workloadConcentration.percentage >= 70 && (
-          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-8">
+          <div className="bg-orange-50 border border-orange-200 rounded-lg px-4 py-3 mb-8" style={{ display: 'block' }}>
             <p className="text-sm font-medium text-orange-800">
               ⚠️ Atenção: {workloadConcentration.percentage.toFixed(1)}% da sua carga horária está concentrada no <span className="font-bold">{workloadConcentration.unit}</span>.
             </p>
+          </div>
+        )}
+        
+        {/* Debug Info - Temporarily visible */}
+        {workloadConcentration && (
+          <div className="bg-gray-100 border border-gray-300 rounded-lg px-4 py-2 mb-4 text-xs">
+            <strong>Debug:</strong> {workloadConcentration.unit} = {workloadConcentration.percentage.toFixed(1)}% {workloadConcentration.percentage >= 70 ? '🚨 ALERTA ATIVO' : '✅ Abaixo do limite'}
           </div>
         )}
 
