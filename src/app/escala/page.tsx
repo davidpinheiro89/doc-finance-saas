@@ -48,20 +48,46 @@ export default function EscalaPage() {
     hospital: '',
     data: '',
     valor: '',
+    status: 'pendente',
     horas: '',
     endereco: '',
     cep: '',
     data_prevista_pagamento: '',
-    prazo_pagamento_dias: '30',
+    prazo_pagamento_dias: '',
     classificacao: '',
-    especialidade: ''
+    especialidade: '',
+    local_favorito_id: ''
   })
+  const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([])
   const router = useRouter()
 
   useEffect(() => {
     checkAuth()
+    fetchLocaisFavoritos()
     console.log('Componente montado com sucesso')
   }, [])
+
+  const fetchLocaisFavoritos = async () => {
+    if (!user) return
+    
+    try {
+      const { data, error } = await supabase
+        .from('locais_favoritos')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching favorite locations:', error)
+        return
+      }
+
+      setLocaisFavoritos(data || [])
+    } catch (error) {
+      console.error('Error fetching favorite locations:', error)
+    }
+  }
 
   const checkAuth = async () => {
     try {
@@ -217,7 +243,7 @@ export default function EscalaPage() {
     await handleAddStatus(status)
   }
 
-  const handlePlantaoFormSubmit = async (e: React.FormEvent) => {
+  const handleSavePlantao = async (e: React.FormEvent) => {
     e.preventDefault()
     
     if (!user) {
@@ -226,40 +252,72 @@ export default function EscalaPage() {
     }
 
     try {
-      const plantaoData = {
-        ...formData,
-        tipo_evento: 'plantao',
-        status: 'confirmado',
-        valor: parseFloat(formData.valor) || 0,
-        horas: parseFloat(formData.horas) || 0,
-        data: formData.data || (selectedDate ? formatDateYYYYMMDD(selectedDate) : new Date().toISOString().split('T')[0])
+      // Validate required fields
+      if (!formData.hospital || !formData.data || !formData.valor || !user.id) {
+        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user.id })
+        alert('Preencha todos os campos obrigatórios.')
+        return
       }
 
+      // Implement date automation logic
+      const selectedDate = new Date(formData.data)
+      const today = new Date()
+      today.setHours(0, 0, 0, 0)
+      
+      // Auto-determine status based on date comparison
+      let autoStatus = formData.status
+      if (selectedDate < today) {
+        autoStatus = 'realizado'
+      } else if (selectedDate >= today) {
+        autoStatus = 'pendente'
+      }
+
+      const plantaoData = {
+        usuario_id: user.id,
+        hospital: formData.hospital.trim(),
+        data: formData.data,
+        valor: parseFloat(formData.valor),
+        status: autoStatus,
+        horas: formData.horas ? parseFloat(formData.horas) : 0,
+        endereco: formData.endereco?.trim() || null,
+        data_prevista_pagamento: formData.data_prevista_pagamento || null,
+        prazo_pagamento_dias: formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null,
+        classificacao: formData.classificacao || null,
+        especialidade: formData.especialidade || null
+      }
+
+      console.log('Saving plantão to table "plantoes":', plantaoData)
       const { data, error } = await supabase
         .from('plantoes')
         .insert([plantaoData])
         .select()
 
       if (error) {
-        console.error('Erro ao salvar plantão:', error)
-        alert('Erro ao salvar plantão: ' + error.message)
+        console.error('Supabase error saving plantão:', error)
+        if (error.code === 'PGRST116') {
+          alert('Tabela "plantoes" não encontrada. Verifique se a tabela foi criada corretamente no Supabase.')
+        } else {
+          alert('Erro ao salvar plantão: ' + error.message)
+        }
         return
       }
 
-      console.log('Plantão salvo com sucesso:', data)
+      console.log('Plantão saved successfully:', data)
       alert('✅ Plantão agendado com sucesso!')
       setShowPlantaoForm(false)
       setFormData({
         hospital: '',
         data: '',
         valor: '',
+        status: 'pendente',
         horas: '',
         endereco: '',
         cep: '',
         data_prevista_pagamento: '',
-        prazo_pagamento_dias: '30',
+        prazo_pagamento_dias: '',
         classificacao: '',
-        especialidade: ''
+        especialidade: '',
+        local_favorito_id: ''
       })
       
       await fetchPlantoes(user.id)
@@ -267,6 +325,63 @@ export default function EscalaPage() {
     } catch (error) {
       console.error('Erro ao salvar plantão:', error)
       alert('Erro ao salvar plantão. Tente novamente.')
+    }
+  }
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }))
+  }
+
+  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedLocationId = e.target.value
+    const selectedLocation = locaisFavoritos.find(local => local.id === selectedLocationId)
+    
+    if (selectedLocation) {
+      setFormData(prev => ({
+        ...prev,
+        local_favorito_id: selectedLocationId,
+        hospital: selectedLocation.nome,
+        endereco: selectedLocation.endereco || ''
+      }))
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        local_favorito_id: '',
+        hospital: '',
+        endereco: ''
+      }))
+    }
+  }
+
+  const handleCepLookup = async () => {
+    const cep = formData.cep.replace(/\D/g, '')
+    
+    if (cep.length !== 8) {
+      alert('CEP inválido. Digite 8 dígitos.')
+      return
+    }
+
+    try {
+      const response = await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+      const data = await response.json()
+
+      if (data.erro) {
+        alert('CEP não encontrado.')
+        return
+      }
+
+      const fullAddress = `${data.logradouro}, ${data.bairro}, ${data.localidade} - ${data.uf}`
+      setFormData(prev => ({
+        ...prev,
+        endereco: fullAddress
+      }))
+    } catch (error) {
+      console.error('Error looking up CEP:', error)
+      alert('Erro ao buscar CEP. Tente novamente.')
     }
   }
 
@@ -457,73 +572,120 @@ export default function EscalaPage() {
               <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                 <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto">
                   <h3 className="text-lg font-semibold mb-4">Agendar Novo Plantão</h3>
-                  <form onSubmit={handlePlantaoFormSubmit} className="space-y-4">
+                  <form onSubmit={handleSavePlantao} className="space-y-4">
+                    {/* Hospital/Local */}
                     <div>
                       <label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
-                        Hospital
+                        Hospital/Local
                       </label>
-                      <input
-                        type="text"
-                        id="hospital"
-                        value={formData.hospital}
-                        onChange={(e) => setFormData(prev => ({ ...prev, hospital: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Nome do hospital"
-                        required
-                      />
+                      <div className="flex space-x-2">
+                        <input
+                          type="text"
+                          id="hospital"
+                          name="hospital"
+                          value={formData.hospital}
+                          onChange={handleInputChange}
+                          className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          placeholder="Nome do hospital"
+                          required
+                        />
+                        <select
+                          id="local_favorito_id"
+                          name="local_favorito_id"
+                          value={formData.local_favorito_id || ''}
+                          onChange={handleLocationChange}
+                          className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        >
+                          <option value="">Selecionar Local Salvo</option>
+                          {locaisFavoritos.map((local) => (
+                            <option key={local.id} value={local.id}>
+                              {local.nome}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
+                    {/* Data */}
                     <div>
                       <label htmlFor="data" className="block text-sm font-medium text-gray-700 mb-2">
-                        Data
+                        Data do Plantão
                       </label>
                       <input
                         type="date"
                         id="data"
+                        name="data"
                         value={formData.data}
-                        onChange={(e) => setFormData(prev => ({ ...prev, data: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onChange={handleInputChange}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         required
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="valor" className="block text-sm font-medium text-gray-700 mb-2">
-                          Valor (R$)
-                        </label>
-                        <input
-                          type="number"
-                          id="valor"
-                          value={formData.valor}
-                          onChange={(e) => setFormData(prev => ({ ...prev, valor: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          required
-                        />
-                      </div>
+                    {/* Valor */}
+                    <div>
+                      <label htmlFor="valor" className="block text-sm font-medium text-gray-700 mb-2">
+                        Valor (R$)
+                      </label>
+                      <input
+                        type="number"
+                        id="valor"
+                        name="valor"
+                        value={formData.valor}
+                        onChange={handleInputChange}
+                        step="0.01"
+                        min="0"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        placeholder="0.00"
+                        required
+                      />
+                    </div>
 
-                      <div>
-                        <label htmlFor="horas" className="block text-sm font-medium text-gray-700 mb-2">
-                          Horas
-                        </label>
+                    {/* Duração (Horas) */}
+                    <div>
+                      <label htmlFor="horas" className="block text-sm font-medium text-gray-700 mb-2">
+                        Duração (Horas)
+                      </label>
+                      <input
+                        type="number"
+                        id="horas"
+                        name="horas"
+                        value={formData.horas}
+                        onChange={handleInputChange}
+                        step="0.5"
+                        min="0"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        placeholder="12"
+                      />
+                    </div>
+
+                    {/* CEP */}
+                    <div>
+                      <label htmlFor="cep" className="block text-sm font-medium text-gray-700 mb-2">
+                        CEP
+                      </label>
+                      <div className="flex space-x-2">
                         <input
-                          type="number"
-                          id="horas"
-                          value={formData.horas}
-                          onChange={(e) => setFormData(prev => ({ ...prev, horas: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="12"
-                          step="0.5"
-                          min="0"
-                          max="24"
-                          required
+                          type="text"
+                          id="cep"
+                          name="cep"
+                          value={formData.cep}
+                          onChange={handleInputChange}
+                          maxLength={9}
+                          className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          placeholder="00000-000"
                         />
+                        <button
+                          type="button"
+                          onClick={handleCepLookup}
+                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg transition-colors duration-200"
+                        >
+                          Buscar
+                        </button>
                       </div>
                     </div>
 
+                    {/* Endereço */}
                     <div>
                       <label htmlFor="endereco" className="block text-sm font-medium text-gray-700 mb-2">
                         Endereço
@@ -531,99 +693,84 @@ export default function EscalaPage() {
                       <input
                         type="text"
                         id="endereco"
-                        value={formData.endereco}
-                        onChange={(e) => setFormData(prev => ({ ...prev, endereco: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        name="endereco"
+                        value={formData.endereco || ''}
+                        onChange={handleInputChange}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                         placeholder="Endereço completo"
                       />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="cep" className="block text-sm font-medium text-gray-700 mb-2">
-                          CEP
-                        </label>
-                        <input
-                          type="text"
-                          id="cep"
-                          value={formData.cep}
-                          onChange={(e) => setFormData(prev => ({ ...prev, cep: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="12345-678"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
-                          Prazo (dias)
-                        </label>
-                        <input
-                          type="number"
-                          id="prazo_pagamento_dias"
-                          value={formData.prazo_pagamento_dias}
-                          onChange={(e) => setFormData(prev => ({ ...prev, prazo_pagamento_dias: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          placeholder="30"
-                          min="0"
-                        />
-                      </div>
-                    </div>
-
+                    {/* Prazo de Pagamento */}
                     <div>
-                      <label htmlFor="data_prevista_pagamento" className="block text-sm font-medium text-gray-700 mb-2">
-                        Data Prevista Pagamento
+                      <label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
+                        Prazo de Pagamento (dias)
                       </label>
                       <input
-                        type="date"
-                        id="data_prevista_pagamento"
-                        value={formData.data_prevista_pagamento}
-                        onChange={(e) => setFormData(prev => ({ ...prev, data_prevista_pagamento: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        type="number"
+                        id="prazo_pagamento_dias"
+                        name="prazo_pagamento_dias"
+                        value={formData.prazo_pagamento_dias}
+                        onChange={handleInputChange}
+                        min="1"
+                        max="365"
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                        placeholder="30"
                       />
+                      <p className="text-xs text-gray-500 mt-1">Dias após a data do plantão para pagamento</p>
                     </div>
 
+                    {/* Classificação/Setor */}
                     <div>
                       <label htmlFor="classificacao" className="block text-sm font-medium text-gray-700 mb-2">
-                        Classificação
+                        Classificação/Setor
                       </label>
                       <select
                         id="classificacao"
+                        name="classificacao"
                         value={formData.classificacao}
-                        onChange={(e) => setFormData(prev => ({ ...prev, classificacao: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        onChange={handleInputChange}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                       >
                         <option value="">Selecione...</option>
-                        <option value="plantao">Plantão</option>
-                        <option value="extra">Extra</option>
-                        <option value="plantao_extra">Plantão Extra</option>
+                        <option value="Sala Verde">Sala Verde</option>
+                        <option value="Sala Amarela">Sala Amarela</option>
+                        <option value="Sala Vermelha">Sala Vermelha</option>
+                        <option value="Outro">Outro</option>
                       </select>
                     </div>
 
+                    {/* Especialidade */}
                     <div>
                       <label htmlFor="especialidade" className="block text-sm font-medium text-gray-700 mb-2">
                         Especialidade
                       </label>
-                      <input
-                        type="text"
+                      <select
                         id="especialidade"
+                        name="especialidade"
                         value={formData.especialidade}
-                        onChange={(e) => setFormData(prev => ({ ...prev, especialidade: e.target.value }))}
-                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="Ex: Clínica Geral"
-                      />
+                        onChange={handleInputChange}
+                        className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                      >
+                        <option value="">Selecione...</option>
+                        <option value="Clínica Médica">Clínica Médica</option>
+                        <option value="Pediatria">Pediatria</option>
+                        <option value="Outro">Outro</option>
+                      </select>
                     </div>
 
-                    <div className="flex gap-3 pt-4">
+                    {/* Actions */}
+                    <div className="flex space-x-2 mt-4">
                       <button
                         type="submit"
-                        className="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg hover:bg-blue-600 transition-colors font-medium"
+                        className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                       >
-                        Agendar Plantão
+                        Cadastrar Plantão
                       </button>
                       <button
                         type="button"
                         onClick={() => setShowPlantaoForm(false)}
-                        className="flex-1 bg-gray-200 text-gray-800 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                        className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                       >
                         Cancelar
                       </button>
