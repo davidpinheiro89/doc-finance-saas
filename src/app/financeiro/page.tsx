@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo, memo } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
+// Chart imports removed to prevent loops
 
 interface Plantao {
   id: string
@@ -258,7 +258,7 @@ export default function FinanceiroPage() {
     }
   }
 
-  // Filter plantões by selected month/year
+  // Simple calculations without useMemo to prevent loops
   const filteredPlantoes = plantoes.filter(p => {
     if (selectedMonth === 'todos') {
       return p.data.startsWith(selectedYear + '-')
@@ -274,47 +274,28 @@ export default function FinanceiroPage() {
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
-    // Memoized calculations to prevent infinite loops
-  const filteredDespesas = useMemo(() => {
-    return despesas.filter(d => {
-      if (selectedMonth === 'todos') {
-        return d.data.startsWith(selectedYear + '-')
-      }
-      return d.data.startsWith(selectedMonth)
-    })
-  }, [despesas.length, selectedMonth, selectedYear])
+  const filteredDespesas = despesas.filter(d => {
+    if (selectedMonth === 'todos') {
+      return d.data.startsWith(selectedYear + '-')
+    }
+    return d.data.startsWith(selectedMonth)
+  })
 
-  const totalDespesas = useMemo(() => {
-    return filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [filteredDespesas.length])
+  const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  const despesasFixas = useMemo(() => {
-    return filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
-  }, [filteredDespesas.length])
+  const despesasFixas = filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
   
-  const despesasVariaveis = useMemo(() => {
-    return filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
-  }, [filteredDespesas.length])
+  const despesasVariaveis = filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
   
-  const totalDespesasFixas = useMemo(() => {
-    return despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [despesasFixas.length])
+  const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  const totalDespesasVariaveis = useMemo(() => {
-    return despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [despesasVariaveis.length])
+  const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  const totalGeralDespesas = useMemo(() => {
-    return totalDespesasFixas + totalDespesasVariaveis
-  }, [totalDespesasFixas, totalDespesasVariaveis])
+  const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
   
-  const impostos = useMemo(() => {
-    return totalRecebido * 0.15
-  }, [totalRecebido])
+  const impostos = totalRecebido * 0.15
   
-  const lucroLiquido = useMemo(() => {
-    return totalRecebido - totalDespesas - impostos
-  }, [totalRecebido, totalDespesas, impostos])
+  const lucroLiquido = totalRecebido - totalDespesas - impostos
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -332,7 +313,8 @@ export default function FinanceiroPage() {
     })
   }
 
-  // Memoized PieChart component to prevent re-renders
+  // Memoized PieChart component to prevent re-renders - COMPLETELY DISABLED
+  /*
   const MemoizedPieChart = memo(() => (
     <div className="pointer-events-none">
       <ResponsiveContainer width="100%" height={250}>
@@ -364,6 +346,7 @@ export default function FinanceiroPage() {
       </ResponsiveContainer>
     </div>
   ))
+  */
 
   return (
     <div className="flex h-screen bg-gray-50 pointer-events-none">
