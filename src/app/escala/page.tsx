@@ -336,25 +336,55 @@ export default function EscalaPage() {
     }))
   }
 
-  const handleLocationChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const selectedLocationId = e.target.value
-    const selectedLocation = locaisFavoritos.find(local => local.id === selectedLocationId)
+  const handleHospitalChange = async (value: string) => {
+    setFormData(prev => ({ ...prev, hospital: value }))
     
-    if (selectedLocation) {
-      setFormData(prev => ({
-        ...prev,
-        local_favorito_id: selectedLocationId,
-        hospital: selectedLocation.nome,
-        endereco: selectedLocation.endereco || ''
-      }))
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        local_favorito_id: '',
-        hospital: '',
-        endereco: ''
-      }))
+    if (value.length < 2) {
+      setHospitalSuggestions([])
+      setShowSuggestions(false)
+      return
     }
+
+    try {
+      const { data, error } = await supabase
+        .from('plantoes')
+        .select('hospital, endereco, cep')
+        .ilike('hospital', `%${value}%`)
+        .limit(5)
+
+      if (error) {
+        console.error('Error fetching hospital suggestions:', error)
+        return
+      }
+
+      const uniqueHospitals = data?.reduce((acc: any[], plantao) => {
+        const exists = acc.find(h => h.hospital === plantao.hospital)
+        if (!exists && plantao.hospital) {
+          acc.push({
+            hospital: plantao.hospital,
+            endereco: plantao.endereco,
+            cep: plantao.cep
+          })
+        }
+        return acc
+      }, []) || []
+
+      setHospitalSuggestions(uniqueHospitals)
+      setShowSuggestions(true)
+    } catch (error) {
+      console.error('Error searching hospitals:', error)
+    }
+  }
+
+  const selectHospital = (hospital: any) => {
+    setFormData(prev => ({
+      ...prev,
+      hospital: hospital.hospital,
+      endereco: hospital.endereco || '',
+      cep: hospital.cep || ''
+    }))
+    setShowSuggestions(false)
+    setHospitalSuggestions([])
   }
 
   const handleCepLookup = async () => {
@@ -578,31 +608,33 @@ export default function EscalaPage() {
                       <label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
                         Hospital/Local
                       </label>
-                      <div className="flex space-x-2">
+                      <div className="relative">
                         <input
                           type="text"
                           id="hospital"
                           name="hospital"
                           value={formData.hospital}
-                          onChange={handleInputChange}
-                          className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          onChange={(e) => handleHospitalChange(e.target.value)}
+                          className="w-full block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                           placeholder="Nome do hospital"
                           required
                         />
-                        <select
-                          id="local_favorito_id"
-                          name="local_favorito_id"
-                          value={formData.local_favorito_id || ''}
-                          onChange={handleLocationChange}
-                          className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                        >
-                          <option value="">Selecionar Local Salvo</option>
-                          {locaisFavoritos.map((local) => (
-                            <option key={local.id} value={local.id}>
-                              {local.nome}
-                            </option>
-                          ))}
-                        </select>
+                        {showSuggestions && hospitalSuggestions.length > 0 && (
+                          <div className="absolute z-10 w-full bg-white border border-gray-300 rounded-lg mt-1 max-h-40 overflow-y-auto shadow-lg">
+                            {hospitalSuggestions.map((hospital, index) => (
+                              <div
+                                key={index}
+                                onClick={() => selectHospital(hospital)}
+                                className="px-3 py-2 hover:bg-gray-100 cursor-pointer border-b border-gray-100 last:border-b-0 transition-colors"
+                              >
+                                <div className="font-medium text-gray-900">{hospital.hospital}</div>
+                                {hospital.endereco && (
+                                  <div className="text-xs text-gray-500">{hospital.endereco}</div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 
