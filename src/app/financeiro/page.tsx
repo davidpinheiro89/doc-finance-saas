@@ -346,40 +346,42 @@ export default function FinanceiroPage() {
 
   // Memoized PieChart component to prevent re-renders
   const MemoizedPieChart = memo(() => (
-    <ResponsiveContainer width="100%" height={250}>
-      <PieChart>
-        <Pie
-          data={[
-            { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
-            { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
-          ]}
-          cx="50%"
-          cy="50%"
-          outerRadius={60}
-          fill="#8884d8"
-          dataKey="value"
-          label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
-        >
-          <Tooltip />
-        </Pie>
-        <Legend 
-          verticalAlign="bottom" 
-          height={36}
-          formatter={(value: any, entry: any) => {
-            const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
-            const entryValue = typeof value === 'number' ? value : 0
-            return `${entryName}: ${formatCurrency(entryValue)}`
-          }}
-        />
-      </PieChart>
-    </ResponsiveContainer>
+    <div className="pointer-events-none">
+      <ResponsiveContainer width="100%" height={250}>
+        <PieChart>
+          <Pie
+            data={[
+              { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
+              { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
+            ]}
+            cx="50%"
+            cy="50%"
+            outerRadius={60}
+            fill="#8884d8"
+            dataKey="value"
+            label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
+          >
+            <Tooltip />
+          </Pie>
+          <Legend 
+            verticalAlign="bottom" 
+            height={36}
+            formatter={(value: any, entry: any) => {
+              const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
+              const entryValue = typeof value === 'number' ? value : 0
+              return `${entryName}: ${formatCurrency(entryValue)}`
+            }}
+          />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
   ))
 
   return (
     <div className="flex h-screen bg-gray-50">
       <Sidebar user={user} />
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto pointer-events-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-8">

@@ -83,7 +83,7 @@ export default function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Desktop Sidebar */}
-      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative h-full z-40 ${
+      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed md:relative h-full z-[9999] ${
         isMobile ? (isCollapsed ? 'translate-x-0' : '-translate-x-full') : ''
       } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
