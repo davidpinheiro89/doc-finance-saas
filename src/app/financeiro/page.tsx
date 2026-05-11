@@ -176,6 +176,9 @@ export default function FinanceiroPage() {
       })
       setShowAddExpense(false)
       await fetchDespesas(user.id)
+      console.log('Despesa adicionada com sucesso:', newExpense)
+      // Force immediate refresh to ensure new expense appears in list
+      setTimeout(() => fetchDespesas(user.id), 500)
     } catch (error) {
       alert('Erro ao adicionar despesa. Tente novamente.')
     }
@@ -293,7 +296,7 @@ export default function FinanceiroPage() {
     if (selectedMonth === 'todos') {
       return d.data.startsWith(selectedYear + '-')
     }
-    return d.data.startsWith(selectedMonth)
+    return d.data.startsWith(selectedMonth.slice(5))
   })
 
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
