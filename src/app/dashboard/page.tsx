@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
@@ -80,6 +80,7 @@ export default function DashboardPage() {
   const [chartReady, setChartReady] = useState(false)
   const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
   const [previousMonthData, setPreviousMonthData] = useState<any[]>([])
+  const [isComparing, setIsComparing] = useState(false)
   const [formData, setFormData] = useState({
     hospital: '',
     data: '',
@@ -248,6 +249,7 @@ export default function DashboardPage() {
 
   // Fetch previous month data
   const fetchPreviousMonthData = async (userId: string) => {
+    setIsComparing(true)
     try {
       const { start, end } = getPreviousMonthRange()
       const { data, error } = await supabase
@@ -265,9 +267,12 @@ export default function DashboardPage() {
       }
 
       setPreviousMonthData(data || [])
+      console.log('Dados do mês anterior carregados:', data?.length || 0, 'itens')
     } catch (error) {
       console.error('Error fetching previous month data:', error)
       setPreviousMonthData([])
+    } finally {
+      setIsComparing(false)
     }
   }
 
@@ -391,32 +396,53 @@ export default function DashboardPage() {
       }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
   }
 
-  // useEffect to calculate efficiency data when listagemPlantoes changes
-  useEffect(() => {
-    if (listagemPlantoes.length > 0) {
-      console.log('Processando dados para gráfico:', listagemPlantoes)
-      
-      const hospitalEfficiency = calculateEfficiency(listagemPlantoes)
-      console.log('Dados processados pelo gráfico:', hospitalEfficiency)
+  // Memoized efficiency calculations to prevent unnecessary re-renders
+  const currentMonthEfficiency = useMemo(() => {
+    return calculateEfficiency(listagemPlantoes)
+  }, [listagemPlantoes])
 
-      const sortedHospitals = Object.entries(hospitalEfficiency)
+  const previousMonthEfficiency = useMemo(() => {
+    return calculateEfficiency(previousMonthData)
+  }, [previousMonthData])
+
+  const efficiencyWithComparison = useMemo(() => {
+    if (!isComparing || monthlyFilter !== 'current') {
+      return Object.entries(currentMonthEfficiency)
         .map(([hospital, data]: any) => ({
           hospital,
           data,
-          delta: 0 // Temporarily disabled
+          delta: 0
         }))
         .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
         .slice(0, 3)
+    }
 
-      console.log('Dados finais para renderização:', sortedHospitals)
+    return Object.entries(currentMonthEfficiency)
+      .map(([hospital, data]: any) => {
+        const previousData = previousMonthEfficiency[hospital]
+        const delta = previousData ? ((data.hourlyRate / previousData.hourlyRate) - 1) * 100 : 0
+        
+        return {
+          hospital,
+          data,
+          delta: Number(delta.toFixed(1))
+        }
+      })
+      .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
+      .slice(0, 3)
+  }, [currentMonthEfficiency, previousMonthEfficiency, isComparing, monthlyFilter])
 
-      setEfficiencyData(sortedHospitals)
+  // useEffect to update efficiency data when memoized calculations change
+  useEffect(() => {
+    if (efficiencyWithComparison.length > 0) {
+      console.log('Atualizando gráfico com dados memoizados:', efficiencyWithComparison)
+      setEfficiencyData(efficiencyWithComparison)
       setChartReady(true)
     } else {
       setEfficiencyData([])
       setChartReady(false)
     }
-  }, [listagemPlantoes.length]) // Simplified dependency
+  }, [efficiencyWithComparison]) // Only depends on memoized data
 
   // Prepare data for bar chart (plantões by unit)
   const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
@@ -799,7 +825,32 @@ export default function DashboardPage() {
           {/* Efficiency Calculation Card */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Eficiência por Hospital</h3>
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-semibold text-gray-800">Eficiência por Hospital</h3>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600">Período:</label>
+                  <select
+                    value={monthlyFilter}
+                    onChange={(e) => setMonthlyFilter(e.target.value as 'current' | 'previous')}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="current">Mês Atual</option>
+                    <option value="previous">Mês Anterior</option>
+                  </select>
+                  {monthlyFilter === 'current' && (
+                    <button
+                      onClick={() => {
+                        setIsComparing(true)
+                        fetchPreviousMonthData(user.id)
+                      }}
+                      disabled={isComparing}
+                      className="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors duration-200"
+                    >
+                      {isComparing ? 'Comparando...' : 'Comparar com Mês Anterior'}
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="bg-blue-100 rounded-full p-2">
                 <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -822,7 +873,23 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-800">{formatCurrency(item.data.hourlyRate)}/h</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-bold text-gray-800">{formatCurrency(item.data.hourlyRate)}/h</p>
+                        {monthlyFilter === 'current' && isComparing && item.delta !== 0 && (
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            item.delta > 0 
+                              ? 'bg-green-100 text-green-700' 
+                              : item.delta < 0 
+                                ? 'bg-red-100 text-red-700' 
+                                : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            <span>
+                              {item.delta > 0 ? '↑' : item.delta < 0 ? '↓' : '→'}
+                            </span>
+                            <span>{Math.abs(item.delta)}%</span>
+                          </div>
+                        )}
+                      </div>
                       <p className="text-xs text-gray-500">R$/h</p>
                       <p className="text-xs text-gray-500">{item.data.totalHours}h totais</p>
                     </div>
