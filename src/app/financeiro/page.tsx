@@ -81,19 +81,17 @@ export default function FinanceiroPage() {
   const fetchPlantoes = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('plantoes')
+        .from('plantões')
         .select('*')
         .eq('user_id', userId)
 
       if (error) {
-        console.error('Error fetching plantões:', error)
         setPlantoes([])
         return
       }
 
       setPlantoes(data || [])
     } catch (error) {
-      console.error('Error fetching plantões:', error)
       setPlantoes([])
     }
   }
@@ -107,14 +105,12 @@ export default function FinanceiroPage() {
         .order('data', { ascending: false })
 
       if (error) {
-        console.error('Error fetching despesas:', error)
         setDespesas([])
         return
       }
 
       setDespesas(data || [])
     } catch (error) {
-      console.error('Error fetching despesas:', error)
       setDespesas([])
     }
   }
@@ -150,7 +146,6 @@ export default function FinanceiroPage() {
           .insert(expensesToInsert)
 
         if (recurringError) {
-          console.error('Error adding recurring expenses:', recurringError)
           alert('Erro ao adicionar despesas recorrentes: ' + recurringError.message)
           return
         }
@@ -167,7 +162,6 @@ export default function FinanceiroPage() {
           })
 
         if (error) {
-          console.error('Error adding despesa:', error)
           alert('Erro ao adicionar despesa: ' + error.message)
           return
         }
@@ -183,7 +177,6 @@ export default function FinanceiroPage() {
       setShowAddExpense(false)
       await fetchDespesas(user.id)
     } catch (error) {
-      console.error('Error adding despesa:', error)
       alert('Erro ao adicionar despesa. Tente novamente.')
     }
   }
@@ -209,7 +202,6 @@ export default function FinanceiroPage() {
         .eq('id', editingExpense.id)
 
       if (error) {
-        console.error('Error updating despesa:', error)
         alert('Erro ao atualizar despesa: ' + error.message)
         return
       }
@@ -218,7 +210,6 @@ export default function FinanceiroPage() {
       setEditingExpense(null)
       await fetchDespesas(user.id)
     } catch (error) {
-      console.error('Error updating despesa:', error)
       alert('Erro ao atualizar despesa. Tente novamente.')
     }
   }
@@ -246,7 +237,6 @@ export default function FinanceiroPage() {
           .eq('recorrente', true)
 
         if (error) {
-          console.error('Error deleting recurring expenses:', error)
           alert('Erro ao excluir despesas recorrentes: ' + error.message)
           return
         }
@@ -257,7 +247,6 @@ export default function FinanceiroPage() {
           .eq('id', despesa.id)
 
         if (error) {
-          console.error('Error deleting despesa:', error)
           alert('Erro ao excluir despesa: ' + error.message)
           return
         }
@@ -265,7 +254,6 @@ export default function FinanceiroPage() {
 
       await fetchDespesas(user.id)
     } catch (error) {
-      console.error('Error deleting despesa:', error)
       alert('Erro ao excluir despesa. Tente novamente.')
     }
   }
@@ -521,8 +509,8 @@ export default function FinanceiroPage() {
                 </div>
               </div>
               
-              {/* Gráfico de Donut */}
-              {totalGeralDespesas > 0 && <MemoizedPieChart />}
+              {/* Gráfico de Donut - TEMPORARILAMENTE DESATIVADO */}
+              {/* {totalGeralDespesas > 0 && <MemoizedPieChart />} */}
             </div>
             
             {/* Cards de Resumo Financeiro */}
