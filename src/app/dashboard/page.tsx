@@ -78,6 +78,8 @@ export default function DashboardPage() {
   const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([]) // Add favorite locations state
   const [efficiencyData, setEfficiencyData] = useState<any[]>([])
   const [chartReady, setChartReady] = useState(false)
+  const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
+  const [previousMonthData, setPreviousMonthData] = useState<any[]>([])
   const [formData, setFormData] = useState({
     hospital: '',
     data: '',
@@ -109,6 +111,7 @@ export default function DashboardPage() {
       
       setUser(user)
       await fetchPlantoes(user.id)
+      await fetchPreviousMonthData(user.id)
     } catch (error) {
       router.push('/login')
     } finally {
@@ -219,6 +222,55 @@ export default function DashboardPage() {
     }))
   }
 
+  // Function to calculate previous month date range
+  const getPreviousMonthRange = () => {
+    const now = new Date()
+    const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0)
+    
+    return {
+      start: previousMonth.toISOString().split('T')[0],
+      end: lastDayOfPreviousMonth.toISOString().split('T')[0]
+    }
+  }
+
+  // Function to get current month date range
+  const getCurrentMonthRange = () => {
+    const now = new Date()
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+    
+    return {
+      start: firstDayOfMonth.toISOString().split('T')[0],
+      end: lastDayOfMonth.toISOString().split('T')[0]
+    }
+  }
+
+  // Fetch previous month data
+  const fetchPreviousMonthData = async (userId: string) => {
+    try {
+      const { start, end } = getPreviousMonthRange()
+      const { data, error } = await supabase
+        .from('plantoes')
+        .select('*')
+        .eq('usuario_id', userId)
+        .gte('data', start)
+        .lte('data', end)
+        .order('data', { ascending: false })
+
+      if (error) {
+        console.error('Error fetching previous month data:', error)
+        setPreviousMonthData([])
+        return
+      }
+
+      setPreviousMonthData(data || [])
+    } catch (error) {
+      console.error('Error fetching previous month data:', error)
+      setPreviousMonthData([])
+    }
+  }
+
   const handleSaveAsFavorite = async () => {
     if (!formData.hospital || !formData.endereco) {
       alert('Para salvar como favorito, preencha primeiro o Hospital/Local e Endereço.')
@@ -266,22 +318,40 @@ export default function DashboardPage() {
     }
   }
 
-  // Filter plantões based on date range
+  // Filter plantões based on date range and monthly filter
   const getListagemPlantoes = () => {
-    if (!dateRange.start && !dateRange.end) {
-      return plantoes // Return all if no filter
+    let dataToFilter = plantoes
+
+    // Apply monthly filter
+    if (monthlyFilter === 'current') {
+      const { start, end } = getCurrentMonthRange()
+      dataToFilter = plantoes.filter(plantao => {
+        const plantaoDate = new Date(plantao.data)
+        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
+      })
+    } else if (monthlyFilter === 'previous') {
+      const { start, end } = getPreviousMonthRange()
+      dataToFilter = previousMonthData.filter(plantao => {
+        const plantaoDate = new Date(plantao.data)
+        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
+      })
     }
 
-    return plantoes.filter(plantao => {
-      const plantaoDate = new Date(plantao.data)
-      const startDate = dateRange.start ? new Date(dateRange.start) : null
-      const endDate = dateRange.end ? new Date(dateRange.end) : null
-      
-      if (startDate && plantaoDate < startDate) return false
-      if (endDate && plantaoDate > endDate) return false
-      
-      return true
-    })
+    // Apply custom date range filter if set
+    if (dateRange.start || dateRange.end) {
+      return dataToFilter.filter(plantao => {
+        const plantaoDate = new Date(plantao.data)
+        const startDate = dateRange.start ? new Date(dateRange.start) : null
+        const endDate = dateRange.end ? new Date(dateRange.end) : null
+        
+        if (startDate && plantaoDate < startDate) return false
+        if (endDate && plantaoDate > endDate) return false
+        
+        return true
+      })
+    }
+
+    return dataToFilter
   }
 
   // Calculate filtered metrics
@@ -293,44 +363,61 @@ export default function DashboardPage() {
     cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
   }
 
+  // Function to calculate efficiency for comparison
+  const calculateEfficiency = (data: any[]) => {
+    return data
+      .filter((p: any) => (p.status === 'pago' || p.status === 'realizado') && (p.horas || p.carga_horaria || p.duration))
+      .reduce((acc: any, plantao: any) => {
+        const hospital = plantao.hospital || plantao.local || 'Desconhecido'
+        const h = Number(plantao.horas || plantao.carga_horaria || plantao.duration || 0)
+        
+        if (h <= 0) return acc
+        
+        if (!acc[hospital]) {
+          acc[hospital] = {
+            totalValue: 0,
+            totalHours: 0,
+            hourlyRate: 0,
+            count: 0
+          }
+        }
+        
+        acc[hospital].totalValue += Number(plantao.valor || 0)
+        acc[hospital].totalHours += h
+        acc[hospital].count += 1
+        acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
+        
+        return acc
+      }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
+  }
+
   // useEffect to calculate efficiency data when listagemPlantoes changes
   useEffect(() => {
     if (listagemPlantoes.length > 0) {
       console.log('Processando dados para gráfico:', listagemPlantoes)
       
-      const hospitalEfficiency = listagemPlantoes
-        .filter((p: any) => (p.status === 'pago' || p.status === 'realizado') && (p.horas || p.carga_horaria || p.duration))
-        .reduce((acc: any, plantao: any) => {
-          // Mapeamento de chaves exato do Supabase
-          const hospital = plantao.hospital || plantao.local || 'Desconhecido'
-          const h = Number(plantao.horas || plantao.carga_horaria || plantao.duration || 0)
-          
-          // Skip se horas for 0 ou inválido
-          if (h <= 0) return acc
-          
-          const hourlyRate = plantao.valor / h
-          
-          if (!acc[hospital]) {
-            acc[hospital] = {
-              totalValue: 0,
-              totalHours: 0,
-              hourlyRate: 0,
-              count: 0
-            }
-          }
-          
-          acc[hospital].totalValue += Number(plantao.valor || 0)
-          acc[hospital].totalHours += h
-          acc[hospital].count += 1
-          acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
-          
-          return acc
-        }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
-
+      const hospitalEfficiency = calculateEfficiency(listagemPlantoes)
       console.log('Dados processados pelo gráfico:', hospitalEfficiency)
 
+      // Calculate previous month efficiency for comparison
+      let previousEfficiency: Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }> = {}
+      if (monthlyFilter === 'current' && previousMonthData.length > 0) {
+        previousEfficiency = calculateEfficiency(previousMonthData)
+        console.log('Eficiência mês anterior:', previousEfficiency)
+      }
+
       const sortedHospitals = Object.entries(hospitalEfficiency)
-        .sort(([,a]: any, [,b]: any) => b.hourlyRate - a.hourlyRate)
+        .map(([hospital, data]: any) => {
+          const previousData = previousEfficiency[hospital]
+          const delta = previousData ? ((data.hourlyRate / previousData.hourlyRate) - 1) * 100 : 0
+          
+          return {
+            hospital,
+            data,
+            delta: Number(delta.toFixed(1))
+          }
+        })
+        .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
         .slice(0, 3)
 
       console.log('Dados finais para renderização:', sortedHospitals)
@@ -341,7 +428,7 @@ export default function DashboardPage() {
       setEfficiencyData([])
       setChartReady(false)
     }
-  }, [listagemPlantoes])
+  }, [listagemPlantoes, monthlyFilter, previousMonthData])
 
   // Prepare data for bar chart (plantões by unit)
   const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
@@ -724,7 +811,20 @@ export default function DashboardPage() {
           {/* Efficiency Calculation Card */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Eficiência por Hospital</h3>
+              <div className="flex items-center space-x-4">
+                <h3 className="text-lg font-semibold text-gray-800">Eficiência por Hospital</h3>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm text-gray-600">Período:</label>
+                  <select
+                    value={monthlyFilter}
+                    onChange={(e) => setMonthlyFilter(e.target.value as 'current' | 'previous')}
+                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  >
+                    <option value="current">Mês Atual</option>
+                    <option value="previous">Mês Anterior</option>
+                  </select>
+                </div>
+              </div>
               <div className="bg-blue-100 rounded-full p-2">
                 <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -733,8 +833,8 @@ export default function DashboardPage() {
             </div>
             <div className="space-y-3">
               {chartReady && efficiencyData.length > 0 ? (
-                efficiencyData.map(([hospital, data]: any, index: number) => (
-                  <div key={hospital} className="flex items-center justify-between p-3 bg-white rounded-lg">
+                efficiencyData.map((item: any, index: number) => (
+                  <div key={item.hospital} className="flex items-center justify-between p-3 bg-white rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${
                         index === 0 ? 'bg-green-500' : index === 1 ? 'bg-blue-500' : 'bg-gray-500'
@@ -742,14 +842,30 @@ export default function DashboardPage() {
                         {index + 1}
                       </div>
                       <div>
-                        <p className="font-medium text-gray-800">{hospital}</p>
-                        <p className="text-xs text-gray-500">{data.count} plantões</p>
+                        <p className="font-medium text-gray-800">{item.hospital}</p>
+                        <p className="text-xs text-gray-500">{item.data.count} plantões</p>
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="font-bold text-gray-800">{formatCurrency(data.hourlyRate)}/h</p>
-                        <p className="text-xs text-gray-500">R$/h</p>
-                      <p className="text-xs text-gray-500">{data.totalHours}h totais</p>
+                      <div className="flex items-center space-x-2">
+                        <p className="font-bold text-gray-800">{formatCurrency(item.data.hourlyRate)}/h</p>
+                        {monthlyFilter === 'current' && item.delta !== 0 && (
+                          <div className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs font-medium ${
+                            item.delta > 0 
+                              ? 'bg-green-100 text-green-700' 
+                              : item.delta < 0 
+                                ? 'bg-red-100 text-red-700' 
+                                : 'bg-gray-100 text-gray-700'
+                          }`}>
+                            <span>
+                              {item.delta > 0 ? '↑' : item.delta < 0 ? '↓' : '→'}
+                            </span>
+                            <span>{Math.abs(item.delta)}%</span>
+                          </div>
+                        )}
+                      </div>
+                      <p className="text-xs text-gray-500">R$/h</p>
+                      <p className="text-xs text-gray-500">{item.data.totalHours}h totais</p>
                     </div>
                   </div>
                 ))
