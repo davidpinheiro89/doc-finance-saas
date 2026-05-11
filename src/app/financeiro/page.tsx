@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, memo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
@@ -286,26 +286,47 @@ export default function FinanceiroPage() {
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
-    // Filter expenses by selected month/year
-  const filteredDespesas = despesas.filter(d => {
-    if (selectedMonth === 'todos') {
-      return d.data.startsWith(selectedYear + '-')
-    }
-    return d.data.startsWith(selectedMonth)
-  })
+    // Memoized calculations to prevent infinite loops
+  const filteredDespesas = useMemo(() => {
+    return despesas.filter(d => {
+      if (selectedMonth === 'todos') {
+        return d.data.startsWith(selectedYear + '-')
+      }
+      return d.data.startsWith(selectedMonth)
+    })
+  }, [despesas, selectedMonth, selectedYear])
+
+  const totalDespesas = useMemo(() => {
+    return filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  }, [filteredDespesas])
   
-  const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  const despesasFixas = useMemo(() => {
+    return filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
+  }, [filteredDespesas])
   
-  const despesasFixas = filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
-  const despesasVariaveis = filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
+  const despesasVariaveis = useMemo(() => {
+    return filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
+  }, [filteredDespesas])
   
-  const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
+  const totalDespesasFixas = useMemo(() => {
+    return despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
+  }, [despesasFixas])
   
-  const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
+  const totalDespesasVariaveis = useMemo(() => {
+    return despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
+  }, [despesasVariaveis])
   
-  const impostos = totalRecebido * 0.15
-  const lucroLiquido = totalRecebido - totalDespesas - impostos
+  const totalGeralDespesas = useMemo(() => {
+    return totalDespesasFixas + totalDespesasVariaveis
+  }, [totalDespesasFixas, totalDespesasVariaveis])
+  
+  const impostos = useMemo(() => {
+    return totalRecebido * 0.15
+  }, [totalRecebido])
+  
+  const lucroLiquido = useMemo(() => {
+    return totalRecebido - totalDespesas - impostos
+  }, [totalRecebido, totalDespesas, impostos])
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -322,6 +343,37 @@ export default function FinanceiroPage() {
       year: 'numeric'
     })
   }
+
+  // Memoized PieChart component to prevent re-renders
+  const MemoizedPieChart = memo(() => (
+    <ResponsiveContainer width="100%" height={250}>
+      <PieChart>
+        <Pie
+          data={[
+            { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
+            { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
+          ]}
+          cx="50%"
+          cy="50%"
+          outerRadius={60}
+          fill="#8884d8"
+          dataKey="value"
+          label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
+        >
+          <Tooltip />
+        </Pie>
+        <Legend 
+          verticalAlign="bottom" 
+          height={36}
+          formatter={(value: any, entry: any) => {
+            const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
+            const entryValue = typeof value === 'number' ? value : 0
+            return `${entryName}: ${formatCurrency(entryValue)}`
+          }}
+        />
+      </PieChart>
+    </ResponsiveContainer>
+  ))
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -468,35 +520,7 @@ export default function FinanceiroPage() {
               </div>
               
               {/* Gráfico de Donut */}
-              {totalGeralDespesas > 0 && (
-                <ResponsiveContainer width="100%" height={250}>
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Fixos', value: totalDespesasFixas, fill: '#fb923c' },
-                        { name: 'Variáveis', value: totalDespesasVariaveis, fill: '#dc2626' }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={60}
-                      fill="#8884d8"
-                      dataKey="value"
-                      label={({ name, percent }) => `${name}: ${percent.toFixed(0)}%`}
-                    >
-                      <Tooltip />
-                    </Pie>
-                    <Legend 
-                      verticalAlign="bottom" 
-                      height={36}
-                      formatter={(value: any, entry: any) => {
-                      const entryName = entry?.payload?.name || entry?.name || 'Desconhecido'
-                      const entryValue = typeof value === 'number' ? value : 0
-                      return `${entryName}: ${formatCurrency(entryValue)}`
-                    }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              )}
+              {totalGeralDespesas > 0 && <MemoizedPieChart />}
             </div>
             
             {/* Cards de Resumo Financeiro */}
