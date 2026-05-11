@@ -294,27 +294,27 @@ export default function FinanceiroPage() {
       }
       return d.data.startsWith(selectedMonth)
     })
-  }, [despesas, selectedMonth, selectedYear])
+  }, [despesas.length, selectedMonth, selectedYear])
 
   const totalDespesas = useMemo(() => {
     return filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [filteredDespesas])
+  }, [filteredDespesas.length])
   
   const despesasFixas = useMemo(() => {
     return filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
-  }, [filteredDespesas])
+  }, [filteredDespesas.length])
   
   const despesasVariaveis = useMemo(() => {
     return filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
-  }, [filteredDespesas])
+  }, [filteredDespesas.length])
   
   const totalDespesasFixas = useMemo(() => {
     return despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [despesasFixas])
+  }, [despesasFixas.length])
   
   const totalDespesasVariaveis = useMemo(() => {
     return despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
-  }, [despesasVariaveis])
+  }, [despesasVariaveis.length])
   
   const totalGeralDespesas = useMemo(() => {
     return totalDespesasFixas + totalDespesasVariaveis

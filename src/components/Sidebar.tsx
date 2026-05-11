@@ -25,7 +25,7 @@ export default function Sidebar({ user }: SidebarProps) {
     return () => {
       window.removeEventListener('resize', handleResize)
     }
-  }, [])
+  }, []) // Empty dependency array ensures Sidebar is independent
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
