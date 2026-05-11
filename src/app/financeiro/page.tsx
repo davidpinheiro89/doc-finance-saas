@@ -110,6 +110,7 @@ export default function FinanceiroPage() {
       }
 
       setDespesas(data || [])
+      console.log('Estado despesas atualizado com:', data?.length || 0, 'itens')
     } catch (error) {
       setDespesas([])
     }
@@ -603,18 +604,9 @@ export default function FinanceiroPage() {
               </div>
             )}
 
-            {/* Lista de Despesas */}
+            {/* Lista de Despesas - RAW DATA DISPLAY */}
             <div className="overflow-x-auto">
-              {filteredDespesas.length === 0 ? (
-                <div className="p-8 text-center">
-                  <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z" />
-                  </svg>
-                  <p className="text-gray-500">Nenhuma despesa registrada</p>
-                  <p className="text-sm text-gray-400 mt-2">Adicione suas despesas para controlar melhor seu financeiro</p>
-                </div>
-              ) : (
-                <table className="min-w-full divide-y divide-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -635,7 +627,7 @@ export default function FinanceiroPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredDespesas.map((despesa: Despesa) => (
+                    {despesas.map((despesa: Despesa) => (
                       <tr key={despesa.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(despesa.data)}
@@ -675,7 +667,6 @@ export default function FinanceiroPage() {
                     ))}
                   </tbody>
                 </table>
-              )}
             </div>
           </div>
 
