@@ -423,54 +423,133 @@ export default function FinanceiroPage() {
                   })()}
                 </div>
 
-                {/* Cost Distribution Bars */}
-                {(totalDespesasFixas > 0 || totalDespesasVariaveis > 0) && (
+                {/* Donut Chart and Category Distribution */}
+                {filteredDespesas.length > 0 && (
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Distribuição de Custos</h4>
+                    <h4 className="text-sm font-semibold text-gray-700 mb-4">Distribuição por Categoria</h4>
                     
-                    <div className="space-y-3">
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-600">Custos Fixos</span>
-                          <span className="text-sm font-medium text-orange-600">{formatCurrency(totalDespesasFixas)}</span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Donut Chart */}
+                      <div className="flex justify-center items-center">
+                        <div className="relative w-40 h-40">
+                          <svg className="w-40 h-40 transform -rotate-90">
+                            {(() => {
+                              const categoryTotals = filteredDespesas.reduce((acc, despesa) => {
+                                acc[despesa.categoria] = (acc[despesa.categoria] || 0) + (despesa.valor || 0)
+                                return acc
+                              }, {} as Record<string, number>)
+                              
+                              const total = Object.values(categoryTotals).reduce((sum, val) => sum + val, 0)
+                              const colors = {
+                                alimentacao: '#fb923c',
+                                transporte: '#dc2626',
+                                material: '#f97316',
+                                saude: '#ea580c',
+                                outros: '#d97706'
+                              }
+                              
+                              let currentAngle = 0
+                              const segments = Object.entries(categoryTotals).map(([category, value]) => {
+                                const percentage = (value / total) * 100
+                                const angle = (percentage / 100) * 360
+                                const startAngle = currentAngle
+                                const endAngle = currentAngle + angle
+                                currentAngle += angle
+                                
+                                return { category, value, percentage, startAngle, endAngle, color: colors[category as keyof typeof colors] || '#6b7280' }
+                              })
+                              
+                              return segments.map((segment, index) => {
+                                const startRad = (segment.startAngle * Math.PI) / 180
+                                const endRad = (segment.endAngle * Math.PI) / 180
+                                const largeArcFlag = segment.endAngle - segment.startAngle > 180 ? 1 : 0
+                                
+                                const x1 = 80 + 70 * Math.cos(startRad)
+                                const y1 = 80 + 70 * Math.sin(startRad)
+                                const x2 = 80 + 70 * Math.cos(endRad)
+                                const y2 = 80 + 70 * Math.sin(endRad)
+                                
+                                return (
+                                  <g key={segment.category}>
+                                    <path
+                                      d={`M 80 80 L ${x1} ${y1} A 70 70 0 ${largeArcFlag} 1 ${x2} ${y2} Z`}
+                                      fill={segment.color}
+                                      className="transition-all duration-300 hover:opacity-80"
+                                    />
+                                  </g>
+                                )
+                              })
+                            })()}
+                          </svg>
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="text-center">
+                              <p className="text-2xl font-bold text-gray-800">{formatCurrency(totalDespesas)}</p>
+                              <p className="text-xs text-gray-500">Total</p>
+                            </div>
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-4">
-                          <div 
-                            className="bg-orange-500 h-4 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${totalDespesasFixas + totalDespesasVariaveis > 0 
-                                ? (totalDespesasFixas / (totalDespesasFixas + totalDespesasVariaveis)) * 100 
-                                : 0}%` 
-                            }}
-                          />
-                        </div>
-                        <span className="text-xs text-gray-500 mt-1">
-                          {totalDespesasFixas + totalDespesasVariaveis > 0 
-                            ? ((totalDespesasFixas / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(1)
-                            : 0}%
-                        </span>
                       </div>
                       
-                      <div>
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="text-sm text-gray-600">Custos Variáveis</span>
-                          <span className="text-sm font-medium text-red-600">{formatCurrency(totalDespesasVariaveis)}</span>
+                      {/* Legend and Fixed vs Variable */}
+                      <div className="space-y-4">
+                        {/* Category Legend */}
+                        <div>
+                          <h5 className="text-xs font-medium text-gray-600 mb-2">Por Categoria</h5>
+                          <div className="space-y-1">
+                            {(() => {
+                              const categoryTotals = filteredDespesas.reduce((acc, despesa) => {
+                                acc[despesa.categoria] = (acc[despesa.categoria] || 0) + (despesa.valor || 0)
+                                return acc
+                              }, {} as Record<string, number>)
+                              
+                              const colors = {
+                                alimentacao: '#fb923c',
+                                transporte: '#dc2626',
+                                material: '#f97316',
+                                saude: '#ea580c',
+                                outros: '#d97706'
+                              }
+                              
+                              return Object.entries(categoryTotals)
+                                .sort(([, a], [, b]) => b - a)
+                                .map(([category, value]) => (
+                                  <div key={category} className="flex items-center justify-between py-1">
+                                    <div className="flex items-center space-x-2">
+                                      <div 
+                                        className="w-3 h-3 rounded-full"
+                                        style={{ backgroundColor: colors[category as keyof typeof colors] || '#6b7280' }}
+                                      />
+                                      <span className="text-sm text-gray-700 capitalize">{category}</span>
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-900">{formatCurrency(value)}</span>
+                                  </div>
+                                ))
+                            })()}
+                          </div>
                         </div>
-                        <div className="w-full bg-gray-200 rounded-full h-4">
-                          <div 
-                            className="bg-red-500 h-4 rounded-full transition-all duration-300"
-                            style={{ 
-                              width: `${totalDespesasFixas + totalDespesasVariaveis > 0 
-                                ? (totalDespesasVariaveis / (totalDespesasFixas + totalDespesasVariaveis)) * 100 
-                                : 0}%` 
-                            }}
-                          />
+                        
+                        {/* Fixed vs Variable Switch */}
+                        <div className="pt-3 border-t border-gray-200">
+                          <h5 className="text-xs font-medium text-gray-600 mb-2">Tipo de Custo</h5>
+                          <div className="flex items-center space-x-2">
+                            <div className="flex-1 bg-orange-100 rounded-lg p-3 text-center">
+                              <p className="text-xs text-orange-600 font-medium">Fixo</p>
+                              <p className="text-sm font-bold text-orange-700">
+                                {totalDespesasFixas + totalDespesasVariaveis > 0 
+                                  ? ((totalDespesasFixas / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(0)
+                                  : '0'}%
+                              </p>
+                            </div>
+                            <div className="flex-1 bg-red-100 rounded-lg p-3 text-center">
+                              <p className="text-xs text-red-600 font-medium">Variável</p>
+                              <p className="text-sm font-bold text-red-700">
+                                {totalDespesasFixas + totalDespesasVariaveis > 0 
+                                  ? ((totalDespesasVariaveis / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(0)
+                                  : '0'}%
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <span className="text-xs text-gray-500 mt-1">
-                          {totalDespesasFixas + totalDespesasVariaveis > 0 
-                            ? ((totalDespesasVariaveis / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(1)
-                            : 0}%
-                        </span>
                       </div>
                     </div>
                   </div>
