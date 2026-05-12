@@ -66,30 +66,10 @@ export default function EscalaPage() {
 
   useEffect(() => {
     checkAuth()
-    fetchLocaisFavoritos()
     console.log('Componente montado com sucesso')
   }, [])
 
-  const fetchLocaisFavoritos = async () => {
-    if (!user) return
-    
-    try {
-      const { data, error } = await supabase
-        .from('locais_favoritos')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching favorite locations:', error)
-        return
-      }
-
-      setLocaisFavoritos(data || [])
-    } catch (error) {
-      console.error('Error fetching favorite locations:', error)
-    }
-  }
-
+  
   const checkAuth = async () => {
     try {
       const { data: { user } }: any = await supabase.auth.getUser()
@@ -140,12 +120,17 @@ export default function EscalaPage() {
     }
   }
 
-  // Calculate hospital efficiency data
+  // Calculate hospital efficiency data using existing plantoes data
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Emergency filter - only valid plantões
-    const validPlantoes = plantoes.filter(p => p.hospital && p.valor !== null)
+    // Use plantoes already loaded in memory - no additional queries
+    const validPlantoes = plantoes.filter(p => 
+      p.hospital && 
+      p.valor !== null && 
+      p.hospital !== '🟢 Disponível' && 
+      p.hospital !== '🔴 Folga'
+    )
     
     console.log('📊 Plantões válidos para gráfico:', validPlantoes.length, 'itens')
     console.log('📊 Plantões detalhados:', validPlantoes)
