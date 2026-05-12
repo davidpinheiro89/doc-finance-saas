@@ -153,6 +153,9 @@ export default function EscalaPage() {
       p.hospital !== '🔴 Folga'
     )
     
+    console.log('📊 Plantões do mês filtrados:', monthPlantoes.length, 'itens')
+    console.log('📊 Plantões detalhados:', monthPlantoes)
+    
     // Group by hospital and sum values
     const hospitalData = monthPlantoes.reduce((acc, plantao) => {
       const hospital = plantao.hospital.trim()
@@ -163,13 +166,18 @@ export default function EscalaPage() {
       return acc
     }, {} as Record<string, number>)
     
+    console.log('📊 Dados agrupados por hospital:', hospitalData)
+    
     // Convert to chart data format
-    return Object.entries(hospitalData)
+    const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
         valor: totalValue as number
       }))
       .sort((a, b) => (b.valor as number) - (a.valor as number))
+    
+    console.log('📊 Dados do gráfico:', chartData)
+    return chartData
   }
 
   const getDaysInMonth = (date: Date) => {
