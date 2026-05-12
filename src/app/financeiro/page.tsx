@@ -54,6 +54,13 @@ export default function FinanceiroPage() {
     checkAuth()
   }, []) // Empty dependency array to prevent infinite loops
 
+  useEffect(() => {
+    // Trigger recalculation when filters or data change
+    if (user) {
+      fetchData(user.id)
+    }
+  }, [selectedMonth, selectedYear, despesas.length]) // React to filter changes
+
   const checkAuth = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser()
@@ -282,8 +289,13 @@ export default function FinanceiroPage() {
     .filter(p => p.status !== 'pago')
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
-  const filteredDespesas = despesas
-  console.log('Lista atualizada:', despesas.length, 'itens')
+  const filteredDespesas = despesas.filter(d => {
+    if (selectedMonth === 'todos') {
+      return d.data.startsWith(selectedYear + '-')
+    }
+    return d.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
+  })
+  console.log('Lista atualizada:', filteredDespesas.length, 'itens')
 
   // Reactivated calculations for Insight card - using recorrente field correctly
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
@@ -789,7 +801,7 @@ export default function FinanceiroPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {despesas.map((despesa: Despesa) => (
+                    {filteredDespesas.map((despesa: Despesa) => (
                       <tr key={despesa.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(despesa.data)}
