@@ -503,33 +503,9 @@ export default function EscalaPage() {
                 
                 return (
                   efficiencyData.length > 0 && (
-                    <div style={{ width: '100%', height: '300px' }}>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={efficiencyData}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis 
-                            dataKey="name" 
-                            angle={-45}
-                            textAnchor="end"
-                            height={80}
-                            tick={{ fontSize: 12 }}
-                          />
-                          <YAxis 
-                            tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => `R$ ${value}`}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                          />
-                          <Legend />
-                          <Bar 
-                            dataKey="value" 
-                            fill="#f97316" 
-                            name="Valor Total (R$)"
-                            radius={[4, 4, 0, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
+                    <div style={{ height: '300px', width: '100%', background: '#fdf2f2', border: '2px solid red' }}>
+                      <h1>TESTE VISUAL</h1>
+                      {/* Temporarily replaced BarChart for layout test */}
                     </div>
                   )
                 )
