@@ -144,39 +144,35 @@ export default function EscalaPage() {
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Use ALL plantoes to match Valor Total card (no month filter)
-    const allPlantoes = plantoes.filter(p => 
-      p.hospital && 
-      p.hospital !== '🟢 Disponível' && 
-      p.hospital !== '🔴 Folga'
-    )
+    // Emergency filter - only valid plantões
+    const validPlantoes = plantoes.filter(p => p.hospital && p.valor !== null)
     
-    console.log('📊 Plantões totais para gráfico:', allPlantoes.length, 'itens')
-    console.log('📊 Plantões detalhados:', allPlantoes)
+    console.log('📊 Plantões válidos para gráfico:', validPlantoes.length, 'itens')
+    console.log('📊 Plantões detalhados:', validPlantoes)
     
-    // Group by hospital and sum values
-    const hospitalData = allPlantoes.reduce((acc, plantao) => {
+    // Group by hospital and sum values with strong typing
+    const hospitalData = validPlantoes.reduce((acc, plantao) => {
       const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += Number(plantao.valor || 0)
+      acc[hospital] += Number(String(plantao.valor).replace(',', '.')) || 0
       return acc
     }, {} as Record<string, number>)
     
     console.log('📊 Dados agrupados por hospital:', hospitalData)
     console.dir(hospitalData)
     
-    // Convert to chart data format and filter out non-finite values
+    // Convert to chart data format and eliminate NaN
     const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: Number(totalValue || 0)
+        valor: Number(String(totalValue).replace(',', '.')) || 0
       }))
-      .filter(d => isFinite(d.valor) && d.valor > 0) // Remove non-finite values
+      .filter(item => !isNaN(item.valor) && isFinite(item.valor) && item.valor > 0)
       .sort((a, b) => b.valor - a.valor)
     
-    console.log('Dados Limpos para o Gráfico:', chartData)
+    console.log('ESTRUTURA FINAL:', JSON.stringify(chartData, null, 2))
     return chartData
   }
 
@@ -553,12 +549,12 @@ export default function EscalaPage() {
                   )
                 }
                 
-                console.log('Dados Limpos para o Gráfico:', efficiencyData)
+                console.log('ESTRUTURA FINAL:', JSON.stringify(efficiencyData, null, 2))
                 return (
                   efficiencyData.length > 0 && (
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={efficiencyData}>
+                        <BarChart data={efficiencyData} key={JSON.stringify(efficiencyData)}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
                             dataKey="hospital" 
