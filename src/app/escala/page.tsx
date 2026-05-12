@@ -158,25 +158,27 @@ export default function EscalaPage() {
     
     // Group by hospital and sum values
     const hospitalData = monthPlantoes.reduce((acc, plantao) => {
-      const hospital = plantao.hospital.trim()
+      const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += (plantao.valor || 0)
+      acc[hospital] += Number(plantao.valor) || 0
       return acc
     }, {} as Record<string, number>)
     
     console.log('📊 Dados agrupados por hospital:', hospitalData)
     
-    // Convert to chart data format
+    // Convert to chart data format and filter out zero values
     const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: totalValue as number
+        valor: Number(totalValue) || 0
       }))
-      .sort((a, b) => (b.valor as number) - (a.valor as number))
+      .filter(item => item.valor > 0) // Only show hospitals with values > 0
+      .sort((a, b) => b.valor - a.valor)
     
     console.log('📊 Dados do gráfico:', chartData)
+    console.table(chartData)
     return chartData
   }
 
