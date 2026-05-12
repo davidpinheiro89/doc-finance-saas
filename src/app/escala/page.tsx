@@ -160,7 +160,7 @@ export default function EscalaPage() {
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += Number(plantao.valor) || 0
+      acc[hospital] += parseFloat(plantao.valor || 0)
       return acc
     }, {} as Record<string, number>)
     
@@ -171,7 +171,7 @@ export default function EscalaPage() {
     const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: Number(totalValue) || 0
+        valor: parseFloat(String(totalValue || 0))
       }))
       .filter(item => item.valor > 0) // Only show hospitals with values > 0
       .sort((a, b) => b.valor - a.valor)
@@ -557,35 +557,38 @@ export default function EscalaPage() {
                 
                 console.log('Array enviado ao Recharts:', efficiencyData)
                 return (
-                  <div style={{ width: '100%', height: '300px', border: '1px solid red' }}>
-                    <ResponsiveContainer width="100%" height={300} key={plantoes.length}>
-                      <BarChart data={efficiencyData}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis 
-                          dataKey="hospital" 
-                          angle={-45}
-                          textAnchor="end"
-                          height={80}
-                          tick={{ fontSize: 12 }}
-                        />
-                        <YAxis 
-                          tick={{ fontSize: 12 }}
-                          tickFormatter={(value) => `R$ ${value}`}
-                        />
-                        <Tooltip 
-                          formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                          labelStyle={{ color: '#374151' }}
-                        />
-                        <Legend />
-                        <Bar 
-                          dataKey="valor" 
-                          fill="#f97316" 
-                          name="Valor Total (R$)"
-                          radius={[4, 4, 0, 0]}
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  efficiencyData.length > 0 && (
+                    <div style={{ width: '100%', height: '300px' }}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={efficiencyData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="hospital" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                            tick={{ fontSize: 12 }}
+                            minTickGap={30}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => `R$ ${value}`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
+                            labelStyle={{ color: '#374151' }}
+                          />
+                          <Legend />
+                          <Bar 
+                            dataKey="valor" 
+                            fill="#f97316" 
+                            name="Valor Total (R$)"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  )
                 )
               })()}
             </div>
