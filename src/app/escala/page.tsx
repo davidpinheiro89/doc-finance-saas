@@ -179,6 +179,7 @@ export default function EscalaPage() {
     
     console.log('📊 Dados do gráfico:', chartData)
     console.table(chartData)
+    console.log('📊 Dados finais para o gráfico:', chartData)
     return chartData
   }
 
@@ -556,7 +557,7 @@ export default function EscalaPage() {
                 }
                 
                 return (
-                  <ResponsiveContainer width="100%" height={300}>
+                  <ResponsiveContainer width="100%" height={300} key={plantoes.length}>
                     <BarChart data={efficiencyData}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
