@@ -285,12 +285,12 @@ export default function FinanceiroPage() {
   const filteredDespesas = despesas
   console.log('Lista atualizada:', despesas.length, 'itens')
 
-  // Reactivated calculations for Insight card
+  // Reactivated calculations for Insight card - using recorrente field correctly
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
-  const despesasFixas = filteredDespesas.filter(d => ['alimentacao', 'material', 'outros'].includes(d.categoria))
+  const despesasFixas = filteredDespesas.filter(d => d.recorrente === true)
   
-  const despesasVariaveis = filteredDespesas.filter(d => ['transporte'].includes(d.categoria))
+  const despesasVariaveis = filteredDespesas.filter(d => d.recorrente === false)
   
   const totalDespesasFixas = despesasFixas.reduce((sum, d) => sum + (d.valor || 0), 0)
   
@@ -360,16 +360,20 @@ export default function FinanceiroPage() {
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-gray-700">Meta de Custos Fixos</span>
                     <span className="text-sm text-gray-600">
-                      {totalDespesasFixas > 0 ? Math.min((totalRecebido / totalDespesasFixas) * 100, 100).toFixed(1) : 0}%
+                      {totalDespesasFixas > 0 ? Math.min((totalRecebido / totalDespesasFixas) * 100, 100).toFixed(1) : '0.0'}%
                     </span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
                       className={`h-3 rounded-full transition-all duration-300 ${
-                        totalRecebido > totalDespesasFixas ? 'bg-green-500' : 
-                        totalRecebido > totalDespesasFixas * 0.5 ? 'bg-yellow-500' : 'bg-red-500'
+                        totalDespesasFixas > 0 && totalRecebido > totalDespesasFixas ? 'bg-green-500' : 
+                        totalDespesasFixas > 0 && totalRecebido > totalDespesasFixas * 0.5 ? 'bg-yellow-500' : 'bg-red-500'
                       }`}
-                      style={{ width: `${Math.min((totalRecebido / totalDespesasFixas) * 100, 100)}%` }}
+                      style={{ 
+                        width: totalDespesasFixas > 0 
+                          ? `${Math.min((totalRecebido / totalDespesasFixas) * 100, 100)}%` 
+                          : '0%' 
+                      }}
                     />
                   </div>
                 </div>
@@ -379,10 +383,10 @@ export default function FinanceiroPage() {
                   totalRecebido > totalDespesasFixas ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
                 }`}>
                   {(() => {
-                    const monthlyBalance = totalRecebido - totalDespesas
-                    const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
+                    const fixedCostsGap = totalDespesasFixas - totalRecebido
+                    const neededPlantoes = fixedCostsGap > 0 ? Math.ceil(fixedCostsGap / 1200) : 0
                     
-                    if (totalRecebido > totalDespesasFixas) {
+                    if (totalRecebido >= totalDespesasFixas) {
                       return (
                         <div>
                           <p className="font-semibold mb-1">
@@ -393,11 +397,11 @@ export default function FinanceiroPage() {
                           </p>
                         </div>
                       )
-                    } else if (monthlyBalance < 0) {
+                    } else if (totalRecebido < totalDespesasFixas) {
                       return (
                         <div>
                           <p className="font-semibold mb-1">
-                            ⚠️ Faltam {formatCurrency(Math.abs(monthlyBalance))} para cobrir custos fixos
+                            ⚠️ Faltam {formatCurrency(fixedCostsGap)} para cobrir custos fixos
                           </p>
                           <p className="text-sm">
                             Precisa de aproximadamente {neededPlantoes} {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
