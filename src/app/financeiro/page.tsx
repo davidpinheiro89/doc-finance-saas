@@ -336,13 +336,50 @@ export default function FinanceiroPage() {
       <div className="flex-1 overflow-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-6">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-4">
               <div className="mb-4 md:mb-0">
                 <h1 className="text-3xl font-bold text-gray-800">
                   <span className="text-orange-500">Financeiro</span>
                 </h1>
                 <p className="text-gray-600 mt-2">Gestão financeira e controle de despesas</p>
+              </div>
+            </div>
+            
+            {/* Month/Year Filters - Moved to Top */}
+            <div className="bg-gray-50 rounded-lg border border-gray-200 p-4 mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-3 sm:space-y-0 sm:space-x-4">
+                <div className="flex items-center space-x-3">
+                  <label className="text-sm font-medium text-gray-700 whitespace-nowrap">Período:</label>
+                  <select
+                    value={selectedMonth}
+                    onChange={(e) => setSelectedMonth(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white text-sm"
+                  >
+                    <option value="todos">Todos os meses</option>
+                    {Array.from({length: 12}, (_, i) => {
+                      const date = new Date(selectedYear, i, 1)
+                      const value = date.toISOString().slice(0, 7)
+                      const label = date.toLocaleDateString('pt-BR', { month: 'long' })
+                      return (
+                        <option key={value} value={value}>
+                          {label.charAt(0).toUpperCase() + label.slice(1)}
+                        </option>
+                      )
+                    })}
+                  </select>
+                  
+                  <select
+                    value={selectedYear}
+                    onChange={(e) => setSelectedYear(parseInt(e.target.value))}
+                    className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white text-sm"
+                  >
+                    <option value={2024}>2024</option>
+                    <option value={2025}>2025</option>
+                    <option value={2026}>2026</option>
+                    <option value={2027}>2027</option>
+                  </select>
+                </div>
               </div>
             </div>
             
@@ -569,39 +606,6 @@ export default function FinanceiroPage() {
               </div>
             )}
           </div>
-
-          {/* Month/Year Selector */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-            <div className="flex items-center space-x-4">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
-                >
-                  <option value="todos">Todos</option>
-                  {Array.from({length: 12}, (_, i) => {
-                    const date = new Date(selectedYear, i, 1)
-                    const value = date.toISOString().slice(0, 7)
-                    const label = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })
-                    return (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    )
-                  })}
-                </select>
-                
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(parseInt(e.target.value))}
-                  className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent bg-white"
-                >
-                  <option value={2024}>2024</option>
-                  <option value={2025}>2025</option>
-                  <option value={2026}>2026</option>
-                </select>
-              </div>
-            </div>
           </div>
 
           {/* Cards de Resumo Financeiro */}
