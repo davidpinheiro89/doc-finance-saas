@@ -119,37 +119,37 @@ export default function EscalaPage() {
     }
   }
 
-  // Simple hospital efficiency data from plantoes array
+  // REBOOT - Hospital efficiency from plantoes memory data
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Only plantões with hospital and valid values
+    // Blind grouping - only valid plantões
     const validPlantoes = plantoes.filter(p => 
       p.hospital && 
       p.hospital !== '🟢 Disponível' && 
       p.hospital !== '🔴 Folga'
     )
     
-    // Group by hospital and sum values
-    const hospitalData = validPlantoes.reduce((acc, plantao) => {
+    // Group by hospital with Number() for safety
+    const hospitalMap = validPlantoes.reduce((acc, plantao) => {
       const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += parseFloat(plantao.valor || 0)
+      acc[hospital] += Number(plantao.valor || 0)
       return acc
     }, {} as Record<string, number>)
     
-    // Convert to chart data format
-    const chartData = Object.entries(hospitalData)
-      .map(([hospital, totalValue]) => ({
-        hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: parseFloat(String(totalValue)) || 0
+    // Convert to chart data format { name, value }
+    const chartData = Object.entries(hospitalMap)
+      .map(([hospital, total]) => ({
+        name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
+        value: Number(total) || 0
       }))
-      .filter(item => item.valor > 0)
-      .sort((a, b) => b.valor - a.valor)
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value)
     
-    console.log('Eficiência por Hospital:', chartData)
+    console.log('REBOOT - Dados para o gráfico:', chartData)
     return chartData
   }
 
@@ -533,7 +533,7 @@ export default function EscalaPage() {
                         <BarChart data={efficiencyData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
-                            dataKey="hospital" 
+                            dataKey="name" 
                             angle={-45}
                             textAnchor="end"
                             height={80}
@@ -548,7 +548,7 @@ export default function EscalaPage() {
                           />
                           <Legend />
                           <Bar 
-                            dataKey="valor" 
+                            dataKey="value" 
                             fill="#f97316" 
                             name="Valor Total (R$)"
                             radius={[4, 4, 0, 0]}
