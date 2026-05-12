@@ -119,11 +119,11 @@ export default function EscalaPage() {
     }
   }
 
-  // REBOOT - Hospital efficiency from plantoes memory data
+  // ZERO - Hospital efficiency from plantoes memory only
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Blind grouping - only valid plantões
+    // Use only plantoes array from memory (11 items)
     const validPlantoes = plantoes.filter(p => 
       p.hospital && 
       p.hospital !== '🟢 Disponível' && 
@@ -131,7 +131,7 @@ export default function EscalaPage() {
     )
     
     // Group by hospital with Number() for safety
-    const hospitalMap = validPlantoes.reduce((acc, plantao) => {
+    const hospitalGroups = validPlantoes.reduce((acc, plantao) => {
       const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
@@ -140,11 +140,11 @@ export default function EscalaPage() {
       return acc
     }, {} as Record<string, number>)
     
-    // Convert to chart data format { name, value }
-    const chartData = Object.entries(hospitalMap)
-      .map(([hospital, total]) => ({
+    // Create chartData with { name: hospital, value: sum }
+    const chartData = Object.entries(hospitalGroups)
+      .map(([hospital, sum]) => ({
         name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        value: Number(total) || 0
+        value: Number(sum) || 0
       }))
       .filter(item => item.value > 0)
       .sort((a, b) => b.value - a.value)
