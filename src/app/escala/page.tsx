@@ -61,7 +61,6 @@ export default function EscalaPage() {
   })
   const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
-  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -120,44 +119,37 @@ export default function EscalaPage() {
     }
   }
 
-  // Calculate hospital efficiency data using existing plantoes data
+  // Simple hospital efficiency data from plantoes array
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Use plantoes already loaded in memory - no additional queries
+    // Only plantões with hospital and valid values
     const validPlantoes = plantoes.filter(p => 
       p.hospital && 
-      p.valor !== null && 
       p.hospital !== '🟢 Disponível' && 
       p.hospital !== '🔴 Folga'
     )
     
-    console.log('📊 Plantões válidos para gráfico:', validPlantoes.length, 'itens')
-    console.log('📊 Plantões detalhados:', validPlantoes)
-    
-    // Group by hospital and sum values with strong typing
+    // Group by hospital and sum values
     const hospitalData = validPlantoes.reduce((acc, plantao) => {
       const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += Number(String(plantao.valor).replace(',', '.')) || 0
+      acc[hospital] += parseFloat(plantao.valor || 0)
       return acc
     }, {} as Record<string, number>)
     
-    console.log('📊 Dados agrupados por hospital:', hospitalData)
-    console.dir(hospitalData)
-    
-    // Convert to chart data format and eliminate NaN
+    // Convert to chart data format
     const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: Number(String(totalValue).replace(',', '.')) || 0
+        valor: parseFloat(String(totalValue)) || 0
       }))
-      .filter(item => !isNaN(item.valor) && isFinite(item.valor) && item.valor > 0)
+      .filter(item => item.valor > 0)
       .sort((a, b) => b.valor - a.valor)
     
-    console.log('ESTRUTURA FINAL:', JSON.stringify(chartData, null, 2))
+    console.log('Eficiência por Hospital:', chartData)
     return chartData
   }
 
@@ -534,12 +526,11 @@ export default function EscalaPage() {
                   )
                 }
                 
-                console.log('ESTRUTURA FINAL:', JSON.stringify(efficiencyData, null, 2))
                 return (
                   efficiencyData.length > 0 && (
                     <div style={{ width: '100%', height: '300px' }}>
                       <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={efficiencyData} key={JSON.stringify(efficiencyData)}>
+                        <BarChart data={efficiencyData}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
                             dataKey="hospital" 
@@ -547,7 +538,6 @@ export default function EscalaPage() {
                             textAnchor="end"
                             height={80}
                             tick={{ fontSize: 12 }}
-                            minTickGap={30}
                           />
                           <YAxis 
                             tick={{ fontSize: 12 }}
@@ -555,7 +545,6 @@ export default function EscalaPage() {
                           />
                           <Tooltip 
                             formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                            labelStyle={{ color: '#374151' }}
                           />
                           <Legend />
                           <Bar 
