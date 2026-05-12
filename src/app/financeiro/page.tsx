@@ -334,45 +334,143 @@ export default function FinanceiroPage() {
               </div>
             </div>
             
-            {/* Intelligent Insight Card */}
+            {/* Enhanced Insight Dashboard */}
             {selectedMonth !== 'todos' && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-6 w-full relative z-0">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-2">Insight do Mês</h3>
-                    <div className="space-y-2">
-                      {(() => {
-                        const monthlyBalance = totalRecebido - totalDespesas
-                        const fixedCostsCoverage = totalRecebido > 0 ? (totalRecebido / totalDespesasFixas) * 100 : 0
-                        const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
-                        
-                        if (monthlyBalance < 0) {
-                          return (
-                            <div>
-                              <p className="text-red-600 font-medium">
-                                ⚠️ Faltam <span className="font-bold">{formatCurrency(Math.abs(monthlyBalance))}</span> para cobrir seus custos fixos este mês.
-                              </p>
-                              <p className="text-gray-600 text-sm">
-                                Faltam aproximadamente <span className="font-bold">{neededPlantoes}</span> {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
-                              </p>
-                            </div>
-                          )
-                        } else if (totalRecebido > totalDespesasFixas) {
-                          return (
-                            <div>
-                              <p className="text-green-600 font-medium">
-                                ✅ Custos fixos quitados! Você já garantiu seu 'break-even' este mês.
-                              </p>
-                              <p className="text-gray-600 text-sm">
-                                Cobertura dos custos fixos: <span className="font-bold">{fixedCostsCoverage.toFixed(1)}%</span>
-                              </p>
-                            </div>
-                          )
-                        }
-                      })()}
-                    </div>
+              <div className={`${totalRecebido > totalDespesasFixas ? 'bg-green-50 border-green-200' : 'bg-blue-50 border-blue-200'} border rounded-xl p-6 mb-6 w-full relative z-0`}>
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">Dashboard Financeiro</h3>
+                
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Total Fixo</p>
+                    <p className="text-xl font-bold text-orange-600">{formatCurrency(totalDespesasFixas)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Total Variável</p>
+                    <p className="text-xl font-bold text-red-600">{formatCurrency(totalDespesasVariaveis)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Recebido</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRecebido)}</p>
                   </div>
                 </div>
+
+                {/* Progress Bar and Status */}
+                <div className="mb-6">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-700">Meta de Custos Fixos</span>
+                    <span className="text-sm text-gray-600">
+                      {totalDespesasFixas > 0 ? Math.min((totalRecebido / totalDespesasFixas) * 100, 100).toFixed(1) : 0}%
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className={`h-3 rounded-full transition-all duration-300 ${
+                        totalRecebido > totalDespesasFixas ? 'bg-green-500' : 
+                        totalRecebido > totalDespesasFixas * 0.5 ? 'bg-yellow-500' : 'bg-red-500'
+                      }`}
+                      style={{ width: `${Math.min((totalRecebido / totalDespesasFixas) * 100, 100)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Status Message */}
+                <div className={`p-4 rounded-lg mb-6 ${
+                  totalRecebido > totalDespesasFixas ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'
+                }`}>
+                  {(() => {
+                    const monthlyBalance = totalRecebido - totalDespesas
+                    const neededPlantoes = monthlyBalance < 0 ? Math.ceil(Math.abs(monthlyBalance) / 1200) : 0
+                    
+                    if (totalRecebido > totalDespesasFixas) {
+                      return (
+                        <div>
+                          <p className="font-semibold mb-1">
+                            🎉 Custos fixos garantidos! Seus próximos plantões são lucro líquido.
+                          </p>
+                          <p className="text-sm">
+                            Parabéns! Você já cobriu {formatCurrency(totalDespesasFixas)} em custos fixos este mês.
+                          </p>
+                        </div>
+                      )
+                    } else if (monthlyBalance < 0) {
+                      return (
+                        <div>
+                          <p className="font-semibold mb-1">
+                            ⚠️ Faltam {formatCurrency(Math.abs(monthlyBalance))} para cobrir custos fixos
+                          </p>
+                          <p className="text-sm">
+                            Precisa de aproximadamente {neededPlantoes} {neededPlantoes === 1 ? 'plantão' : 'plantões'} de 12h.
+                          </p>
+                        </div>
+                      )
+                    } else {
+                      return (
+                        <div>
+                          <p className="font-semibold mb-1">
+                            📊 Quase lá! Continue focado para atingir a meta.
+                          </p>
+                          <p className="text-sm">
+                            Você está a {formatCurrency(totalDespesasFixas - totalRecebido)} dos custos fixos.
+                          </p>
+                        </div>
+                      )
+                    }
+                  })()}
+                </div>
+
+                {/* Cost Distribution Bars */}
+                {(totalDespesasFixas > 0 || totalDespesasVariaveis > 0) && (
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Distribuição de Custos</h4>
+                    
+                    <div className="space-y-3">
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm text-gray-600">Custos Fixos</span>
+                          <span className="text-sm font-medium text-orange-600">{formatCurrency(totalDespesasFixas)}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className="bg-orange-500 h-4 rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${totalDespesasFixas + totalDespesasVariaveis > 0 
+                                ? (totalDespesasFixas / (totalDespesasFixas + totalDespesasVariaveis)) * 100 
+                                : 0}%` 
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">
+                          {totalDespesasFixas + totalDespesasVariaveis > 0 
+                            ? ((totalDespesasFixas / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(1)
+                            : 0}%
+                        </span>
+                      </div>
+                      
+                      <div>
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-sm text-gray-600">Custos Variáveis</span>
+                          <span className="text-sm font-medium text-red-600">{formatCurrency(totalDespesasVariaveis)}</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-4">
+                          <div 
+                            className="bg-red-500 h-4 rounded-full transition-all duration-300"
+                            style={{ 
+                              width: `${totalDespesasFixas + totalDespesasVariaveis > 0 
+                                ? (totalDespesasVariaveis / (totalDespesasFixas + totalDespesasVariaveis)) * 100 
+                                : 0}%` 
+                            }}
+                          />
+                        </div>
+                        <span className="text-xs text-gray-500 mt-1">
+                          {totalDespesasFixas + totalDespesasVariaveis > 0 
+                            ? ((totalDespesasVariaveis / (totalDespesasFixas + totalDespesasVariaveis)) * 100).toFixed(1)
+                            : 0}%
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
