@@ -167,6 +167,7 @@ export default function EscalaPage() {
     }, {} as Record<string, number>)
     
     console.log('📊 Dados agrupados por hospital:', hospitalData)
+    console.dir(hospitalData)
     
     // Convert to chart data format and filter out zero values
     const chartData = Object.entries(hospitalData)
@@ -557,33 +558,35 @@ export default function EscalaPage() {
                 }
                 
                 return (
-                  <ResponsiveContainer width="100%" height={300} key={plantoes.length}>
-                    <BarChart data={efficiencyData}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis 
-                        dataKey="hospital" 
-                        angle={-45}
-                        textAnchor="end"
-                        height={80}
-                        tick={{ fontSize: 12 }}
-                      />
-                      <YAxis 
-                        tick={{ fontSize: 12 }}
-                        tickFormatter={(value) => `R$ ${value}`}
-                      />
-                      <Tooltip 
-                        formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                        labelStyle={{ color: '#374151' }}
-                      />
-                      <Legend />
-                      <Bar 
-                        dataKey="valor" 
-                        fill="#fb923c" 
-                        name="Valor Total (R$)"
-                        radius={[4, 4, 0, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
+                  <div style={{ width: '100%', height: '300px' }}>
+                    <ResponsiveContainer width="100%" height={300} key={plantoes.length}>
+                      <BarChart data={efficiencyData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis 
+                          dataKey="hospital" 
+                          angle={-45}
+                          textAnchor="end"
+                          height={80}
+                          tick={{ fontSize: 12 }}
+                        />
+                        <YAxis 
+                          tick={{ fontSize: 12 }}
+                          tickFormatter={(value) => `R$ ${value}`}
+                        />
+                        <Tooltip 
+                          formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
+                          labelStyle={{ color: '#374151' }}
+                        />
+                        <Legend />
+                        <Bar 
+                          dataKey="valor" 
+                          fill="#f97316" 
+                          name="Valor Total (R$)"
+                          radius={[4, 4, 0, 0]}
+                        />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
                 )
               })()}
             </div>
