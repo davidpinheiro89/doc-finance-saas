@@ -119,37 +119,12 @@ export default function EscalaPage() {
     }
   }
 
-  // ZERO - Hospital efficiency from plantoes memory only
+  // SENIOR DEV - Hardcoded test data for sanity check
   const getHospitalEfficiencyData = () => {
-    if (!plantoes || plantoes.length === 0) return []
+    // HARDCODE TEST: Force single bar to test visualization
+    const chartData = [{name: 'Hospital A', value: 3800}]
     
-    // Use only plantoes array from memory (11 items)
-    const validPlantoes = plantoes.filter(p => 
-      p.hospital && 
-      p.hospital !== '🟢 Disponível' && 
-      p.hospital !== '🔴 Folga'
-    )
-    
-    // Group by hospital with Number() for safety
-    const hospitalGroups = validPlantoes.reduce((acc, plantao) => {
-      const hospital = (plantao.hospital || 'Não informado').trim()
-      if (!acc[hospital]) {
-        acc[hospital] = 0
-      }
-      acc[hospital] += Number(plantao.valor || 0)
-      return acc
-    }, {} as Record<string, number>)
-    
-    // Create chartData with { name: hospital, value: sum }
-    const chartData = Object.entries(hospitalGroups)
-      .map(([hospital, sum]) => ({
-        name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        value: Number(sum) || 0
-      }))
-      .filter(item => item.value > 0)
-      .sort((a, b) => b.value - a.value)
-    
-    console.log('REBOOT - Dados para o gráfico:', chartData)
+    console.log('SANITY CHECK - Hardcoded data:', chartData)
     return chartData
   }
 
