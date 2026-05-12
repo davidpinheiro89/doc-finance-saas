@@ -144,20 +144,18 @@ export default function EscalaPage() {
   const getHospitalEfficiencyData = () => {
     if (!plantoes || plantoes.length === 0) return []
     
-    // Filter plantoes for current month
-    const currentMonthStr = currentMonth.toISOString().slice(0, 7)
-    const monthPlantoes = plantoes.filter(p => 
-      p.data.startsWith(currentMonthStr) && 
+    // Use ALL plantoes to match Valor Total card (no month filter)
+    const allPlantoes = plantoes.filter(p => 
       p.hospital && 
       p.hospital !== '🟢 Disponível' && 
       p.hospital !== '🔴 Folga'
     )
     
-    console.log('📊 Plantões do mês filtrados:', monthPlantoes.length, 'itens')
-    console.log('📊 Plantões detalhados:', monthPlantoes)
+    console.log('📊 Plantões totais para gráfico:', allPlantoes.length, 'itens')
+    console.log('📊 Plantões detalhados:', allPlantoes)
     
     // Group by hospital and sum values
-    const hospitalData = monthPlantoes.reduce((acc, plantao) => {
+    const hospitalData = allPlantoes.reduce((acc, plantao) => {
       const hospital = (plantao.hospital || 'Não informado').trim()
       if (!acc[hospital]) {
         acc[hospital] = 0
@@ -557,8 +555,9 @@ export default function EscalaPage() {
                   )
                 }
                 
+                console.log('Array enviado ao Recharts:', efficiencyData)
                 return (
-                  <div style={{ width: '100%', height: '300px' }}>
+                  <div style={{ width: '100%', height: '300px', border: '1px solid red' }}>
                     <ResponsiveContainer width="100%" height={300} key={plantoes.length}>
                       <BarChart data={efficiencyData}>
                         <CartesianGrid strokeDasharray="3 3" />
