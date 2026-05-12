@@ -160,25 +160,23 @@ export default function EscalaPage() {
       if (!acc[hospital]) {
         acc[hospital] = 0
       }
-      acc[hospital] += parseFloat(plantao.valor || 0)
+      acc[hospital] += Number(plantao.valor || 0)
       return acc
     }, {} as Record<string, number>)
     
     console.log('📊 Dados agrupados por hospital:', hospitalData)
     console.dir(hospitalData)
     
-    // Convert to chart data format and filter out zero values
+    // Convert to chart data format and filter out non-finite values
     const chartData = Object.entries(hospitalData)
       .map(([hospital, totalValue]) => ({
         hospital: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        valor: parseFloat(String(totalValue || 0))
+        valor: Number(totalValue || 0)
       }))
-      .filter(item => item.valor > 0) // Only show hospitals with values > 0
+      .filter(d => isFinite(d.valor) && d.valor > 0) // Remove non-finite values
       .sort((a, b) => b.valor - a.valor)
     
-    console.log('📊 Dados do gráfico:', chartData)
-    console.table(chartData)
-    console.log('📊 Dados finais para o gráfico:', chartData)
+    console.log('Dados Limpos para o Gráfico:', chartData)
     return chartData
   }
 
@@ -555,7 +553,7 @@ export default function EscalaPage() {
                   )
                 }
                 
-                console.log('Array enviado ao Recharts:', efficiencyData)
+                console.log('Dados Limpos para o Gráfico:', efficiencyData)
                 return (
                   efficiencyData.length > 0 && (
                     <div style={{ width: '100%', height: '300px' }}>
