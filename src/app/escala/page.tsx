@@ -119,12 +119,37 @@ export default function EscalaPage() {
     }
   }
 
-  // SENIOR DEV - Hardcoded test data for sanity check
+  // REAL - Hospital efficiency from plantoes data with sanitization
   const getHospitalEfficiencyData = () => {
-    // HARDCODE TEST: Force single bar to test visualization
-    const chartData = [{name: 'Hospital A', value: 3800}]
+    if (!plantoes || plantoes.length === 0) return []
     
-    console.log('SANITY CHECK - Hardcoded data:', chartData)
+    // Use plantoes array that feeds R$ 3.800,00 card
+    const validPlantoes = plantoes.filter(p => 
+      p.hospital && 
+      p.hospital !== '🟢 Disponível' && 
+      p.hospital !== '🔴 Folga'
+    )
+    
+    // Group by hospital with parseFloat sanitization
+    const hospitalGroups = validPlantoes.reduce((acc, plantao) => {
+      const hospital = (plantao.hospital || 'Não informado').trim()
+      if (!acc[hospital]) {
+        acc[hospital] = 0
+      }
+      acc[hospital] += parseFloat(plantao.valor || 0)
+      return acc
+    }, {} as Record<string, number>)
+    
+    // Convert to chart format
+    const chartData = Object.entries(hospitalGroups)
+      .map(([hospital, sum]) => ({
+        name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
+        value: parseFloat(String(sum)) || 0
+      }))
+      .filter(item => item.value > 0)
+      .sort((a, b) => b.value - a.value)
+    
+    console.log('DADOS REAIS - Gráfico:', chartData)
     return chartData
   }
 
@@ -503,9 +528,33 @@ export default function EscalaPage() {
                 
                 return (
                   efficiencyData.length > 0 && (
-                    <div style={{ height: '300px', width: '100%', background: '#fdf2f2', border: '2px solid red' }}>
-                      <h1>TESTE VISUAL</h1>
-                      {/* Temporarily replaced BarChart for layout test */}
+                    <div style={{ height: '300px', width: '100%', background: '#f97316' }}>
+                      <ResponsiveContainer width="100%" height={300}>
+                        <BarChart data={efficiencyData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis 
+                            dataKey="name" 
+                            angle={-45}
+                            textAnchor="end"
+                            height={80}
+                            tick={{ fontSize: 12 }}
+                          />
+                          <YAxis 
+                            tick={{ fontSize: 12 }}
+                            tickFormatter={(value) => `R$ ${value}`}
+                          />
+                          <Tooltip 
+                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
+                          />
+                          <Legend />
+                          <Bar 
+                            dataKey="value" 
+                            fill="#f97316" 
+                            name="Valor Total (R$)"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
                   )
                 )
