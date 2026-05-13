@@ -90,7 +90,7 @@ export default function Sidebar({ user }: SidebarProps) {
       )}
 
       {/* Desktop Sidebar */}
-      <div data-sidebar-mobile className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
+      <div data-sidebar-mobile className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] hidden md:block ${
         isMobile ? (isCollapsed ? '-translate-x-full' : 'translate-x-0') : ''
       } ${isMobile ? 'max-w-[80%] w-[80%]' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
