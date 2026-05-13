@@ -93,7 +93,7 @@ export default function Sidebar({ user }: SidebarProps) {
       {/* Desktop Sidebar */}
       <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
         isMobile ? (isCollapsed ? '-translate-x-full' : 'translate-x-0') : ''
-      } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
+      } ${isMobile ? 'max-w-[80%] w-[80%]' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between">

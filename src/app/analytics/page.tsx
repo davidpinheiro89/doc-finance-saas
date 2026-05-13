@@ -297,7 +297,7 @@ export default function AnalyticsPage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
         {/* Pílulas Inteligentes */}
         <div className="flex flex-wrap gap-2 mb-8">
           <div className="bg-orange-100 border border-orange-200 rounded-lg px-4 py-3">
