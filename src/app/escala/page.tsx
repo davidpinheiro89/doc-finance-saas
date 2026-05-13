@@ -101,6 +101,7 @@ export default function EscalaPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
+        .eq('user_id', userId)
 
       if (error) {
         console.error('❌ ERRO EXATO DO SUPABASE:', error)

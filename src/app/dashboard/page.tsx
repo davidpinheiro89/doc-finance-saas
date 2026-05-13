@@ -13,11 +13,12 @@ const deletePlantaoEvent = async (id: string, userId: string) => {
   }
 
   try {
-    // Force delete with no timezone issues
+    // Force delete with no timezone issues and user_id filter
     const { error } = await supabase
       .from('plantoes')
-        .delete()
-        .eq('id', id)
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
 
     if (error) {
       console.error('Supabase delete error:', error)
@@ -37,7 +38,7 @@ const deletePlantaoEvent = async (id: string, userId: string) => {
 
 interface Plantao {
   id: string
-  usuario_id: string
+  user_id: string
   hospital: string
   data: string
   valor: number
@@ -55,7 +56,7 @@ interface Plantao {
 
 interface LocalFavorito {
   id: string
-  usuario_id: string
+  user_id: string
   nome: string
   endereco: string
   valor_hora: number
@@ -125,7 +126,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) {
@@ -166,7 +167,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('locais_favoritos')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -255,7 +256,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .gte('data', start)
         .lte('data', end)
         .order('data', { ascending: false })
@@ -629,10 +630,12 @@ export default function DashboardPage() {
           .from('plantoes')
           .update(plantaoData)
           .eq('id', editingPlantao.id)
+          .eq('user_id', user.id)
           .select()
       } else {
         // Create new plantão
         plantaoData.created_at = new Date().toISOString()
+        plantaoData.user_id = user.id
         console.log('Saving plantão to table "plantoes":', plantaoData)
         result = await supabase
           .from('plantoes')

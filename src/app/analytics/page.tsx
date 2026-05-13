@@ -54,7 +54,7 @@ export default function AnalyticsPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) {
