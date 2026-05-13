@@ -792,10 +792,10 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 relative">
+    <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
       <Sidebar user={user} />
       
-      <div className="flex-1 overflow-auto relative z-10">
+      <div className="flex-1 overflow-auto w-full relative z-10">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">

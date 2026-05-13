@@ -76,15 +76,23 @@ export default function Sidebar({ user }: SidebarProps) {
       {isMobile && (
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="fixed top-4 left-4 z-50 bg-white p-2 rounded-lg shadow-lg border border-gray-200 md:hidden"
+          className="fixed top-4 left-4 z-[99999] bg-white p-2 rounded-lg shadow-lg border border-gray-200 md:hidden"
         >
           <span className="h-6 w-6">☰</span>
         </button>
       )}
 
+      {/* Mobile Overlay */}
+      {isMobile && !isCollapsed && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-[99998] md:hidden"
+          onClick={() => setIsCollapsed(true)}
+        />
+      )}
+
       {/* Desktop Sidebar */}
       <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
-        isMobile ? (isCollapsed ? 'translate-x-0' : '-translate-x-full') : ''
+        isMobile ? (isCollapsed ? '-translate-x-full' : 'translate-x-0') : ''
       } ${isMobile ? 'w-64' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
@@ -100,6 +108,14 @@ export default function Sidebar({ user }: SidebarProps) {
                 </h1>
               )}
             </div>
+            {isMobile && (
+              <button
+                onClick={() => setIsCollapsed(true)}
+                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
+              >
+                <span className="h-5 w-5">❌</span>
+              </button>
+            )}
             {!isMobile && (
               <button
                 onClick={() => setIsCollapsed(!isCollapsed)}

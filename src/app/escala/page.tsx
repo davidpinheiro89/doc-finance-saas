@@ -445,10 +445,10 @@ export default function EscalaPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-gray-50">
+      <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
         <Sidebar user={user} />
         
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-auto w-full">
           <div className='p-6'>
             <div className="flex justify-between items-center mb-6">
               <h1 className="text-2xl font-bold text-gray-800">Escala de Plantões</h1>

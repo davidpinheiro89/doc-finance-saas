@@ -267,10 +267,10 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
       <Sidebar user={user} />
       
-      <div className="flex-1 overflow-auto">
+      <div className="flex-1 overflow-auto w-full">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
