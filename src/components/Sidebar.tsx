@@ -6,9 +6,10 @@ import { supabase } from '@/lib/supabase'
 
 interface SidebarProps {
   user?: any
+  isSidebarOpen?: boolean
 }
 
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user, isSidebarOpen }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(true) // Start closed on mobile
   const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
@@ -91,7 +92,7 @@ export default function Sidebar({ user }: SidebarProps) {
 
       {/* Desktop Sidebar */}
       <div data-sidebar-mobile className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] hidden md:block ${
-        isMobile ? (isCollapsed ? '-translate-x-full' : 'translate-x-0') : ''
+        isMobile ? (isSidebarOpen ? 'translate-x-0' : '-translate-x-full') : ''
       } ${isMobile ? 'max-w-[80%] w-[80%]' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
@@ -109,7 +110,14 @@ export default function Sidebar({ user }: SidebarProps) {
             </div>
             {isMobile && (
               <button
-                onClick={() => setIsCollapsed(true)}
+                onClick={() => {
+                  setIsCollapsed(true)
+                  // Also close the sidebar in parent component
+                  if (typeof window !== 'undefined') {
+                    const event = new CustomEvent('closeSidebar')
+                    window.dispatchEvent(event)
+                  }
+                }}
                 className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
               >
                 <span className="h-5 w-5">❌</span>
