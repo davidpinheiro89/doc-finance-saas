@@ -139,12 +139,9 @@ export default function PlantoesRealizadosPage() {
   }
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    })
+    // Use ISO string to avoid timezone issues
+    const [year, month, day] = dateString.split('-')
+    return `${day}/${month}/${year}`
   }
 
   const getStatusColor = (status: string) => {
@@ -159,6 +156,27 @@ export default function PlantoesRealizadosPage() {
         return 'bg-purple-100 text-purple-800'
       default:
         return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusText = (plantao: Plantao) => {
+    // Check if there's a payment deadline and status is not paid
+    if (plantao.prazo_pagamento_dias && plantao.status !== 'pago') {
+      return 'Aguardando'
+    }
+    
+    // Return the actual status text
+    switch (plantao.status) {
+      case 'pago':
+        return 'Pago'
+      case 'confirmado':
+        return 'Confirmado'
+      case 'pendente':
+        return 'Pendente'
+      case 'realizado':
+        return 'Realizado'
+      default:
+        return plantao.status
     }
   }
 
@@ -430,10 +448,10 @@ export default function PlantoesRealizadosPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {plantao.horas || 0}h
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           <div className="flex items-center space-x-2">
                             <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                              {plantao.status}
+                              {getStatusText(plantao)}
                             </span>
                             {plantao.status !== 'pago' && (
                               <button
