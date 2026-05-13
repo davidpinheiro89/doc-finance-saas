@@ -9,7 +9,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ user }: SidebarProps) {
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(true) // Start closed on mobile
   const [isMobile, setIsMobile] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
@@ -72,16 +72,6 @@ export default function Sidebar({ user }: SidebarProps) {
 
   return (
     <>
-      {/* Mobile Menu Button */}
-      {isMobile && (
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="fixed top-4 left-4 z-[99999] bg-white p-2 rounded-lg shadow-lg border border-gray-200 md:hidden"
-        >
-          <span className="h-6 w-6">☰</span>
-        </button>
-      )}
-
       {/* Mobile Overlay */}
       {isMobile && !isCollapsed && (
         <div 
@@ -89,9 +79,18 @@ export default function Sidebar({ user }: SidebarProps) {
           onClick={() => setIsCollapsed(true)}
         />
       )}
+      
+      {/* Block scroll when sidebar is open */}
+      {isMobile && !isCollapsed && (
+        <style jsx>{`
+          body {
+            overflow: hidden;
+          }
+        `}</style>
+      )}
 
       {/* Desktop Sidebar */}
-      <div className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
+      <div data-sidebar-mobile className={`bg-white border-r border-gray-200 transition-all duration-300 fixed h-full relative z-[99999] ${
         isMobile ? (isCollapsed ? '-translate-x-full' : 'translate-x-0') : ''
       } ${isMobile ? 'max-w-[80%] w-[80%]' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}

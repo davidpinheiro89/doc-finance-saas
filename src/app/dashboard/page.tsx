@@ -801,7 +801,19 @@ export default function DashboardPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
             <div className="flex items-center">
-              <h1 className="text-3xl font-bold text-gray-800">
+              {/* Mobile Menu Button */}
+              <button
+                onClick={() => {
+                  const sidebar = document.querySelector('[data-sidebar-mobile]')
+                  if (sidebar) {
+                    sidebar.classList.toggle('-translate-x-full')
+                  }
+                }}
+                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <span className="h-6 w-6">☰</span>
+              </button>
+              <h1 className="text-3xl font-bold text-gray-800 ml-2">
                 Início
               </h1>
             </div>

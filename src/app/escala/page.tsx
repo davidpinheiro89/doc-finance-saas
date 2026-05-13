@@ -63,6 +63,11 @@ export default function EscalaPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const router = useRouter()
 
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
   useEffect(() => {
     checkAuth()
     console.log('Componente montado com sucesso')
@@ -445,9 +450,42 @@ export default function EscalaPage() {
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
+      <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden relative">
         <Sidebar user={user} />
-        
+        {/* Header */}
+        <header className="bg-white border-b border-gray-200 shadow-sm relative z-10">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center">
+                {/* Mobile Menu Button */}
+                <button
+                  onClick={() => {
+                    const sidebar = document.querySelector('[data-sidebar-mobile]')
+                    if (sidebar) {
+                      sidebar.classList.toggle('-translate-x-full')
+                    }
+                  }}
+                  className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
+                >
+                  <span className="h-6 w-6">☰</span>
+                </button>
+                <h1 className="text-2xl font-bold text-gray-800 ml-2">Escala de Plantões</h1>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="text-sm text-gray-600">
+                  <span className="font-medium">{user?.user_metadata?.full_name || 'Médico'}</span>
+                  <span className="ml-2 text-xs text-gray-500">{user?.user_metadata?.crm || 'CRM'}</span>
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
+                >
+                  Sair
+                </button>
+              </div>
+            </div>
+          </div>
+        </header>
         <div className="flex-1 overflow-auto w-full">
           <div className='p-4 md:p-6'>
             <div className="flex justify-between items-center mb-6">
