@@ -120,40 +120,6 @@ export default function EscalaPage() {
     }
   }
 
-  // REAL - Hospital efficiency from plantoes data with sanitization
-  const getHospitalEfficiencyData = () => {
-    if (!plantoes || plantoes.length === 0) return []
-    
-    // Use plantoes array that feeds R$ 3.800,00 card
-    const validPlantoes = plantoes.filter(p => 
-      p.hospital && 
-      p.hospital !== '🟢 Disponível' && 
-      p.hospital !== '🔴 Folga'
-    )
-    
-    // Group by hospital with parseFloat sanitization
-    const hospitalGroups = validPlantoes.reduce((acc, plantao) => {
-      const hospital = (plantao.hospital || 'Não informado').trim()
-      if (!acc[hospital]) {
-        acc[hospital] = 0
-      }
-      acc[hospital] += parseFloat(plantao.valor || 0)
-      return acc
-    }, {} as Record<string, number>)
-    
-    // Convert to chart format
-    const chartData = Object.entries(hospitalGroups)
-      .map(([hospital, sum]) => ({
-        name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-        value: parseFloat(String(sum)) || 0
-      }))
-      .filter(item => item.value > 0)
-      .sort((a, b) => b.value - a.value)
-    
-    console.log('DADOS REAIS - Gráfico:', chartData)
-    return chartData
-  }
-
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
   }
@@ -506,60 +472,6 @@ export default function EscalaPage() {
                   <span className="text-xl">▶</span>
                 </button>
               </div>
-            </div>
-
-            {/* Hospital Efficiency Chart */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-4">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Eficiência por Hospital</h3>
-              {(() => {
-                const efficiencyData = getHospitalEfficiencyData()
-                
-                if (efficiencyData.length === 0) {
-                  return (
-                    <div className="text-center py-8">
-                      <div className="text-gray-400 mb-2">
-                        <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                        </svg>
-                      </div>
-                      <p className="text-gray-500">Nenhum plantão registrado neste período</p>
-                    </div>
-                  )
-                }
-                
-                return (
-                  efficiencyData.length > 0 && (
-                    <div style={{ height: '300px', width: '100%', background: '#f97316' }}>
-                      <ResponsiveContainer width="100%" height={300} aspect={2}>
-                        <BarChart data={efficiencyData} layout="horizontal" barSize={32} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis 
-                            type="number"
-                            tickFormatter={(value) => `R$ ${value.toFixed(2)}`}
-                            tick={{ fontSize: 12 }}
-                          />
-                          <YAxis 
-                            dataKey="name"
-                            type="category"
-                            tick={{ fontSize: 12 }}
-                            width={120}
-                          />
-                          <Tooltip 
-                            formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                          />
-                          <Legend />
-                          <Bar 
-                            dataKey="value" 
-                            fill="#f97316" 
-                            name="Valor Total (R$)"
-                            radius={[0, 4, 4, 0]}
-                          />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                  )
-                )
-              })()}
             </div>
 
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">

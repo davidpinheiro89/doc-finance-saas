@@ -825,43 +825,6 @@ export default function DashboardPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Intelligent Insights Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Efficiency Calculation Card */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-4">
-                <h3 className="text-lg font-semibold text-gray-800">Eficiência por Hospital</h3>
-                <div className="flex items-center space-x-2">
-                  <label className="text-sm text-gray-600">Período:</label>
-                  <select
-                    value={monthlyFilter}
-                    onChange={(e) => setMonthlyFilter(e.target.value as 'current' | 'previous')}
-                    className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  >
-                    <option value="current">Mês Atual</option>
-                    <option value="previous">Mês Anterior</option>
-                  </select>
-                  {monthlyFilter === 'current' && (
-                    <button
-                      onClick={() => {
-                        setIsComparing(true)
-                        fetchPreviousMonthData(user.id)
-                      }}
-                      disabled={isComparing}
-                      className="px-3 py-1 text-sm bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:bg-blue-300 disabled:cursor-not-allowed transition-colors duration-200"
-                    >
-                      {isComparing ? 'Comparando...' : 'Comparar com Mês Anterior'}
-                    </button>
-                  )}
-                </div>
-              </div>
-              <div className="bg-blue-100 rounded-full p-2">
-                <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
           {/* Workload Monitoring Card */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
             <div className="flex items-center justify-between mb-4">

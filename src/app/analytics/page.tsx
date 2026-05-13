@@ -372,77 +372,7 @@ export default function AnalyticsPage() {
           </div>
         )}
 
-        {/* Eficiência por Hospital */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Eficiência por Hospital</h3>
-          {(() => {
-            // Group by hospital and sum values
-            const hospitalGroups = filteredPlantoes.reduce((acc, plantao) => {
-              const hospital = (plantao.hospital || 'Não informado').trim()
-              if (!acc[hospital]) {
-                acc[hospital] = 0
-              }
-              acc[hospital] += Number(plantao.valor || 0)
-              return acc
-            }, {} as Record<string, number>)
-            
-            // Convert to chart data format
-            const chartData = Object.entries(hospitalGroups)
-              .map(([hospital, sum]) => ({
-                name: hospital.length > 15 ? hospital.substring(0, 15) + '...' : hospital,
-                value: parseFloat(String(sum)) || 0
-              }))
-              .filter(item => item.value > 0)
-              .sort((a, b) => b.value - a.value)
-            
-            console.log('Eficiência por Hospital (Analytics):', chartData)
-            
-            if (chartData.length === 0) {
-              return (
-                <div className="text-center py-8">
-                  <div className="text-gray-400 mb-2">
-                    <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                    </svg>
-                  </div>
-                  <p className="text-gray-500">Nenhum plantão registrado neste período</p>
-                </div>
-              )
-            }
-            
-            return (
-              <div style={{ height: '300px', width: '100%', background: '#f97316' }}>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={chartData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="name" 
-                      angle={-45}
-                      textAnchor="end"
-                      height={80}
-                      tick={{ fontSize: 12 }}
-                    />
-                    <YAxis 
-                      tick={{ fontSize: 12 }}
-                      tickFormatter={(value) => `R$ ${value}`}
-                    />
-                    <Tooltip 
-                      formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
-                    />
-                    <Legend />
-                    <Bar 
-                      dataKey="value" 
-                      fill="#f97316" 
-                      name="Valor Total (R$)"
-                      radius={[4, 4, 0, 0]}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            )
-          })()}
-        </div>
-
+        
         {/* Filtro de Período */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
           <h3 className="text-lg font-semibold text-gray-800 mb-4">Filtrar por Período</h3>
