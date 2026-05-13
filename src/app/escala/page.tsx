@@ -530,19 +530,19 @@ export default function EscalaPage() {
                 return (
                   efficiencyData.length > 0 && (
                     <div style={{ height: '300px', width: '100%', background: '#f97316' }}>
-                      <ResponsiveContainer width="100%" height={300}>
-                        <BarChart data={efficiencyData}>
+                      <ResponsiveContainer width="100%" height={300} aspect={2}>
+                        <BarChart data={efficiencyData} layout="horizontal" barSize={32} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
                           <CartesianGrid strokeDasharray="3 3" />
                           <XAxis 
-                            dataKey="name" 
-                            angle={-45}
-                            textAnchor="end"
-                            height={80}
+                            type="number"
+                            tickFormatter={(value) => `R$ ${value.toFixed(2)}`}
                             tick={{ fontSize: 12 }}
                           />
                           <YAxis 
+                            dataKey="name"
+                            type="category"
                             tick={{ fontSize: 12 }}
-                            tickFormatter={(value) => `R$ ${value}`}
+                            width={120}
                           />
                           <Tooltip 
                             formatter={(value: number) => [`R$ ${value.toFixed(2)}`, 'Valor Total']}
@@ -552,7 +552,7 @@ export default function EscalaPage() {
                             dataKey="value" 
                             fill="#f97316" 
                             name="Valor Total (R$)"
-                            radius={[4, 4, 0, 0]}
+                            radius={[0, 4, 4, 0]}
                           />
                         </BarChart>
                       </ResponsiveContainer>
