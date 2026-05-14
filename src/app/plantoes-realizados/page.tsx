@@ -1,59 +1,30 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'realizado'
-  horas?: number
-  endereco?: string
-  prazo_pagamento_dias?: number
-}
+import type { Plantao } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export default function PlantoesRealizadosPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null)
-  const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (user) fetchPlantoes(user.id)
+  }, [user])
 
   const fetchPlantoes = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) {
@@ -160,24 +131,24 @@ export default function PlantoesRealizadosPage() {
   }
 
   const getStatusText = (plantao: Plantao) => {
-    // Check if there's a payment deadline and status is not paid
-    if (plantao.prazo_pagamento_dias && plantao.status !== 'pago') {
+    // Unique status logic - show only one status per plantão
+    if (plantao.status === 'pago') {
+      return 'Pago'
+    }
+    
+    // If payment hasn't been received or is within deadline
+    // (status 'pago' already returned above, so no need to re-check)
+    if (plantao.prazo_pagamento_dias) {
       return 'Aguardando'
     }
     
-    // Return the actual status text
-    switch (plantao.status) {
-      case 'pago':
-        return 'Pago'
-      case 'confirmado':
-        return 'Confirmado'
-      case 'pendente':
-        return 'Pendente'
-      case 'realizado':
-        return 'Realizado'
-      default:
-        return plantao.status
+    // If plantão was done but no payment info
+    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
+      return 'Realizado'
     }
+    
+    // Default to actual status
+    return plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)
   }
 
   const isOverdue = (plantao: Plantao) => {
@@ -215,7 +186,7 @@ export default function PlantoesRealizadosPage() {
       }
 
       // Refresh plantões list
-      await fetchPlantoes(user.id)
+      if (user) await fetchPlantoes(user.id)
       
       alert('Pagamento confirmado com sucesso!')
     } catch (error) {
@@ -449,32 +420,9 @@ export default function PlantoesRealizadosPage() {
                           {plantao.horas || 0}h
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                              {getStatusText(plantao)}
-                            </span>
-                            {plantao.status !== 'pago' && (
-                              <button
-                                onClick={() => handleMarkAsPaid(plantao.id)}
-                                disabled={confirmingPayment === plantao.id}
-                                className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-1 px-2 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {confirmingPayment === plantao.id ? (
-                                  <div className="flex items-center">
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                    Confirmando...
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center">
-                                    <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Pago
-                                  </div>
-                                )}
-                              </button>
-                            )}
-                          </div>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
+                            {getStatusText(plantao)}
+                          </span>
                         </td>
                       </tr>
                     ))}

@@ -1,51 +1,24 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Legend } from 'recharts'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado'
-  horas?: number
-  endereco?: string
-}
+import type { Plantao } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export default function AnalyticsPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
-    const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (user) fetchPlantoes(user.id)
+  }, [user])
 
   const fetchPlantoes = async (userId: string) => {
     try {

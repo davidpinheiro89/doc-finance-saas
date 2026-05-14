@@ -1,33 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 // Chart imports removed to prevent loops
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado'
-  horas?: number
-}
-
-interface Despesa {
-  id: string
-  descricao: string
-  valor: number
-  data: string
-  categoria: string
-  user_id: string
-  recorrente?: boolean
-}
+import type { Plantao, Despesa } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export default function FinanceiroPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
@@ -48,35 +29,13 @@ export default function FinanceiroPage() {
     categoria: 'transporte',
     recorrente: false
   })
-  const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, []) // Empty dependency array to prevent infinite loops
-
-  useEffect(() => {
-    // Trigger recalculation when filters or data change
+    // Initial fetch + refetch when filters change
     if (user) {
-      fetchData(user.id)
+      fetchData(user!.id)
     }
-  }, [selectedMonth, selectedYear, despesas.length]) // React to filter changes
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchData(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user, selectedMonth, selectedYear, despesas.length])
 
   const fetchData = async (userId: string) => {
     await Promise.all([
@@ -88,7 +47,7 @@ export default function FinanceiroPage() {
   const fetchPlantoes = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('plantões')
+        .from('plantoes')
         .select('*')
         .eq('user_id', userId)
 
@@ -145,7 +104,7 @@ export default function FinanceiroPage() {
             data: expenseDate.toISOString().split('T')[0],
             categoria: newExpense.categoria,
             recorrente: true,
-            user_id: user.id
+            user_id: user!.id
           })
         }
 
@@ -166,7 +125,7 @@ export default function FinanceiroPage() {
             data: newExpense.data,
             categoria: newExpense.categoria,
             recorrente: false,
-            user_id: user.id
+            user_id: user!.id
           })
 
         if (error) {
@@ -186,11 +145,11 @@ export default function FinanceiroPage() {
       setShowAddExpense(false)
       
       // Sync with database immediately
-      await fetchDespesas(user.id)
+      await fetchDespesas(user!.id)
       console.log('Despesa adicionada com sucesso:', newExpense)
       
       // Force immediate refresh to ensure new expense appears in list
-      setTimeout(() => fetchDespesas(user.id), 500)
+      setTimeout(() => fetchDespesas(user!.id), 500)
     } catch (error) {
       alert('Erro ao adicionar despesa. Tente novamente.')
     }
@@ -223,7 +182,7 @@ export default function FinanceiroPage() {
 
       setShowEditExpense(false)
       setEditingExpense(null)
-      await fetchDespesas(user.id)
+      await fetchDespesas(user!.id)
     } catch (error) {
       alert('Erro ao atualizar despesa. Tente novamente.')
     }
@@ -247,7 +206,7 @@ export default function FinanceiroPage() {
         const { error } = await supabase
           .from('despesas')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .like('descricao', `${baseDescription}%`)
           .eq('recorrente', true)
 
@@ -267,7 +226,7 @@ export default function FinanceiroPage() {
         }
       }
 
-      await fetchDespesas(user.id)
+      await fetchDespesas(user!.id)
     } catch (error) {
       alert('Erro ao excluir despesa. Tente novamente.')
     }

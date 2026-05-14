@@ -1,56 +1,21 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import jsPDF from 'jspdf'
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado'
-  horas?: number
-}
-
-interface Despesa {
-  id: string
-  descricao: string
-  valor: number
-  data: string
-  categoria: string
-}
+import type { Plantao, Despesa } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export default function ImpostoRendaPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchData(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (user) fetchData(user.id)
+  }, [user])
 
   const fetchData = async (userId: string) => {
     await Promise.all([
@@ -64,7 +29,7 @@ export default function ImpostoRendaPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
 
       if (error) {
         console.error('Error fetching plantões:', error)
@@ -84,7 +49,7 @@ export default function ImpostoRendaPage() {
       const { data, error } = await supabase
         .from('despesas')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
 
       if (error) {
         console.error('Error fetching despesas:', error)

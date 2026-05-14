@@ -1,10 +1,20 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Sidebar from '@/components/Sidebar'
+import { SkeletonMetricCard, SkeletonTableRows } from '@/components/Skeleton'
+import type { Plantao, LocalFavorito } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  fetchPlantoesByUser,
+  fetchPlantoesByUserRange,
+  applyAutoRealizadoStatus,
+  plantoesKeys,
+  type PlantaoListItem,
+} from '@/lib/queries/plantoes'
 
 // Shared delete function for both pages
 const deletePlantaoEvent = async (id: string, userId: string) => {
@@ -36,52 +46,59 @@ const deletePlantaoEvent = async (id: string, userId: string) => {
   }
 }
 
-interface Plantao {
-  id: string
-  user_id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'realizado'
-  horas?: number
-  endereco?: string
-  cep: string
-  data_prevista_pagamento: string
-  prazo_pagamento_dias: string
-  classificacao: string
-  especialidade: string
-  tipo_evento?: 'plantao' | 'folga' | 'disponivel'
-  local_favorito_id?: string | null
-}
-
-interface LocalFavorito {
-  id: string
-  user_id: string
-  nome: string
-  endereco: string
-  valor_hora: number
-  created_at: string
-  updated_at: string
-}
-
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [plantoes, setPlantoes] = useState<any[]>([])
+  const { user, loading } = useAuthGuard()
+  const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
-  const [editingPlantao, setEditingPlantao] = useState<Plantao | null>(null)
+  const [editingPlantao, setEditingPlantao] = useState<PlantaoListItem | null>(null)
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
-  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([]) // Add favorite locations state
-  const [efficiencyData, setEfficiencyData] = useState<any[]>([])
-  const [chartReady, setChartReady] = useState(false)
+  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([])
   const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
-  const [previousMonthData, setPreviousMonthData] = useState<any[]>([])
-  const [isComparing, setIsComparing] = useState(false)
+
+  // --- TanStack Query: lista principal de plantões do usuário ---
+  const { data: plantoes = [], isPending: isPlantoesPending } = useQuery({
+    queryKey: user ? plantoesKeys.byUser(user.id) : ['plantoes', 'anon'],
+    queryFn: () => fetchPlantoesByUser(user!.id),
+    enabled: !!user,
+    // Aplica regra de negócio (data passada + pendente → realizado) sem
+    // alterar o cache subjacente.
+    select: applyAutoRealizadoStatus,
+  })
+
+  // Mostra skeletons enquanto: (a) auth não terminou OU (b) primeira busca
+  // de plantões está em andamento. Após carga inicial, refetches em
+  // background não disparam skeleton (fica responsivo).
+  const isInitialLoading = loading || (!!user && isPlantoesPending)
+
+  // --- TanStack Query: plantões do mês anterior (para comparação) ---
+  const previousMonthRange = useMemo(() => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
+    return {
+      start: firstDay.toISOString().split('T')[0],
+      end: lastDay.toISOString().split('T')[0],
+    }
+  }, [])
+
+  const { data: previousMonthData = [], isFetching: isComparing } = useQuery({
+    queryKey: user
+      ? plantoesKeys.byUserRange(user.id, previousMonthRange.start, previousMonthRange.end)
+      : ['plantoes', 'anon-range'],
+    queryFn: () => fetchPlantoesByUserRange(user!.id, previousMonthRange.start, previousMonthRange.end),
+    enabled: !!user,
+  })
+
+  const invalidatePlantoes = () => {
+    if (user) {
+      queryClient.invalidateQueries({ queryKey: plantoesKeys.byUser(user.id) })
+    }
+  }
   const [formData, setFormData] = useState({
     hospital: '',
     data: '',
@@ -98,69 +115,11 @@ export default function DashboardPage() {
   })
   const router = useRouter()
 
+  // Carrega lugares favoritos sempre que o user mudar (não-cacheado por
+  // ora; pode ser migrado para useQuery quando necessário).
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-      await fetchPreviousMonthData(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchPlantoes = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('plantoes')
-        .select('*')
-        .eq('user_id', userId)
-        .order('data', { ascending: false })
-
-      if (error) {
-        console.error('Supabase error fetching plantões:', error)
-        alert('Erro ao buscar plantões: ' + error.message)
-        setPlantoes([])
-        return
-      }
-
-      // Filter out 'Folga' entries and apply automatic status logic for past plantões
-      const processedData = (data || []).map((plantao: Plantao) => {
-        // Keep data as pure string, no Date object conversion
-        const plantaoDate = new Date(plantao.data + 'T00:00:00')
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        // If plantão date is in the past and status is still 'pendente', change to 'realizado'
-        if (plantaoDate < today && plantao.status === 'pendente') {
-          return { ...plantao, status: 'realizado' }
-        }
-        
-        return plantao
-      })
-      
-      setPlantoes(processedData)
-      
-      // Fetch favorite locations
-      await fetchLocaisFavoritos(userId)
-    } catch (error) {
-      console.error('Error fetching plantões:', error)
-      alert('Erro ao buscar plantões. Tente novamente.')
-      setPlantoes([])
-    }
-  }
+    if (user) fetchLocaisFavoritos(user.id)
+  }, [user])
 
   const fetchLocaisFavoritos = async (userId: string) => {
     try {
@@ -248,34 +207,6 @@ export default function DashboardPage() {
     }
   }
 
-  // Fetch previous month data
-  const fetchPreviousMonthData = async (userId: string) => {
-    setIsComparing(true)
-    try {
-      const { start, end } = getPreviousMonthRange()
-      const { data, error } = await supabase
-        .from('plantoes')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('data', start)
-        .lte('data', end)
-        .order('data', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching previous month data:', error)
-        setPreviousMonthData([])
-        return
-      }
-
-      setPreviousMonthData(data || [])
-      console.log('Dados do mês anterior carregados:', data?.length || 0, 'itens')
-    } catch (error) {
-      console.error('Error fetching previous month data:', error)
-      setPreviousMonthData([])
-    } finally {
-      setIsComparing(false)
-    }
-  }
 
   const handleSaveAsFavorite = async () => {
     if (!formData.hospital || !formData.endereco) {
@@ -287,7 +218,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('locais_favoritos')
         .insert({
-          usuario_id: user.id,
+          user_id: user!.id,
           nome: `${formData.hospital} - ${formData.endereco}`,
           endereco: formData.endereco,
           valor_hora: parseFloat(formData.valor) || 0
@@ -317,7 +248,7 @@ export default function DashboardPage() {
       }
       
       // Refresh favorites list
-      await fetchLocaisFavoritos(user.id)
+      await fetchLocaisFavoritos(user!.id)
     } catch (error) {
       console.error('Error saving favorite location:', error)
       alert('Erro ao salvar local favorito. Tente novamente.')
@@ -366,116 +297,8 @@ export default function DashboardPage() {
   const filteredMetrics = {
     quantidade: listagemPlantoes.length,
     valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
+    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
-
-  // Function to calculate efficiency for comparison
-  const calculateEfficiency = (data: any[]) => {
-    return data
-      .filter((p: any) => (p.status === 'pago' || p.status === 'realizado') && (p.horas || p.carga_horaria || p.duration))
-      .reduce((acc: any, plantao: any) => {
-        const hospital = plantao.hospital || plantao.local || 'Desconhecido'
-        const h = Number(plantao.horas || plantao.carga_horaria || plantao.duration || 0)
-        
-        if (h <= 0) return acc
-        
-        if (!acc[hospital]) {
-          acc[hospital] = {
-            totalValue: 0,
-            totalHours: 0,
-            hourlyRate: 0,
-            count: 0
-          }
-        }
-        
-        acc[hospital].totalValue += Number(plantao.valor || 0)
-        acc[hospital].totalHours += h
-        acc[hospital].count += 1
-        acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
-        
-        return acc
-      }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
-  }
-
-  // Memoized efficiency calculations to prevent unnecessary re-renders
-  const currentMonthEfficiency = useMemo(() => {
-    return calculateEfficiency(listagemPlantoes)
-  }, [listagemPlantoes])
-
-  const previousMonthEfficiency = useMemo(() => {
-    return calculateEfficiency(previousMonthData)
-  }, [previousMonthData])
-
-  const efficiencyWithComparison = useMemo(() => {
-    if (!isComparing || monthlyFilter !== 'current') {
-      return Object.entries(currentMonthEfficiency)
-        .map(([hospital, data]: any) => ({
-          hospital,
-          data,
-          delta: 0
-        }))
-        .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
-        .slice(0, 3)
-    }
-
-    return Object.entries(currentMonthEfficiency)
-      .map(([hospital, data]: any) => {
-        const previousData = previousMonthEfficiency[hospital]
-        const delta = previousData ? ((data.hourlyRate / previousData.hourlyRate) - 1) * 100 : 0
-        
-        return {
-          hospital,
-          data,
-          delta: Number(delta.toFixed(1))
-        }
-      })
-      .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
-      .slice(0, 3)
-  }, [currentMonthEfficiency, previousMonthEfficiency, isComparing, monthlyFilter])
-
-  // useEffect to update efficiency data when memoized calculations change
-  useEffect(() => {
-    if (efficiencyWithComparison.length > 0) {
-      // console.log('Atualizando gráfico com dados memoizados:', efficiencyWithComparison) - REMOVED TO PREVENT LOOP
-      setEfficiencyData(efficiencyWithComparison)
-      setChartReady(true)
-    } else {
-      setEfficiencyData([])
-      setChartReady(false)
-    }
-  }, []) // Empty dependency array to prevent infinite loop
-
-  // Prepare data for bar chart (plantões by unit)
-  const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
-    const unit = plantao.hospital
-    if (!acc[unit]) {
-      acc[unit] = 0
-    }
-    acc[unit] += 1
-    return acc
-  }, {} as Record<string, number>)
-
-  const chartData = Object.entries(plantoesByUnit).map(([unit, count]) => ({
-    unidade: unit,
-    quantidade: (count as number) || 0
-  })).sort((a, b) => b.quantidade - a.quantidade)
-
-  // Prepare data for hours distribution chart
-  const hoursByUnit = listagemPlantoes.reduce((acc, plantao) => {
-    const unit = plantao.hospital
-    if (!acc[unit]) {
-      acc[unit] = 0
-    }
-    acc[unit] += (plantao.horas || plantao.carga_horaria || plantao.duration || 0) as number
-    return acc
-  }, {} as Record<string, number>)
-
-  const hoursChartData = Object.entries(hoursByUnit).map(([unit, hours]) => ({
-    unidade: unit,
-    horas: (hours as number) || 0
-  })).sort((a, b) => b.horas - a.horas)
-
-  const COLORS = ['#f97316', '#ea580c', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#22c55e']
 
   const handleCepLookup = async () => {
     const cep = formData.cep.replace(/\D/g, '') // Remove non-digits
@@ -530,7 +353,7 @@ export default function DashboardPage() {
     setDeletingId(id)
 
     try {
-      const { success, error } = await deletePlantaoEvent(id, user.id)
+      const { success, error } = await deletePlantaoEvent(id, user!.id)
 
       if (error) {
         console.error('Supabase delete error:', error)
@@ -538,11 +361,12 @@ export default function DashboardPage() {
         return
       }
 
-      // Update local state immediately for visual feedback - NO AUTO FETCH
-      setPlantoes(prev => {
-        const updated = prev.filter(p => p.id !== id)
-        return updated
-      })
+      // Optimistic delete diretamente no cache do TanStack Query
+      if (user) {
+        queryClient.setQueryData<PlantaoListItem[]>(plantoesKeys.byUser(user.id), (old) =>
+          (old ?? []).filter((p) => p.id !== id),
+        )
+      }
       
       // Force router refresh to clear any cache
       router.refresh()
@@ -556,7 +380,7 @@ export default function DashboardPage() {
     }
   }
 
-  const handleEditPlantao = (plantao: Plantao) => {
+  const handleEditPlantao = (plantao: PlantaoListItem) => {
     setEditingPlantao(plantao)
     setFormData({
       hospital: plantao.hospital,
@@ -581,8 +405,8 @@ export default function DashboardPage() {
 
     try {
       // Validate required fields
-      if (!formData.hospital || !formData.data || !formData.valor || !user.id) {
-        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user.id })
+      if (!formData.hospital || !formData.data || !formData.valor || !user!.id) {
+        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user!.id })
         alert('Preencha todos os campos obrigatórios.')
         return
       }
@@ -608,7 +432,7 @@ export default function DashboardPage() {
       }
 
       let plantaoData: any = {
-        usuario_id: user.id,
+        user_id: user!.id,
         hospital: formData.hospital.trim(),
         data: formData.data,
         valor: parseFloat(formData.valor),
@@ -630,12 +454,12 @@ export default function DashboardPage() {
           .from('plantoes')
           .update(plantaoData)
           .eq('id', editingPlantao.id)
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .select()
       } else {
         // Create new plantão
         plantaoData.created_at = new Date().toISOString()
-        plantaoData.user_id = user.id
+        plantaoData.user_id = user!.id
         console.log('Saving plantão to table "plantoes":', plantaoData)
         result = await supabase
           .from('plantoes')
@@ -658,7 +482,7 @@ export default function DashboardPage() {
       console.log('Plantão saved successfully:', data)
 
       // Refresh plantões list
-      await fetchPlantoes(user.id)
+      invalidatePlantoes()
       
       // Close modal and reset form
       setShowModal(false)
@@ -772,8 +596,8 @@ export default function DashboardPage() {
     .reduce((sum, p) => sum + (p.valor || 0), 0)
 
   const horasTotais = plantoes
-    .filter(p => p.horas || p.carga_horaria || p.duration)
-    .reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
+    .filter(p => p.horas)
+    .reduce((sum, p) => sum + (p.horas || 0), 0)
 
   const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
 
@@ -972,56 +796,66 @@ export default function DashboardPage() {
 
         {/* Cards de Resumo */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Plantões no Período */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Plantões no Período</p>
-                <p className="text-3xl font-bold text-orange-500 mt-2">
-                  {filteredMetrics.quantidade}
-                </p>
+          {isPlantoesPending ? (
+            <>
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+              <SkeletonMetricCard />
+            </>
+          ) : (
+            <>
+              {/* Plantões no Período */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Plantões no Período</p>
+                    <p className="text-3xl font-bold text-orange-500 mt-2">
+                      {filteredMetrics.quantidade}
+                    </p>
+                  </div>
+                  <div className="bg-orange-100 rounded-full p-3">
+                    <svg className="h-6 w-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <div className="bg-orange-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
 
-          {/* Valor Total (R$) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total (R$)</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">
-                  {formatCurrency(filteredMetrics.valorTotal)}
-                </p>
+              {/* Valor Total (R$) */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Valor Total (R$)</p>
+                    <p className="text-3xl font-bold text-green-600 mt-2">
+                      {formatCurrency(filteredMetrics.valorTotal)}
+                    </p>
+                  </div>
+                  <div className="bg-green-100 rounded-full p-3">
+                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
 
-          {/* Carga Horária Total (Hrs) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Carga Horária Total (Hrs)</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">
-                  {horasTotais.toFixed(1)}
-                </p>
+              {/* Carga Horária Total (Hrs) */}
+              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">Carga Horária Total (Hrs)</p>
+                    <p className="text-3xl font-bold text-blue-600 mt-2">
+                      {horasTotais.toFixed(1)}
+                    </p>
+                  </div>
+                  <div className="bg-blue-100 rounded-full p-3">
+                    <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                </div>
               </div>
-              <div className="bg-blue-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
+            </>
+          )}
         </div>
 
         {/* Próximos Plantões (A Realizar) */}
@@ -1039,7 +873,15 @@ export default function DashboardPage() {
             </button>
           </div>
 
-          {upcomingPlantoes.length === 0 ? (
+          {isPlantoesPending ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <tbody>
+                  <SkeletonTableRows rows={4} cols={6} />
+                </tbody>
+              </table>
+            </div>
+          ) : upcomingPlantoes.length === 0 ? (
             <div className="text-center py-8">
               <div className="text-gray-400 mb-2">
                 <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1080,8 +922,8 @@ export default function DashboardPage() {
                         <div className="font-semibold text-orange-600">
                           {formatDate(plantao.data)}
                         </div>
-                        {(plantao.horas || plantao.carga_horaria || plantao.duration) && (
-                          <div className="text-xs text-gray-500">{plantao.horas || plantao.carga_horaria || plantao.duration}h</div>
+                        {plantao.horas && (
+                          <div className="text-xs text-gray-500">{plantao.horas}h</div>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1107,7 +949,7 @@ export default function DashboardPage() {
                         {formatCurrency(plantao.valor)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(plantao.horas || plantao.carga_horaria || plantao.duration || 0)}h
+                        {(plantao.horas || 0)}h
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>

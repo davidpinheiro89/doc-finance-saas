@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+import { supabaseClient as supabase } from './supabase-client'
 import { offlineDB, PlantaoData, SyncQueueItem } from './offline-db'
 
 class SyncService {
@@ -112,7 +112,7 @@ class SyncService {
         data_prevista_pagamento: data.data_prevista_pagamento,
         horas: data.horas,
         prazo_pagamento_dias: data.prazo_pagamento_dias,
-        usuario_id: data.usuario_id
+        user_id: data.user_id
       })
       .select()
       .single()
@@ -137,7 +137,7 @@ class SyncService {
         prazo_pagamento_dias: data.prazo_pagamento_dias
       })
       .eq('id', data.id)
-      .eq('usuario_id', data.usuario_id)
+      .eq('user_id', data.user_id)
 
     if (error) throw error
     
@@ -154,7 +154,7 @@ class SyncService {
     if (error) throw error
   }
 
-  public async syncFromServer(usuarioId: string): Promise<void> {
+  public async syncFromServer(userId: string): Promise<void> {
     if (!this.isOnline) return
 
     try {
@@ -162,13 +162,13 @@ class SyncService {
       const { data: serverPlantoes, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', usuarioId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) throw error
 
       // Get local plantões
-      const localPlantoes = await offlineDB.getPlantoes(usuarioId)
+      const localPlantoes = await offlineDB.getPlantoes(userId)
 
       // Merge server data with local data
       const mergedPlantoes = this.mergePlantoes(serverPlantoes || [], localPlantoes)
@@ -267,15 +267,15 @@ class SyncService {
     }
   }
 
-  public async deletePlantaoOffline(id: string, usuarioId: string): Promise<void> {
+  public async deletePlantaoOffline(id: string, userId: string): Promise<void> {
     // Get the plantao first to ensure it exists
-    const plantao = await offlineDB.getPlantoes(usuarioId)
+    const plantao = await offlineDB.getPlantoes(userId)
     const plantaoToDelete = plantao.find(p => p.id === id)
-    
+
     if (!plantaoToDelete) return
 
     // Delete from local storage
-    await offlineDB.deletePlantao(id, usuarioId)
+    await offlineDB.deletePlantao(id, userId)
 
     // Try to sync if online
     if (this.isOnline) {
@@ -283,14 +283,14 @@ class SyncService {
     }
   }
 
-  public async getPlantoesOffline(usuarioId: string): Promise<PlantaoData[]> {
+  public async getPlantoesOffline(userId: string): Promise<PlantaoData[]> {
     // Always try to sync from server first if online
     if (this.isOnline) {
-      await this.syncFromServer(usuarioId)
+      await this.syncFromServer(userId)
     }
 
     // Return from local storage
-    return await offlineDB.getPlantoes(usuarioId)
+    return await offlineDB.getPlantoes(userId)
   }
 
   public getSyncStatus(): {

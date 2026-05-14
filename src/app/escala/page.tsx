@@ -2,10 +2,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Sidebar from '../../components/Sidebar'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { fetchPlantoesByUser, plantoesKeys } from '@/lib/queries/plantoes'
 
 // Error boundary component
 interface ErrorBoundaryState {
@@ -38,9 +40,22 @@ class ErrorBoundary extends React.Component<any, any> {
 }
 
 export default function EscalaPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
-  const [plantoes, setPlantoes] = useState<any[]>([])
+  const { user, loading } = useAuthGuard()
+  const queryClient = useQueryClient()
+
+  const { data: plantoes = [] } = useQuery({
+    queryKey: user ? plantoesKeys.byUser(user.id) : ['plantoes', 'anon'],
+    queryFn: () => fetchPlantoesByUser(user!.id),
+    enabled: !!user,
+  })
+
+  // Invalida o cache de plantões do usuário atual após mutações locais.
+  const invalidatePlantoes = () => {
+    if (user) {
+      queryClient.invalidateQueries({ queryKey: plantoesKeys.byUser(user.id) })
+    }
+  }
+
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [showActionModal, setShowActionModal] = useState(false)
@@ -71,72 +86,17 @@ export default function EscalaPage() {
   }
 
   useEffect(() => {
-    checkAuth()
-    console.log('Componente montado com sucesso')
-    
     // Listen for sidebar close event
     const handleSidebarClose = () => {
       setIsSidebarOpen(false)
     }
-    
+
     window.addEventListener('closeSidebar', handleSidebarClose)
-    
+
     return () => {
       window.removeEventListener('closeSidebar', handleSidebarClose)
     }
   }, [])
-
-  
-  const checkAuth = async () => {
-    try {
-      const { data: { user } }: any = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-    } catch (error) {
-      console.error('Erro de autenticação:', error)
-      
-      if ((error as any)?.message?.includes('grant_type=password') || (error as any)?.status === 400) {
-        console.error('Erro de grant_type/password detectado')
-        router.push('/login')
-        return
-      }
-      
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const fetchPlantoes = async (userId: string) => {
-    try {
-      console.log('🔄 INICIANDO BUSCA DE PLANTÕES...')
-      
-      const { data, error } = await supabase
-        .from('plantoes')
-        .select('*')
-        .eq('user_id', userId)
-
-      if (error) {
-        console.error('❌ ERRO EXATO DO SUPABASE:', error)
-        setPlantoes([])
-        setLoading(false)
-        return
-      }
-
-      console.log('✅ Dados carregados do Supabase:', data?.length || 0, 'registros')
-      setPlantoes(data || [])
-      setLoading(false)
-    } catch (error) {
-      console.error('❌ ERRO GERAL NA BUSCA:', error)
-      setPlantoes([])
-      setLoading(false)
-    }
-  }
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -219,7 +179,7 @@ export default function EscalaPage() {
       console.log('Status salvo com sucesso:', data)
       alert(`✅ ${status === 'disponivel' ? 'Disponível' : 'Folga'} marcado com sucesso!`)
       setShowActionModal(false)
-      await fetchPlantoes(user.id)
+      invalidatePlantoes()
     } catch (error) {
       console.error('Erro ao salvar status:', error)
       alert('Erro ao salvar status. Tente novamente.')
@@ -252,8 +212,8 @@ export default function EscalaPage() {
 
     try {
       // Validate required fields
-      if (!formData.hospital || !formData.data || !formData.valor || !user.id) {
-        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user.id })
+      if (!formData.hospital || !formData.data || !formData.valor || !user!.id) {
+        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user!.id })
         alert('Preencha todos os campos obrigatórios.')
         return
       }
@@ -272,7 +232,7 @@ export default function EscalaPage() {
       }
 
       const plantaoData = {
-        usuario_id: user.id,
+        user_id: user!.id,
         hospital: formData.hospital.trim(),
         data: formData.data,
         valor: parseFloat(formData.valor),
@@ -319,7 +279,7 @@ export default function EscalaPage() {
         local_favorito_id: ''
       })
       
-      await fetchPlantoes(user.id)
+      invalidatePlantoes()
       
     } catch (error) {
       console.error('Erro ao salvar plantão:', error)
@@ -437,7 +397,7 @@ export default function EscalaPage() {
       console.log('Dia limpo com sucesso')
       alert('✅ Dia limpo com sucesso!')
       setShowActionModal(false)
-      await fetchPlantoes(user.id)
+      invalidatePlantoes()
     } catch (error) {
       console.error('Error clearing day:', error)
       alert('Erro ao limpar o dia. Tente novamente.')
