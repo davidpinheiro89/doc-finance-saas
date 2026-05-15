@@ -413,7 +413,7 @@ export default function DashboardPage() {
       prazo_pagamento_dias: plantao.prazo_pagamento_dias?.toString() || '',
       classificacao: plantao.classificacao || '',
       especialidade: plantao.especialidade || '',
-      local_favorito_id: plantao.local_favorito_id || null
+      local_favorito_id: null // coluna não existe no schema atual
     })
     setShowModal(true)
   }
@@ -584,25 +584,25 @@ export default function DashboardPage() {
   }
 
   // Filter plantões by date — comparação por string YYYY-MM-DD evita 100% dos
-  // problemas de fuso horário (plantao.data já vem nesse formato do Supabase).
-  // Calcula a data local de hoje (America/Sao_Paulo é UTC-3, sem horário de verão).
-  const today = new Date()
-  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  // problemas de fuso horário. Normaliza com `.split('T')[0]` para ser robusto
+  // caso o Supabase devolva timestamp completo em vez de date puro.
+  const todayStr = todayLocalISO()
+  const dataKey = (p: PlantaoListItem) => (p.data || '').split('T')[0]
 
-  const todayPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
-    if (!plantao.data) return false
-    return plantao.data === todayStr
+  const todayPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d === todayStr
   }).sort((a: PlantaoListItem, b: PlantaoListItem) => (a.hospital || '').localeCompare(b.hospital || ''))
 
-  const upcomingPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
-    if (!plantao.data) return false
-    return plantao.data > todayStr
-  }).sort((a: PlantaoListItem, b: PlantaoListItem) => a.data.localeCompare(b.data))
+  const upcomingPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d > todayStr
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(a).localeCompare(dataKey(b)))
 
-  const historicalPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
-    if (!plantao.data) return false
-    return plantao.data < todayStr
-  }).sort((a: PlantaoListItem, b: PlantaoListItem) => b.data.localeCompare(a.data))
+  const historicalPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d < todayStr
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(b).localeCompare(dataKey(a)))
 
   // Calculate management metrics - normaliza datas para evitar problemas de fuso horário
   const currentMonth = new Date().getMonth()

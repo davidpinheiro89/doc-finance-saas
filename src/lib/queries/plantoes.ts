@@ -38,7 +38,8 @@ export const PLANTAO_LIST_COLUMNS = [
   'data_prevista_pagamento',
   'classificacao',
   'especialidade',
-  'local_favorito_id',
+  // 'local_favorito_id' — coluna não existe no schema atual; reativar quando
+  // for adicionada via migration.
 ].join(', ')
 
 /**
@@ -61,7 +62,6 @@ export type PlantaoListItem = Pick<
   | 'data_prevista_pagamento'
   | 'classificacao'
   | 'especialidade'
-  | 'local_favorito_id'
 >
 
 // =============================================================================
