@@ -1171,32 +1171,33 @@ export default function DashboardPage() {
                 <label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
                   Hospital/Local
                 </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    id="hospital"
-                    name="hospital"
-                    value={formData.hospital}
-                    onChange={handleInputChange}
-                    className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    placeholder="Nome do hospital"
-                    required
-                  />
+                {/* Seletor de local salvo aparece somente se houver favoritos cadastrados */}
+                {locaisFavoritos.length > 0 && (
                   <select
                     id="local_favorito_id"
                     name="local_favorito_id"
                     value={formData.local_favorito_id || ''}
                     onChange={handleLocationChange}
-                    className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="block w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm bg-gray-50"
                   >
-                    <option value="">Selecionar Local Salvo</option>
+                    <option value="">Selecionar local salvo (opcional)</option>
                     {locaisFavoritos.map((local) => (
                       <option key={local.id} value={local.id}>
                         {local.nome}
                       </option>
                     ))}
                   </select>
-                </div>
+                )}
+                <input
+                  type="text"
+                  id="hospital"
+                  name="hospital"
+                  value={formData.hospital}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Nome do hospital"
+                  required
+                />
               </div>
 
               {/* Data */}
