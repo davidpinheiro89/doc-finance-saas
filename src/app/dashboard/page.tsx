@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const [showModal, setShowModal] = useState(false)
   const [editingPlantao, setEditingPlantao] = useState<PlantaoListItem | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({
     start: '',
@@ -492,10 +493,26 @@ export default function DashboardPage() {
 
       console.log('Plantão saved successfully:', data)
 
+      // Salvar como favorito se o checkbox estiver marcado
+      if (saveAsFavorite && formData.hospital && !formData.local_favorito_id) {
+        try {
+          await supabase.from('locais_favoritos').insert({
+            user_id: user!.id,
+            nome: formData.hospital,
+            endereco: formData.endereco || '',
+            valor_hora: parseFloat(formData.valor) || 0,
+          })
+          await fetchLocaisFavoritos(user!.id)
+        } catch (favErr) {
+          console.error('Erro ao salvar favorito:', favErr)
+        }
+      }
+
       // Refresh plantões list
       invalidatePlantoes()
-      
+
       // Close modal and reset form
+      setSaveAsFavorite(false)
       setShowModal(false)
       setEditingPlantao(null)
       setFormData({
@@ -1354,39 +1371,34 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex space-x-2 mt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                >
-                  {editingPlantao ? 'Atualizar Plantão' : 'Cadastrar Plantão'}
-                </button>
-                {formData.hospital && !formData.local_favorito_id && (
-                  <button
-                    type="button"
-                    onClick={handleSaveAsFavorite}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                  >
-                    Salvar como Favorito
-                  </button>
-                )}
-              </div>
+              {/* Checkbox discreto: salvar local como favorito */}
+              {formData.hospital && !formData.local_favorito_id && !editingPlantao && (
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none pt-2">
+                  <input
+                    type="checkbox"
+                    checked={saveAsFavorite}
+                    onChange={(e) => setSaveAsFavorite(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  Salvar este local como favorito
+                </label>
+              )}
 
-              <div className="flex space-x-3 pt-4">
+              {/* Ações: Cancelar + Salvar Plantão */}
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Salvando...' : (editingPlantao ? 'Atualizar Plantão' : 'Salvar Plantão')}
+                  {saving ? 'Salvando...' : 'Salvar Plantão'}
                 </button>
               </div>
             </form>
