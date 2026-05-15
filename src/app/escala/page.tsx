@@ -442,7 +442,7 @@ export default function EscalaPage() {
         </header>
         
         {/* Sidebar - Hidden in mobile */}
-        <Sidebar user={user} isSidebarOpen={isSidebarOpen} />
+        <Sidebar user={user} />
         
         {/* Main Content */}
         <main className="flex-1 p-4 md:p-8 w-full max-w-full overflow-x-hidden">
