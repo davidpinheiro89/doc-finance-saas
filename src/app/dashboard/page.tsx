@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
 
   // --- TanStack Query: lista principal de plantões do usuário ---
-  const { data: plantoes = [], isPending: isPlantoesPending } = useQuery({
+  const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
     queryKey: user ? plantoesKeys.byUser(user.id) : ['plantoes', 'anon'],
     queryFn: () => fetchPlantoesByUser(user!.id),
     enabled: !!user,
@@ -69,6 +69,11 @@ export default function DashboardPage() {
     // alterar o cache subjacente.
     select: applyAutoRealizadoStatus,
   })
+
+  // Log erros do useQuery (TanStack Query v5 não suporta onError nas opções)
+  if (plantoesError) {
+    console.error('Erro ao buscar plantões:', plantoesError)
+  }
 
   // Mostra skeletons enquanto: (a) auth não terminou OU (b) primeira busca
   // de plantões está em andamento. Após carga inicial, refetches em
@@ -255,35 +260,41 @@ export default function DashboardPage() {
     }
   }
 
-  // Filter plantões based on date range and monthly filter
+  // Filter plantões based on date range and monthly filter - normaliza datas para evitar problemas de fuso horário
   const getListagemPlantoes = () => {
-    let dataToFilter = plantoes
+    let dataToFilter: PlantaoListItem[] = plantoes
 
     // Apply monthly filter
     if (monthlyFilter === 'current') {
       const { start, end } = getCurrentMonthRange()
-      dataToFilter = plantoes.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
+      dataToFilter = plantoes.filter((plantao: PlantaoListItem) => {
+        if (!plantao.data) return false
+        const plantaoDate = new Date(plantao.data + 'T00:00:00')
+        if (isNaN(plantaoDate.getTime())) return false
+        return plantaoDate >= new Date(start + 'T00:00:00') && plantaoDate <= new Date(end + 'T00:00:00')
       })
     } else if (monthlyFilter === 'previous') {
       const { start, end } = getPreviousMonthRange()
-      dataToFilter = previousMonthData.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
+      dataToFilter = previousMonthData.filter((plantao: PlantaoListItem) => {
+        if (!plantao.data) return false
+        const plantaoDate = new Date(plantao.data + 'T00:00:00')
+        if (isNaN(plantaoDate.getTime())) return false
+        return plantaoDate >= new Date(start + 'T00:00:00') && plantaoDate <= new Date(end + 'T00:00:00')
       })
     }
 
     // Apply custom date range filter if set
     if (dateRange.start || dateRange.end) {
-      return dataToFilter.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        const startDate = dateRange.start ? new Date(dateRange.start) : null
-        const endDate = dateRange.end ? new Date(dateRange.end) : null
-        
+      return dataToFilter.filter((plantao: PlantaoListItem) => {
+        if (!plantao.data) return false
+        const plantaoDate = new Date(plantao.data + 'T00:00:00')
+        if (isNaN(plantaoDate.getTime())) return false
+        const startDate = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null
+        const endDate = dateRange.end ? new Date(dateRange.end + 'T00:00:00') : null
+
         if (startDate && plantaoDate < startDate) return false
         if (endDate && plantaoDate > endDate) return false
-        
+
         return true
       })
     }
@@ -293,11 +304,11 @@ export default function DashboardPage() {
 
   // Calculate filtered metrics
   const listagemPlantoes = getListagemPlantoes()
-  
+
   const filteredMetrics = {
     quantidade: listagemPlantoes.length,
-    valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
+    valorTotal: listagemPlantoes.reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0),
+    cargaHoraria: listagemPlantoes.reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
   }
 
   const handleCepLookup = async () => {
@@ -553,53 +564,60 @@ export default function DashboardPage() {
     }
   }
 
-  // Filter plantões by date
+  // Filter plantões by date - normaliza datas para evitar problemas de fuso horário
   const today = new Date()
-  today.setHours(0, 0, 0, 0) // Set to start of day for accurate comparison
+  today.setHours(0, 0, 0, 0)
 
-  const upcomingPlantoes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
+  const upcomingPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
+    if (!plantao.data) return false
+    // Usa T00:00:00 para garantir interpretação correta como local, não UTC
+    const plantaoDate = new Date(plantao.data + 'T00:00:00')
+    if (isNaN(plantaoDate.getTime())) return false
     plantaoDate.setHours(0, 0, 0, 0)
     return plantaoDate >= today
-  }).sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime())
 
-  const historicalPlantoes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
+  const historicalPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
+    if (!plantao.data) return false
+    const plantaoDate = new Date(plantao.data + 'T00:00:00')
+    if (isNaN(plantaoDate.getTime())) return false
     plantaoDate.setHours(0, 0, 0, 0)
     return plantaoDate < today
-  }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => new Date(b.data + 'T00:00:00').getTime() - new Date(a.data + 'T00:00:00').getTime())
 
-  // Calculate management metrics
+  // Calculate management metrics - normaliza datas para evitar problemas de fuso horário
   const currentMonth = new Date().getMonth()
   const currentYear = new Date().getFullYear()
-  
-  const plantoesEsteMes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
+
+  const plantoesEsteMes = plantoes.filter((plantao: PlantaoListItem) => {
+    if (!plantao.data) return false
+    const plantaoDate = new Date(plantao.data + 'T00:00:00')
+    if (isNaN(plantaoDate.getTime())) return false
     return plantaoDate.getMonth() === currentMonth && plantaoDate.getFullYear() === currentYear
   }).length
 
-  const pendentesPagamento = plantoes.filter(plantao => 
+  const pendentesPagamento = plantoes.filter((plantao: PlantaoListItem) =>
     plantao.status === 'pendente' || plantao.status === 'confirmado'
   ).length
 
   // Calculate net profit (placeholder tax rate - will be configurable later)
   const TAX_RATE = 0.25 // 25% for taxes and costs (configurable later)
   const totalRealizado = plantoes
-    .filter(p => p.status === 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
+    .filter((p: PlantaoListItem) => p.status === 'pago')
+    .reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0)
   const estimatedTaxCosts = totalRealizado * TAX_RATE
   const lucroLiquidoEstimado = totalRealizado - estimatedTaxCosts
 
   // Calculate metrics from real data
   const totalGanho = plantoes
-    .filter(p => p.status === 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
+    .filter((p: PlantaoListItem) => p.status === 'pago')
+    .reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0)
 
   const horasTotais = plantoes
-    .filter(p => p.horas)
-    .reduce((sum, p) => sum + (p.horas || 0), 0)
+    .filter((p: PlantaoListItem) => p.horas)
+    .reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
 
-  const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
+  const plantoesRealizados = plantoes.filter((p: PlantaoListItem) => p.status === 'pago').length
 
   // Debug: Log filtered data - REMOVED TO PREVENT INFINITE LOOP
   // console.log('Dados do gráfico:', listagemPlantoes)
@@ -679,13 +697,15 @@ export default function DashboardPage() {
                 
                 // Calculate monthly hours
                 const monthlyHours = plantoes
-                  .filter((p: any) => {
-                    const plantaoDate = new Date(p.data)
-                    return plantaoDate.getMonth() === currentMonth && 
+                  .filter((p: PlantaoListItem) => {
+                    if (!p.data) return false
+                    const plantaoDate = new Date(p.data + 'T00:00:00')
+                    if (isNaN(plantaoDate.getTime())) return false
+                    return plantaoDate.getMonth() === currentMonth &&
                            plantaoDate.getFullYear() === currentYear &&
                            p.horas && p.horas > 0
                   })
-                  .reduce((sum: number, p: any) => sum + (p.horas || 0), 0)
+                  .reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
 
                 // Calculate weekly hours (last 7 days)
                 const sevenDaysAgo = new Date(today)
@@ -693,13 +713,15 @@ export default function DashboardPage() {
                 sevenDaysAgo.setHours(0, 0, 0, 0)
 
                 const weeklyHours = plantoes
-                  .filter((p: any) => {
-                    const plantaoDate = new Date(p.data)
-                    return plantaoDate >= sevenDaysAgo && 
+                  .filter((p: PlantaoListItem) => {
+                    if (!p.data) return false
+                    const plantaoDate = new Date(p.data + 'T00:00:00')
+                    if (isNaN(plantaoDate.getTime())) return false
+                    return plantaoDate >= sevenDaysAgo &&
                            plantaoDate <= today &&
                            p.horas && p.horas > 0
                   })
-                  .reduce((sum: number, p: any) => sum + (p.horas || 0), 0)
+                  .reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
 
                 const healthWarning = weeklyHours > 60
 
