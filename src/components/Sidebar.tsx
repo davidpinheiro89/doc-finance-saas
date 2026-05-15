@@ -96,19 +96,19 @@ export default function Sidebar({ user, isSidebarOpen }: SidebarProps) {
       } ${isMobile ? 'max-w-[80%] w-[80%]' : (isCollapsed ? 'w-20' : 'w-64')}`}>
         {/* Header */}
         <div className="p-4 border-b border-gray-200">
-          <div className="flex items-center justify-between">
-            <div className={`flex items-center ${isCollapsed && !isMobile ? 'justify-center' : ''}`}>
-              <div className="bg-orange-500 rounded-lg p-2">
-                <span className="h-6 w-6 text-white">🏠</span>
+          <div className="flex items-center justify-center relative">
+            <div className="flex items-center">
+              <div className="bg-orange-500 rounded-lg p-2 flex items-center justify-center">
+                <span className="text-white text-lg leading-none">🏠</span>
               </div>
               {(!isCollapsed || isMobile) && (
-                <h1 className="ml-3 text-xl font-bold">
+                <h1 className="ml-3 text-xl font-bold whitespace-nowrap">
                   <span className="text-orange-500">BEM</span>
                   <span className="text-gray-800"> plantonista</span>
                 </h1>
               )}
             </div>
-            {/* Botão de fechar — visível apenas em mobile (md:hidden garante sumir no desktop) */}
+            {/* Botão de fechar — visível apenas em mobile */}
             {isMobile && (
               <button
                 onClick={() => {
@@ -118,7 +118,7 @@ export default function Sidebar({ user, isSidebarOpen }: SidebarProps) {
                     window.dispatchEvent(event)
                   }
                 }}
-                className="md:hidden text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
+                className="md:hidden absolute right-0 text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
                 aria-label="Fechar menu"
               >
                 <span className="h-5 w-5">✕</span>
@@ -135,18 +135,18 @@ export default function Sidebar({ user, isSidebarOpen }: SidebarProps) {
             return (
               <li key={item.name}>
                 <button
-                      onClick={() => router.push(item.href)}
-                      className={`w-full flex items-center px-3 py-2 rounded-lg transition-colors duration-200 pointer-events-auto cursor-pointer ${
-                        isActive
-                          ? 'bg-orange-50 text-orange-600 border-l-4 border-orange-500'
-                          : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-                      }`}
-                    >
-                      <div className="flex-shrink-0">{item.icon}</div>
-                      <span className="ml-3">{item.name}</span>
-                    </button>
-                  </li>
-                )
+                  onClick={() => router.push(item.href)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors duration-200 pointer-events-auto cursor-pointer font-medium ${
+                    isActive
+                      ? 'bg-orange-50 text-orange-600'
+                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+                  }`}
+                >
+                  <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">{item.icon}</span>
+                  <span className="truncate">{item.name}</span>
+                </button>
+              </li>
+            )
           })}
         </ul>
       </nav>
