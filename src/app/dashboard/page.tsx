@@ -15,6 +15,13 @@ import {
   plantoesKeys,
   type PlantaoListItem,
 } from '@/lib/queries/plantoes'
+import {
+  formatDateBR,
+  todayLocalISO,
+  toLocalISO,
+  getCurrentMonthRangeLocal,
+  getPreviousMonthRangeLocal,
+} from '@/lib/date-utils'
 
 // Shared delete function for both pages
 const deletePlantaoEvent = async (id: string, userId: string) => {
@@ -87,8 +94,8 @@ export default function DashboardPage() {
     const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
     return {
-      start: firstDay.toISOString().split('T')[0],
-      end: lastDay.toISOString().split('T')[0],
+      start: toLocalISO(firstDay),
+      end: toLocalISO(lastDay),
     }
   }, [])
 
@@ -194,10 +201,10 @@ export default function DashboardPage() {
     const now = new Date()
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0)
-    
+
     return {
-      start: previousMonth.toISOString().split('T')[0],
-      end: lastDayOfPreviousMonth.toISOString().split('T')[0]
+      start: toLocalISO(previousMonth),
+      end: toLocalISO(lastDayOfPreviousMonth)
     }
   }
 
@@ -206,10 +213,10 @@ export default function DashboardPage() {
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    
+
     return {
-      start: firstDayOfMonth.toISOString().split('T')[0],
-      end: lastDayOfMonth.toISOString().split('T')[0]
+      start: toLocalISO(firstDayOfMonth),
+      end: toLocalISO(lastDayOfMonth)
     }
   }
 
@@ -557,13 +564,8 @@ export default function DashboardPage() {
   }
 
   const formatDate = (dateString: string) => {
-    // Consistent date formatting - no timezone issues
-    const date = new Date(dateString + 'T00:00:00')
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    
-    return `${day}/${month}/${year}`
+    // Split puro da string YYYY-MM-DD — zero conversão de fuso.
+    return formatDateBR(dateString)
   }
 
   const getStatusColor = (status: string) => {

@@ -277,6 +277,10 @@ export default function FinanceiroPage() {
   }
 
   const formatDate = (dateString: string) => {
+    // Split puro da string YYYY-MM-DD para evitar conversão UTC (off-by-one no fuso UTC-3)
+    if (!dateString) return ''
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    if (year && month && day) return `${day}/${month}/${year}`
     const date = new Date(dateString)
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',

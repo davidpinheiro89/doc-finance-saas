@@ -107,7 +107,8 @@ export default function EscalaPage() {
   }
 
   const formatDateYYYYMMDD = (date: Date) => {
-    return date.toISOString().split('T')[0]
+    // Usa hora local (não UTC) para evitar off-by-one no fuso UTC-3
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
   }
 
   const navigateMonth = (direction: 'prev' | 'next') => {
