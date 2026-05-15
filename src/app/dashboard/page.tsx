@@ -581,26 +581,26 @@ export default function DashboardPage() {
     }
   }
 
-  // Filter plantões by date - normaliza datas para evitar problemas de fuso horário
+  // Filter plantões by date — comparação por string YYYY-MM-DD evita 100% dos
+  // problemas de fuso horário (plantao.data já vem nesse formato do Supabase).
+  // Calcula a data local de hoje (America/Sao_Paulo é UTC-3, sem horário de verão).
   const today = new Date()
-  today.setHours(0, 0, 0, 0)
+  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+
+  const todayPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
+    if (!plantao.data) return false
+    return plantao.data === todayStr
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => (a.hospital || '').localeCompare(b.hospital || ''))
 
   const upcomingPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
     if (!plantao.data) return false
-    // Usa T00:00:00 para garantir interpretação correta como local, não UTC
-    const plantaoDate = new Date(plantao.data + 'T00:00:00')
-    if (isNaN(plantaoDate.getTime())) return false
-    plantaoDate.setHours(0, 0, 0, 0)
-    return plantaoDate >= today
-  }).sort((a: PlantaoListItem, b: PlantaoListItem) => new Date(a.data + 'T00:00:00').getTime() - new Date(b.data + 'T00:00:00').getTime())
+    return plantao.data > todayStr
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => a.data.localeCompare(b.data))
 
   const historicalPlantoes = plantoes.filter((plantao: PlantaoListItem) => {
     if (!plantao.data) return false
-    const plantaoDate = new Date(plantao.data + 'T00:00:00')
-    if (isNaN(plantaoDate.getTime())) return false
-    plantaoDate.setHours(0, 0, 0, 0)
-    return plantaoDate < today
-  }).sort((a: PlantaoListItem, b: PlantaoListItem) => new Date(b.data + 'T00:00:00').getTime() - new Date(a.data + 'T00:00:00').getTime())
+    return plantao.data < todayStr
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => b.data.localeCompare(a.data))
 
   // Calculate management metrics - normaliza datas para evitar problemas de fuso horário
   const currentMonth = new Date().getMonth()
@@ -896,6 +896,42 @@ export default function DashboardPage() {
             </>
           )}
         </div>
+
+        {/* Plantões de Hoje — destaque (só aparece se houver plantões para hoje) */}
+        {!isPlantoesPending && todayPlantoes.length > 0 && (
+          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6 mb-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-orange-500 rounded-full p-2">
+                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-800">Plantões de Hoje</h2>
+                <p className="text-sm text-gray-600">{todayPlantoes.length} plantão(ões) agendado(s) para hoje</p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {todayPlantoes.map((plantao) => (
+                <div key={plantao.id} className="bg-white rounded-lg p-4 flex items-center justify-between border border-orange-100">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 truncate">{plantao.hospital}</p>
+                    <p className="text-sm text-gray-500 truncate">
+                      {plantao.horas ? `${plantao.horas}h` : ''}
+                      {plantao.especialidade ? ` · ${plantao.especialidade}` : ''}
+                    </p>
+                  </div>
+                  <div className="text-right ml-4">
+                    <p className="font-bold text-green-600">{formatCurrency(plantao.valor || 0)}</p>
+                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${getStatusColor(plantao.status)}`}>
+                      {plantao.status}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Próximos Plantões (A Realizar) */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
