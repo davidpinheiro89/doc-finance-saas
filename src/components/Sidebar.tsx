@@ -108,27 +108,20 @@ export default function Sidebar({ user, isSidebarOpen }: SidebarProps) {
                 </h1>
               )}
             </div>
+            {/* Botão de fechar — visível apenas em mobile (md:hidden garante sumir no desktop) */}
             {isMobile && (
               <button
                 onClick={() => {
                   setIsCollapsed(true)
-                  // Also close the sidebar in parent component
                   if (typeof window !== 'undefined') {
                     const event = new CustomEvent('closeSidebar')
                     window.dispatchEvent(event)
                   }
                 }}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
+                className="md:hidden text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
+                aria-label="Fechar menu"
               >
-                <span className="h-5 w-5">❌</span>
-              </button>
-            )}
-            {!isMobile && (
-              <button
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="text-gray-500 hover:text-gray-700 p-1 rounded-lg hover:bg-gray-100 pointer-events-auto cursor-pointer"
-              >
-                <span className="h-5 w-5">❌</span>
+                <span className="h-5 w-5">✕</span>
               </button>
             )}
           </div>
