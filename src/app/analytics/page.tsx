@@ -283,6 +283,97 @@ export default function AnalyticsPage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
+        {/* Monitor de Carga Horária — movido de Início para cá pois é métrica de desempenho */}
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold text-gray-800">Monitor de Carga Horária</h3>
+            <div className="bg-blue-100 rounded-full p-2">
+              <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {(() => {
+              const today = new Date()
+              const currentMonth = today.getMonth()
+              const currentYear = today.getFullYear()
+
+              const monthlyHours = plantoes
+                .filter((p) => {
+                  if (!p.data) return false
+                  const plantaoDate = new Date(p.data + 'T00:00:00')
+                  if (isNaN(plantaoDate.getTime())) return false
+                  return plantaoDate.getMonth() === currentMonth &&
+                         plantaoDate.getFullYear() === currentYear &&
+                         p.horas && p.horas > 0
+                })
+                .reduce((sum, p) => sum + (p.horas || 0), 0)
+
+              const sevenDaysAgo = new Date(today)
+              sevenDaysAgo.setDate(today.getDate() - 7)
+              sevenDaysAgo.setHours(0, 0, 0, 0)
+
+              const weeklyHours = plantoes
+                .filter((p) => {
+                  if (!p.data) return false
+                  const plantaoDate = new Date(p.data + 'T00:00:00')
+                  if (isNaN(plantaoDate.getTime())) return false
+                  return plantaoDate >= sevenDaysAgo &&
+                         plantaoDate <= today &&
+                         p.horas && p.horas > 0
+                })
+                .reduce((sum, p) => sum + (p.horas || 0), 0)
+
+              const healthWarning = weeklyHours > 60
+
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white rounded-lg p-3">
+                      <p className="text-sm text-gray-600">Horas Mensais</p>
+                      <p className={`text-xl font-bold ${monthlyHours > 160 ? 'text-red-600' : 'text-gray-800'}`}>
+                        {monthlyHours.toFixed(1)}h
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {monthlyHours > 160 ? '⚠️ Acima da média' : 'Dentro do esperado'}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-lg p-3">
+                      <p className="text-sm text-gray-600">Horas Semanais</p>
+                      <p className={`text-xl font-bold ${healthWarning ? 'text-red-600' : 'text-gray-800'}`}>
+                        {weeklyHours.toFixed(1)}h / 60h
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {healthWarning ? '⚠️ Cuidado com a Saúde' : 'Carga segura'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {healthWarning && (
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+                      <p className="text-red-700 font-medium text-sm">⚠️ Cuidado com a Saúde</p>
+                      <p className="text-red-600 text-xs mt-1">
+                        Sua carga horária semanal de {weeklyHours.toFixed(1)}h excede o recomendado de 60h.
+                        Considere descansar para manter sua saúde e bem-estar.
+                      </p>
+                    </div>
+                  )}
+
+                  {!healthWarning && weeklyHours > 0 && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                      <p className="text-green-700 font-medium text-sm">✅ Carga Horária Saudável</p>
+                      <p className="text-green-600 text-xs mt-1">
+                        Sua carga horária semanal está dentro dos limites recomendados para uma boa saúde.
+                      </p>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
+          </div>
+        </div>
+
         {/* Pílulas Inteligentes */}
         <div className="flex flex-wrap gap-2 mb-8">
           <div className="bg-orange-100 border border-orange-200 rounded-lg px-4 py-3">
