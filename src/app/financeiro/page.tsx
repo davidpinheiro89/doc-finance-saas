@@ -352,7 +352,7 @@ export default function FinanceiroPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Dashboard Financeiro</h3>
                 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <p className="text-sm text-gray-600 mb-1">Total Fixo</p>
                     <p className="text-xl font-bold text-orange-600">{formatCurrency(totalDespesasFixas)}</p>
@@ -360,6 +360,10 @@ export default function FinanceiroPage() {
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <p className="text-sm text-gray-600 mb-1">Total Variável</p>
                     <p className="text-xl font-bold text-red-600">{formatCurrency(totalDespesasVariaveis)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border-2 border-gray-300">
+                    <p className="text-sm text-gray-600 mb-1 font-medium">Total Geral</p>
+                    <p className="text-xl font-bold text-gray-800">{formatCurrency(totalGeralDespesas)}</p>
                   </div>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
                     <p className="text-sm text-gray-600 mb-1">Recebido</p>
@@ -444,7 +448,7 @@ export default function FinanceiroPage() {
                       {/* Donut Chart */}
                       <div className="flex justify-center items-center">
                         <div className="relative w-40 h-40">
-                          <svg className="w-40 h-40 transform -rotate-90">
+                          <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 160 160">
                             {(() => {
                               const categoryTotals = filteredDespesas.reduce((acc, despesa) => {
                                 acc[despesa.categoria] = (acc[despesa.categoria] || 0) + (despesa.valor || 0)
@@ -492,13 +496,9 @@ export default function FinanceiroPage() {
                                 )
                               })
                             })()}
+                            {/* Furo central do donut para look mais limpo */}
+                            <circle cx="80" cy="80" r="40" fill="white" />
                           </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-gray-800">{formatCurrency(totalDespesas)}</p>
-                              <p className="text-xs text-gray-500">Total</p>
-                            </div>
-                          </div>
                         </div>
                       </div>
                       
