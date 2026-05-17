@@ -10,6 +10,7 @@ import { useAuthGuard } from '@/hooks/useAuthGuard'
 export default function FinanceiroPage() {
   const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showEditExpense, setShowEditExpense] = useState(false)
@@ -294,9 +295,17 @@ export default function FinanceiroPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center gap-3 p-4 bg-white border-b sticky top-0 z-50">
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg hover:bg-gray-100">
+            <span className="h-6 w-6">☰</span>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Financeiro</h1>
+        </header>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-6">

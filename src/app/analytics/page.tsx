@@ -11,6 +11,7 @@ export default function AnalyticsPage() {
   const { user, loading } = useAuthGuard()
   const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
@@ -241,7 +242,7 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto w-full">
         {/* Header */}
@@ -251,12 +252,7 @@ export default function AnalyticsPage() {
             <div className="flex items-center">
               {/* Mobile Menu Button */}
               <button
-                onClick={() => {
-                  const sidebar = document.querySelector('[data-sidebar-mobile]')
-                  if (sidebar) {
-                    sidebar.classList.toggle('-translate-x-full')
-                  }
-                }}
+                onClick={() => setMobileMenuOpen(true)}
                 className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span className="h-6 w-6">☰</span>

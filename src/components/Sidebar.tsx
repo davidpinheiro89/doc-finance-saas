@@ -5,18 +5,13 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 
 interface SidebarProps {
   user?: any
+  /** Mobile drawer: controla se está aberto */
+  mobileOpen?: boolean
+  /** Mobile drawer: callback para fechar */
+  onMobileClose?: () => void
 }
 
-/**
- * Sidebar de navegação do BEM Plantonista.
- *
- * Layout:
- *  - Desktop (md+): largura fixa de 260px, sempre visível.
- *  - Mobile: oculta por padrão, controlada via toggle externo (drawer).
- *
- * Estrutura: header com logo + nome, lista de menus, e rodapé com usuário/logout.
- */
-export default function Sidebar({ user }: SidebarProps) {
+export default function Sidebar({ user, mobileOpen = false, onMobileClose }: SidebarProps) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -25,19 +20,24 @@ export default function Sidebar({ user }: SidebarProps) {
     router.push('/login')
   }
 
+  const handleNavigate = (href: string) => {
+    router.push(href)
+    onMobileClose?.()
+  }
+
   const menuItems = [
     { name: 'Início', href: '/dashboard', icon: '🏠' },
     { name: 'Meu desempenho', href: '/analytics', icon: '📊' },
     { name: 'Plantões Realizados', href: '/plantoes-realizados', icon: '⏰' },
     { name: 'Plantões Futuros', href: '/plantoes-futuros', icon: '📅' },
-    { name: 'Escala', href: '/escala', icon: '�️' },
+    { name: 'Escala', href: '/escala', icon: '🗓️' },
     { name: 'Financeiro', href: '/financeiro', icon: '💰' },
     { name: 'Imposto de Renda', href: '/ir', icon: '📄' },
   ]
 
-  return (
-    <aside className="hidden md:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-gray-200 h-screen sticky top-0">
-      {/* Header — logo centralizado */}
+  const sidebarContent = (
+    <>
+      {/* Header */}
       <div className="px-6 py-5 border-b border-gray-200">
         <div className="flex items-center justify-center gap-3">
           <div className="bg-orange-500 rounded-lg w-10 h-10 flex items-center justify-center flex-shrink-0">
@@ -58,7 +58,7 @@ export default function Sidebar({ user }: SidebarProps) {
             return (
               <li key={item.name}>
                 <button
-                  onClick={() => router.push(item.href)}
+                  onClick={() => handleNavigate(item.href)}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer ${
                     isActive
                       ? 'bg-orange-50 text-orange-600'
@@ -99,6 +99,36 @@ export default function Sidebar({ user }: SidebarProps) {
           <span>Sair</span>
         </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      {/* Desktop — sempre visível em md+ */}
+      <aside className="hidden md:flex flex-col w-[260px] flex-shrink-0 bg-white border-r border-gray-200 h-screen sticky top-0">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile — drawer overlay */}
+      {mobileOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/40 z-[9998] md:hidden"
+            onClick={onMobileClose}
+          />
+          <aside className="fixed inset-y-0 left-0 z-[9999] w-[280px] flex flex-col bg-white shadow-xl md:hidden animate-slide-in">
+            {/* Botão fechar */}
+            <button
+              onClick={onMobileClose}
+              className="absolute top-4 right-4 p-1 rounded-lg hover:bg-gray-100 text-gray-500"
+              aria-label="Fechar menu"
+            >
+              ✕
+            </button>
+            {sidebarContent}
+          </aside>
+        </>
+      )}
+    </>
   )
 }

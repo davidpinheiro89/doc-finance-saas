@@ -77,7 +77,7 @@ export default function EscalaPage() {
   const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [showModal, setShowModal] = useState(false)
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const router = useRouter()
 
   const handleLogout = async () => {
@@ -85,18 +85,6 @@ export default function EscalaPage() {
     router.push('/login')
   }
 
-  useEffect(() => {
-    // Listen for sidebar close event
-    const handleSidebarClose = () => {
-      setIsSidebarOpen(false)
-    }
-
-    window.addEventListener('closeSidebar', handleSidebarClose)
-
-    return () => {
-      window.removeEventListener('closeSidebar', handleSidebarClose)
-    }
-  }, [])
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -152,8 +140,8 @@ export default function EscalaPage() {
 
     try {
       const statusData = {
+        user_id: user.id,
         data: dateStr,
-        tipo_evento: status,
         status: 'confirmado',
         hospital: status === 'disponivel' ? '🟢 Disponível' : '🔴 Folga',
         valor: 0,
@@ -219,16 +207,12 @@ export default function EscalaPage() {
         return
       }
 
-      // Implement date automation logic
-      const selectedDate = new Date(formData.data)
-      const today = new Date()
-      today.setHours(0, 0, 0, 0)
-      
-      // Auto-determine status based on date comparison
+      // Auto-determine status based on date string comparison (no Date objects = no TZ issues)
+      const todayStr = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`
       let autoStatus = formData.status
-      if (selectedDate < today) {
+      if (formData.data < todayStr) {
         autoStatus = 'realizado'
-      } else if (selectedDate >= today) {
+      } else {
         autoStatus = 'pendente'
       }
 
@@ -428,7 +412,7 @@ export default function EscalaPage() {
         {/* Mobile Header */}
         <header className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-50">
           <button 
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+            onClick={() => setMobileMenuOpen(true)}
             className="p-2 border rounded-md"
           >
             <span className="h-6 w-6">☰</span>
@@ -443,7 +427,7 @@ export default function EscalaPage() {
         </header>
         
         {/* Sidebar - Hidden in mobile */}
-        <Sidebar user={user} />
+        <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
         
         {/* Main Content */}
         <main className="flex-1 p-4 md:p-8 w-full max-w-full overflow-x-hidden">

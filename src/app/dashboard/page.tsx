@@ -60,6 +60,7 @@ export default function DashboardPage() {
   const [editingPlantao, setEditingPlantao] = useState<PlantaoListItem | null>(null)
   const [saving, setSaving] = useState(false)
   const [saveAsFavorite, setSaveAsFavorite] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({
     start: '',
@@ -654,7 +655,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto w-full relative z-10">
         {/* Header */}
@@ -664,12 +665,7 @@ export default function DashboardPage() {
             <div className="flex items-center">
               {/* Mobile Menu Button */}
               <button
-                onClick={() => {
-                  const sidebar = document.querySelector('[data-sidebar-mobile]')
-                  if (sidebar) {
-                    sidebar.classList.toggle('-translate-x-full')
-                  }
-                }}
+                onClick={() => setMobileMenuOpen(true)}
                 className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
               >
                 <span className="h-6 w-6">☰</span>
