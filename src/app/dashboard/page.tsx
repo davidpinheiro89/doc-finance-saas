@@ -62,6 +62,7 @@ export default function DashboardPage() {
   const [saveAsFavorite, setSaveAsFavorite] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
@@ -633,19 +634,65 @@ export default function DashboardPage() {
     return formatDateBR(dateString)
   }
 
+  const getSmartStatus = (plantao: PlantaoListItem): string => {
+    if (plantao.status === 'pago') return 'pago'
+    // Check if overdue: past payment deadline and not paid
+    if (plantao.data_prevista_pagamento) {
+      const deadlineStr = plantao.data_prevista_pagamento.split('T')[0]
+      if (deadlineStr < todayStr && plantao.status !== 'pago') return 'atrasado'
+    } else if (plantao.prazo_pagamento_dias && plantao.data) {
+      const base = new Date(plantao.data.split('T')[0] + 'T00:00:00')
+      base.setDate(base.getDate() + plantao.prazo_pagamento_dias)
+      const deadlineStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+      if (deadlineStr < todayStr && plantao.status !== 'pago') return 'atrasado'
+    }
+    return plantao.status
+  }
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pago':
-        return 'bg-green-100 text-green-800'
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'confirmado':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-emerald-100 text-emerald-700'
       case 'realizado':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-emerald-50 text-emerald-600'
+      case 'atrasado':
+        return 'bg-red-100 text-red-700'
+      case 'pendente':
+      case 'confirmado':
+        return 'bg-amber-100 text-amber-700'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-600'
     }
+  }
+
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pago': return 'Pago'
+      case 'realizado': return 'Realizado'
+      case 'atrasado': return 'Atrasado'
+      case 'pendente': return 'Aguardando'
+      case 'confirmado': return 'Confirmado'
+      default: return status
+    }
+  }
+
+  const handleMarkAsPaid = async (plantao: PlantaoListItem) => {
+    setMarkingPaidId(plantao.id)
+    try {
+      const { error } = await supabase
+        .from('plantoes')
+        .update({ status: 'pago' })
+        .eq('id', plantao.id)
+        .eq('user_id', user!.id)
+      if (error) { alert('Erro: ' + error.message); return }
+      // Optimistic update in TanStack cache
+      if (user) {
+        queryClient.setQueryData<PlantaoListItem[]>(plantoesKeys.byUser(user.id), (old) =>
+          (old ?? []).map((p) => p.id === plantao.id ? { ...p, status: 'pago' as const } : p),
+        )
+      }
+    } catch { alert('Erro ao confirmar pagamento.') }
+    finally { setMarkingPaidId(null) }
   }
 
   // Filter plantões by date — comparação por string YYYY-MM-DD evita 100% dos
@@ -935,7 +982,7 @@ export default function DashboardPage() {
                     </div>
                     <div className="text-right ml-4">
                       <p className="font-bold text-emerald-600">{formatCurrency(plantao.valor || 0)}</p>
-                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1 ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1 ${getStatusColor(getSmartStatus(plantao))}`}>{getStatusLabel(getSmartStatus(plantao))}</span>
                     </div>
                   </div>
                 ))}
@@ -993,7 +1040,7 @@ export default function DashboardPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(plantao.valor)}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{plantao.horas || 0}h</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(getSmartStatus(plantao))}`}>{getStatusLabel(getSmartStatus(plantao))}</span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex gap-1">
