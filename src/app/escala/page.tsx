@@ -36,6 +36,7 @@ export default function EscalaPage() {
   const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [conflictData, setConflictData] = useState<{ hospitals: string[]; dateStr: string } | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const router = useRouter()
 
   // ── Helpers ──
@@ -113,14 +114,19 @@ export default function EscalaPage() {
     setFormData(prev => ({ ...prev, data: fmt(selectedDate) }))
   }
 
-  const handleClearDay = async () => {
+  const handleClearDay = () => {
     if (!user || !selectedDate) return
-    if (!confirm('Apagar todos os registros deste dia?')) return
+    setShowActionModal(false)
+    setShowDeleteConfirm(true)
+  }
+
+  const confirmDeleteDay = async () => {
+    if (!user || !selectedDate) return
     const dateStr = fmt(selectedDate)
     try {
       const { error } = await supabase.from('plantoes').delete().eq('data', dateStr).eq('user_id', user.id)
       if (error) { alert('Erro: ' + error.message); return }
-      setShowActionModal(false)
+      setShowDeleteConfirm(false)
       invalidatePlantoes()
     } catch { alert('Erro ao limpar. Tente novamente.') }
   }
@@ -456,6 +462,58 @@ export default function EscalaPage() {
                   className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all"
                 >
                   Sim, Adicionar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Delete Confirmation Modal ── */}
+        {showDeleteConfirm && selectedDate && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setShowDeleteConfirm(false)}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Confirmar Exclusão</h3>
+                  <p className="text-xs text-gray-400">{selectedDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long' })}</p>
+                </div>
+              </div>
+
+              <div className="bg-red-50 border border-red-200/60 rounded-xl p-4 mb-5">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Tem certeza que deseja apagar <strong>todos os registros</strong> deste dia? Os plantões removidos serão descontados do faturamento do Dashboard.
+                </p>
+                {(() => {
+                  const dayEvents = getPlantoesForDay(selectedDate.getDate())
+                  const real = dayEvents.filter(e => e.classificacao !== 'folga' && e.classificacao !== 'disponivel')
+                  if (real.length > 0) return (
+                    <div className="mt-3 space-y-1">
+                      {real.map((p, i) => (
+                        <div key={i} className="flex items-center justify-between text-sm">
+                          <span className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-red-400" />
+                            <span className="font-medium text-gray-800">{p.hospital}</span>
+                          </span>
+                          <span className="text-red-600 font-semibold">{formatCurrency(p.valor)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                  return null
+                })()}
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-colors">
+                  Cancelar
+                </button>
+                <button onClick={confirmDeleteDay}
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-red-500/20 hover:shadow-lg transition-all">
+                  Sim, Apagar
                 </button>
               </div>
             </div>
