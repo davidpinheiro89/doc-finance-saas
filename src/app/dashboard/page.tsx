@@ -67,7 +67,9 @@ export default function DashboardPage() {
     end: ''
   })
   const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([])
-  const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
+  const [dashboardFilter, setDashboardFilter] = useState<'current' | '3months' | 'hospital'>('current')
+  const [hospitalFilter, setHospitalFilter] = useState<string>('')
+  const [metaMensal, setMetaMensal] = useState<number>(30000)
 
   // --- TanStack Query: lista principal de plantões do usuário ---
   const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
@@ -269,56 +271,76 @@ export default function DashboardPage() {
     }
   }
 
-  // Filter plantões based on date range and monthly filter - normaliza datas para evitar problemas de fuso horário
-  const getListagemPlantoes = () => {
-    let dataToFilter: PlantaoListItem[] = plantoes
+  // ── Smart filter: filtra plantões conforme o modo selecionado ──
+  const getFilteredPlantoes = useMemo(() => {
+    const dk = (p: PlantaoListItem) => (p.data || '').split('T')[0]
+    let result: PlantaoListItem[] = plantoes
 
-    // Apply monthly filter
-    if (monthlyFilter === 'current') {
-      const { start, end } = getCurrentMonthRange()
-      dataToFilter = plantoes.filter((plantao: PlantaoListItem) => {
-        if (!plantao.data) return false
-        const plantaoDate = new Date(plantao.data + 'T00:00:00')
-        if (isNaN(plantaoDate.getTime())) return false
-        return plantaoDate >= new Date(start + 'T00:00:00') && plantaoDate <= new Date(end + 'T00:00:00')
-      })
-    } else if (monthlyFilter === 'previous') {
-      const { start, end } = getPreviousMonthRange()
-      dataToFilter = previousMonthData.filter((plantao: PlantaoListItem) => {
-        if (!plantao.data) return false
-        const plantaoDate = new Date(plantao.data + 'T00:00:00')
-        if (isNaN(plantaoDate.getTime())) return false
-        return plantaoDate >= new Date(start + 'T00:00:00') && plantaoDate <= new Date(end + 'T00:00:00')
-      })
+    if (dashboardFilter === 'current') {
+      const { start, end } = getCurrentMonthRangeLocal()
+      result = plantoes.filter((p) => { const d = dk(p); return d >= start && d <= end })
+    } else if (dashboardFilter === '3months') {
+      const now = new Date()
+      const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+      const start = toLocalISO(threeMonthsAgo)
+      const end = todayLocalISO()
+      result = plantoes.filter((p) => { const d = dk(p); return d >= start && d <= end })
     }
 
-    // Apply custom date range filter if set
-    if (dateRange.start || dateRange.end) {
-      return dataToFilter.filter((plantao: PlantaoListItem) => {
-        if (!plantao.data) return false
-        const plantaoDate = new Date(plantao.data + 'T00:00:00')
-        if (isNaN(plantaoDate.getTime())) return false
-        const startDate = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null
-        const endDate = dateRange.end ? new Date(dateRange.end + 'T00:00:00') : null
-
-        if (startDate && plantaoDate < startDate) return false
-        if (endDate && plantaoDate > endDate) return false
-
-        return true
-      })
+    if (dashboardFilter === 'hospital' && hospitalFilter) {
+      result = plantoes.filter((p) => p.hospital === hospitalFilter)
     }
 
-    return dataToFilter
-  }
+    // Custom date range overlay
+    if (dateRange.start) result = result.filter((p) => dk(p) >= dateRange.start)
+    if (dateRange.end) result = result.filter((p) => dk(p) <= dateRange.end)
 
-  // Calculate filtered metrics
-  const listagemPlantoes = getListagemPlantoes()
+    return result
+  }, [plantoes, dashboardFilter, hospitalFilter, dateRange])
 
-  const filteredMetrics = {
-    quantidade: listagemPlantoes.length,
-    valorTotal: listagemPlantoes.reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0),
-    cargaHoraria: listagemPlantoes.reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
-  }
+  // ── Hospital list for filter dropdown ──
+  const uniqueHospitals = useMemo(() => {
+    const set = new Set(plantoes.map((p) => p.hospital).filter(Boolean))
+    return Array.from(set).sort()
+  }, [plantoes])
+
+  // ── Business Intelligence Metrics ──
+  const metrics = useMemo(() => {
+    const filtered = getFilteredPlantoes
+    const quantidade = filtered.length
+    const valorBruto = filtered.reduce((s, p) => s + (p.valor || 0), 0)
+    const horasTotal = filtered.reduce((s, p) => s + (p.horas || 0), 0)
+
+    // Valor Líquido Estimado (PJ médico: ~25% impostos/retenções)
+    const TAX_RATE = 0.25
+    const valorLiquido = valorBruto * (1 - TAX_RATE)
+
+    // Valor médio por hora trabalhada
+    const valorHora = horasTotal > 0 ? valorBruto / horasTotal : 0
+
+    // Progresso da meta mensal (usa apenas mês atual)
+    const { start: mesStart, end: mesEnd } = getCurrentMonthRangeLocal()
+    const faturamentoMes = plantoes
+      .filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd })
+      .reduce((s, p) => s + (p.valor || 0), 0)
+    const progressoMeta = metaMensal > 0 ? Math.min((faturamentoMes / metaMensal) * 100, 100) : 0
+
+    // Ranking de hospitais por valor/hora
+    const hospitalMap: Record<string, { valor: number; horas: number; count: number }> = {}
+    filtered.forEach((p) => {
+      if (!p.hospital) return
+      if (!hospitalMap[p.hospital]) hospitalMap[p.hospital] = { valor: 0, horas: 0, count: 0 }
+      hospitalMap[p.hospital].valor += p.valor || 0
+      hospitalMap[p.hospital].horas += p.horas || 0
+      hospitalMap[p.hospital].count += 1
+    })
+    const hospitalRanking = Object.entries(hospitalMap)
+      .map(([name, d]) => ({ name, valorHora: d.horas > 0 ? d.valor / d.horas : 0, total: d.valor, count: d.count }))
+      .sort((a, b) => b.valorHora - a.valorHora)
+      .slice(0, 5)
+
+    return { quantidade, valorBruto, horasTotal, valorLiquido, valorHora, faturamentoMes, progressoMeta, hospitalRanking }
+  }, [getFilteredPlantoes, plantoes, metaMensal])
 
   const handleCepLookup = async () => {
     const cep = formData.cep.replace(/\D/g, '') // Remove non-digits
@@ -605,42 +627,9 @@ export default function DashboardPage() {
     return d && d < todayStr
   }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(b).localeCompare(dataKey(a)))
 
-  // Calculate management metrics - normaliza datas para evitar problemas de fuso horário
-  const currentMonth = new Date().getMonth()
-  const currentYear = new Date().getFullYear()
-
-  const plantoesEsteMes = plantoes.filter((plantao: PlantaoListItem) => {
-    if (!plantao.data) return false
-    const plantaoDate = new Date(plantao.data + 'T00:00:00')
-    if (isNaN(plantaoDate.getTime())) return false
-    return plantaoDate.getMonth() === currentMonth && plantaoDate.getFullYear() === currentYear
-  }).length
-
-  const pendentesPagamento = plantoes.filter((plantao: PlantaoListItem) =>
-    plantao.status === 'pendente' || plantao.status === 'confirmado'
+  const pendentesPagamento = plantoes.filter((p: PlantaoListItem) =>
+    p.status === 'pendente' || p.status === 'confirmado'
   ).length
-
-  // Calculate net profit (placeholder tax rate - will be configurable later)
-  const TAX_RATE = 0.25 // 25% for taxes and costs (configurable later)
-  const totalRealizado = plantoes
-    .filter((p: PlantaoListItem) => p.status === 'pago')
-    .reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0)
-  const estimatedTaxCosts = totalRealizado * TAX_RATE
-  const lucroLiquidoEstimado = totalRealizado - estimatedTaxCosts
-
-  // Calculate metrics from real data
-  const totalGanho = plantoes
-    .filter((p: PlantaoListItem) => p.status === 'pago')
-    .reduce((sum: number, p: PlantaoListItem) => sum + (p.valor || 0), 0)
-
-  const horasTotais = plantoes
-    .filter((p: PlantaoListItem) => p.horas)
-    .reduce((sum: number, p: PlantaoListItem) => sum + (p.horas || 0), 0)
-
-  const plantoesRealizados = plantoes.filter((p: PlantaoListItem) => p.status === 'pago').length
-
-  // Debug: Log filtered data - REMOVED TO PREVENT INFINITE LOOP
-  // console.log('Dados do gráfico:', listagemPlantoes)
 
   if (loading) {
     return (
@@ -654,439 +643,402 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
       <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
-      
+
       <div className="flex-1 overflow-auto w-full relative z-10">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <span className="h-6 w-6">☰</span>
-              </button>
-              <h1 className="text-3xl font-bold text-gray-800 ml-2">
-                Início
-              </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">{user?.user_metadata?.full_name || 'Médico'}</span>
-                <span className="ml-2 text-xs text-gray-500">{user?.user_metadata?.crm || 'CRM'}</span>
+        {/* ── Header Premium ── */}
+        <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/60 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <span className="text-lg">☰</span>
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Painel de Controle</h1>
+                  <p className="text-xs text-gray-500 hidden sm:block">Visão geral dos seus plantões</p>
+                </div>
               </div>
-              <button
-                onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-              >
-                Sair
-              </button>
+              <div className="flex items-center gap-3">
+                {pendentesPagamento > 0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-full border border-amber-200">
+                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                    {pendentesPagamento} pagamento(s) pendente(s)
+                  </span>
+                )}
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-800">{user?.user_metadata?.full_name || 'Médico'}</p>
+                  <p className="text-xs text-gray-400">{user?.user_metadata?.crm || 'CRM'}</p>
+                </div>
+                <button onClick={handleLogout} className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-all" title="Sair">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      </header>
+        </header>
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-        {/* Filtro de Período */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Filtrar por Período</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Data Inicial
-              </label>
-              <input
-                type="date"
-                id="startDate"
-                value={dateRange.start}
-                onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              />
-            </div>
-            <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Data Final
-              </label>
-              <input
-                type="date"
-                id="endDate"
-                value={dateRange.end}
-                onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              />
-            </div>
-            <div className="flex items-end">
-              <button
-                onClick={() => setDateRange({ start: '', end: '' })}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-              >
-                Limpar Filtro
-              </button>
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6">
+
+          {/* ── Filtros Fluidos ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                {([
+                  { key: 'current', label: 'Mês Atual' },
+                  { key: '3months', label: 'Últimos 3 Meses' },
+                  { key: 'hospital', label: 'Por Hospital' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setDashboardFilter(key); if (key !== 'hospital') setHospitalFilter('') }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      dashboardFilter === key
+                        ? 'bg-white text-orange-600 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              {dashboardFilter === 'hospital' && (
+                <select
+                  value={hospitalFilter}
+                  onChange={(e) => setHospitalFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white"
+                >
+                  <option value="">Todos os hospitais</option>
+                  {uniqueHospitals.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              )}
+
+              <div className="flex items-center gap-2 ml-auto">
+                <input type="date" value={dateRange.start} onChange={(e) => handleDateRangeChange('start', e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                <span className="text-gray-400 text-xs">até</span>
+                <input type="date" value={dateRange.end} onChange={(e) => handleDateRangeChange('end', e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                {(dateRange.start || dateRange.end) && (
+                  <button onClick={() => setDateRange({ start: '', end: '' })} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar datas">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
 
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {/* ── Cards de Métricas Premium ── */}
           {isPlantoesPending ? (
-            <>
-              <SkeletonMetricCard />
-              <SkeletonMetricCard />
-              <SkeletonMetricCard />
-            </>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SkeletonMetricCard /><SkeletonMetricCard /><SkeletonMetricCard /><SkeletonMetricCard />
+            </div>
           ) : (
             <>
-              {/* Plantões no Período */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Plantões no Período</p>
-                    <p className="text-3xl font-bold text-orange-500 mt-2">
-                      {filteredMetrics.quantidade}
-                    </p>
-                  </div>
-                  <div className="bg-orange-100 rounded-full p-3">
-                    <svg className="h-6 w-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Faturamento Bruto */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-orange-100">Faturamento Bruto</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorBruto)}</p>
+                  <p className="text-xs text-orange-200 mt-2">{metrics.quantidade} plantões no período</p>
+                </div>
+
+                {/* Líquido Estimado */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-emerald-100">Líquido Estimado</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorLiquido)}</p>
+                  <p className="text-xs text-emerald-200 mt-2">Após ~25% de retenções PJ</p>
+                </div>
+
+                {/* Valor Médio/Hora */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 p-5 text-white shadow-lg shadow-violet-500/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-violet-100">Valor Médio / Hora</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorHora)}</p>
+                  <p className="text-xs text-violet-200 mt-2">{metrics.horasTotal.toFixed(0)}h trabalhadas</p>
+                </div>
+
+                {/* Carga Horária */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 p-5 text-white shadow-lg shadow-sky-500/20 hover:shadow-xl hover:shadow-sky-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-sky-100">Carga Horária</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{metrics.horasTotal.toFixed(1)}h</p>
+                  <p className="text-xs text-sky-200 mt-2">{metrics.quantidade} plantões</p>
                 </div>
               </div>
 
-              {/* Valor Total (R$) */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Valor Total (R$)</p>
-                    <p className="text-3xl font-bold text-green-600 mt-2">
-                      {formatCurrency(filteredMetrics.valorTotal)}
-                    </p>
+              {/* ── Meta Mensal + Ranking por Hospital ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Meta Mensal */}
+                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Meta Mensal</h3>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-gray-400">Meta:</span>
+                      <input
+                        type="number"
+                        value={metaMensal}
+                        onChange={(e) => setMetaMensal(Number(e.target.value) || 0)}
+                        className="w-24 text-right text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                      />
+                    </div>
                   </div>
-                  <div className="bg-green-100 rounded-full p-3">
-                    <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
+
+                  {/* Ring Progress */}
+                  <div className="flex items-center gap-6">
+                    <div className="relative w-28 h-28 flex-shrink-0">
+                      <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                        <circle
+                          cx="60" cy="60" r="50" fill="none"
+                          stroke={metrics.progressoMeta >= 100 ? '#10b981' : '#f97316'}
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={`${(metrics.progressoMeta / 100) * 314.16} 314.16`}
+                          className="transition-all duration-700 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-gray-800">{metrics.progressoMeta.toFixed(0)}%</span>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-gray-400">Faturado este mês</p>
+                        <p className="text-lg font-bold text-gray-800">{formatCurrency(metrics.faturamentoMes)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Falta para a meta</p>
+                        <p className="text-lg font-bold text-gray-800">
+                          {formatCurrency(Math.max(metaMensal - metrics.faturamentoMes, 0))}
+                        </p>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Carga Horária Total (Hrs) */}
-              <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-gray-600">Carga Horária Total (Hrs)</p>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">
-                      {horasTotais.toFixed(1)}
-                    </p>
-                  </div>
-                  <div className="bg-blue-100 rounded-full p-3">
-                    <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
+                {/* Ranking de Hospitais */}
+                <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Top Hospitais por R$/Hora</h3>
+                  {metrics.hospitalRanking.length === 0 ? (
+                    <p className="text-sm text-gray-400 py-4 text-center">Registre plantões com horas para ver o ranking</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {metrics.hospitalRanking.map((h, i) => {
+                        const maxValorHora = metrics.hospitalRanking[0]?.valorHora || 1
+                        const pct = (h.valorHora / maxValorHora) * 100
+                        return (
+                          <div key={h.name} className="group">
+                            <div className="flex items-center justify-between mb-1">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  i === 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'
+                                }`}>{i + 1}</span>
+                                <span className="text-sm font-medium text-gray-800 truncate">{h.name}</span>
+                              </div>
+                              <div className="text-right flex-shrink-0 ml-3">
+                                <span className="text-sm font-bold text-gray-900">{formatCurrency(h.valorHora)}/h</span>
+                                <span className="text-xs text-gray-400 ml-2">{h.count}x</span>
+                              </div>
+                            </div>
+                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-orange-500' : 'bg-orange-300'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               </div>
             </>
           )}
-        </div>
 
-        {/* Plantões de Hoje — destaque (só aparece se houver plantões para hoje) */}
-        {!isPlantoesPending && todayPlantoes.length > 0 && (
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-6 mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="bg-orange-500 rounded-full p-2">
-                <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          {/* ── Plantões de Hoje ── */}
+          {!isPlantoesPending && todayPlantoes.length > 0 && (
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 p-6">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-orange-500 rounded-xl p-2.5 shadow-lg shadow-orange-500/30">
+                  <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Plantões de Hoje</h2>
+                  <p className="text-xs text-gray-500">{todayPlantoes.length} plantão(ões) agendado(s)</p>
+                </div>
               </div>
+              <div className="space-y-2">
+                {todayPlantoes.map((plantao) => (
+                  <div key={plantao.id} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 flex items-center justify-between border border-orange-100/60 hover:bg-white transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{plantao.hospital}</p>
+                      <p className="text-xs text-gray-500">{plantao.horas ? `${plantao.horas}h` : ''}{plantao.especialidade ? ` · ${plantao.especialidade}` : ''}</p>
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="font-bold text-emerald-600">{formatCurrency(plantao.valor || 0)}</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1 ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ── Próximos Plantões ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+            <div className="flex justify-between items-center p-6 pb-0">
               <div>
-                <h2 className="text-xl font-semibold text-gray-800">Plantões de Hoje</h2>
-                <p className="text-sm text-gray-600">{todayPlantoes.length} plantão(ões) agendado(s) para hoje</p>
+                <h2 className="text-lg font-bold text-gray-900">Próximos Plantões</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{upcomingPlantoes.length} agendado(s)</p>
               </div>
+              <button
+                onClick={() => setShowModal(true)}
+                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all duration-200"
+              >
+                + Novo Plantão
+              </button>
             </div>
-            <div className="space-y-2">
-              {todayPlantoes.map((plantao) => (
-                <div key={plantao.id} className="bg-white rounded-lg p-4 flex items-center justify-between border border-orange-100">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-semibold text-gray-800 truncate">{plantao.hospital}</p>
-                    <p className="text-sm text-gray-500 truncate">
-                      {plantao.horas ? `${plantao.horas}h` : ''}
-                      {plantao.especialidade ? ` · ${plantao.especialidade}` : ''}
-                    </p>
-                  </div>
-                  <div className="text-right ml-4">
-                    <p className="font-bold text-green-600">{formatCurrency(plantao.valor || 0)}</p>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-1 ${getStatusColor(plantao.status)}`}>
-                      {plantao.status}
-                    </span>
-                  </div>
+
+            {isPlantoesPending ? (
+              <div className="p-6"><SkeletonTableRows rows={4} cols={6} /></div>
+            ) : upcomingPlantoes.length === 0 ? (
+              <div className="text-center py-12 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
+                  <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Próximos Plantões (A Realizar) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Próximos Plantões</h2>
-              <p className="text-sm text-gray-600 mt-1">Plantões agendados para datas futuras</p>
-            </div>
-            <button 
-              onClick={() => setShowModal(true)}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-            >
-              + Novo Plantão
-            </button>
-          </div>
-
-          {isPlantoesPending ? (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <tbody>
-                  <SkeletonTableRows rows={4} cols={6} />
-                </tbody>
-              </table>
-            </div>
-          ) : upcomingPlantoes.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 mb-2">
-                <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
+                <p className="text-gray-500 font-medium">Nenhum plantão agendado</p>
+                <p className="text-xs text-gray-400 mt-1">Clique em &quot;+ Novo Plantão&quot; para começar</p>
               </div>
-              <p className="text-gray-500">Nenhum plantão agendado</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Hospital
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Horas
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {upcomingPlantoes.map((plantao) => (
-                    <tr key={plantao.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="font-semibold text-orange-600">
-                          {formatDate(plantao.data)}
-                        </div>
-                        {plantao.horas && (
-                          <div className="text-xs text-gray-500">{plantao.horas}h</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div>
-                          <button
-                            onClick={() => {
-                              const query = plantao.endereco || plantao.hospital
-                              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-                              window.open(mapsUrl, '_blank')
-                            }}
-                            className="text-gray-900 hover:text-orange-500 font-medium underline underline-offset-2 hover:underline-offset-4 transition-all duration-200"
-                          >
-                            {plantao.hospital}
-                          </button>
-                        </div>
-                        {plantao.endereco && (
-                          <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
-                            {plantao.endereco}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        {formatCurrency(plantao.valor)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(plantao.horas || 0)}h
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                          {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditPlantao(plantao)}
-                            className="text-orange-500 hover:text-orange-600 p-1 rounded hover:bg-orange-50 transition-colors duration-200"
-                            title="Editar plantão"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeletePlantao(plantao.id)}
-                            disabled={deletingId === plantao.id}
-                            className="text-red-500 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Excluir plantão"
-                          >
-                            {deletingId === plantao.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b border-red-500"></div>
-                            ) : (
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      {['Data', 'Hospital', 'Valor', 'Horas', 'Status', 'Ações'].map((h) => (
+                        <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Histórico (Realizados) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Histórico</h2>
-              <p className="text-sm text-gray-600 mt-1">Plantões já realizados</p>
-            </div>
+                  </thead>
+                  <tbody>
+                    {upcomingPlantoes.map((plantao, idx) => (
+                      <tr key={plantao.id} className={`hover:bg-orange-50/40 transition-colors ${idx !== upcomingPlantoes.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-orange-600">{formatDate(plantao.data)}</span>
+                          {plantao.horas && <span className="block text-[10px] text-gray-400">{plantao.horas}h</span>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
+                            className="text-sm text-gray-900 hover:text-orange-600 font-medium transition-colors">{plantao.hospital}</button>
+                          {plantao.endereco && <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{plantao.endereco}</p>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(plantao.valor)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{plantao.horas || 0}h</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-1">
+                            <button onClick={() => handleEditPlantao(plantao)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
+                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-500 border-t-transparent" /> : (
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {historicalPlantoes.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 mb-2">
-                <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <p className="text-gray-500">Nenhum plantão realizado ainda</p>
+          {/* ── Histórico ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+            <div className="p-6 pb-0">
+              <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
+              <p className="text-xs text-gray-500 mt-0.5">{historicalPlantoes.length} plantão(ões) realizado(s)</p>
             </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Hospital/Local
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {historicalPlantoes.map((plantao) => (
-                    <tr key={plantao.id} className="hover:bg-gray-50 opacity-75">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <div>{formatDate(plantao.data)}</div>
-                        {plantao.horas && (
-                          <div className="text-xs text-gray-400">{plantao.horas}h</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div>
-                          <button
-                            onClick={() => {
-                              const query = plantao.endereco || plantao.hospital
-                              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-                              window.open(mapsUrl, '_blank')
-                            }}
-                            className="text-gray-700 hover:text-orange-500 font-medium underline underline-offset-2 hover:underline-offset-4 transition-all duration-200"
-                          >
-                            {plantao.hospital}
-                          </button>
-                        </div>
-                        {plantao.endereco && (
-                          <div className="text-xs text-gray-400 mt-1 max-w-xs truncate">
-                            {plantao.endereco}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
-                        {formatCurrency(plantao.valor)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                          {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex space-x-2">
-                          {/* Edit Button */}
-                          <button
-                            onClick={() => handleEditPlantao(plantao)}
-                            className="text-orange-500 hover:text-orange-600 p-1 rounded hover:bg-orange-50 transition-colors duration-200"
-                            title="Editar plantão"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeletePlantao(plantao.id)}
-                            disabled={deletingId === plantao.id}
-                            className="text-red-500 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Apagar plantão"
-                          >
-                            {deletingId === plantao.id ? (
-                              <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            ) : (
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
 
-      {/* Modal */}
+            {historicalPlantoes.length === 0 ? (
+              <div className="text-center py-12 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
+                  <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p className="text-gray-500 font-medium">Nenhum plantão realizado ainda</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="border-b border-gray-100">
+                      {['Data', 'Hospital', 'Valor', 'Status', 'Ações'].map((h) => (
+                        <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historicalPlantoes.slice(0, 10).map((plantao, idx) => (
+                      <tr key={plantao.id} className={`hover:bg-gray-50/60 transition-colors ${idx !== Math.min(historicalPlantoes.length, 10) - 1 ? 'border-b border-gray-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-600">{formatDate(plantao.data)}</span>
+                          {plantao.horas && <span className="block text-[10px] text-gray-400">{plantao.horas}h</span>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
+                            className="text-sm text-gray-700 hover:text-orange-600 font-medium transition-colors">{plantao.hospital}</button>
+                          {plantao.endereco && <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{plantao.endereco}</p>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{formatCurrency(plantao.valor)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-1">
+                            <button onClick={() => handleEditPlantao(plantao)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
+                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-500 border-t-transparent" /> : (
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {historicalPlantoes.length > 10 && (
+                  <div className="text-center py-3 border-t border-gray-50">
+                    <button onClick={() => router.push('/plantoes-realizados')} className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">
+                      Ver todos os {historicalPlantoes.length} plantões →
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+      {/* Modal Premium */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center px-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto flex flex-col border border-gray-200/60">
             <div className="flex justify-between items-center mb-6 flex-shrink-0">
-              <h3 className="text-xl font-semibold text-gray-800">
+              <h3 className="text-xl font-bold text-gray-900">
                 {editingPlantao ? 'Editar Plantão' : 'Novo Plantão'}
               </h3>
               <button
@@ -1323,14 +1275,14 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-colors duration-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {saving ? 'Salvando...' : 'Salvar Plantão'}
                 </button>
