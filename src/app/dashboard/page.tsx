@@ -635,18 +635,19 @@ export default function DashboardPage() {
   }
 
   const getSmartStatus = (plantao: PlantaoListItem): string => {
-    if (plantao.status === 'pago') return 'pago'
+    const st = plantao.status as string
+    if (st === 'pago') return 'pago'
     // Check if overdue: past payment deadline and not paid
     if (plantao.data_prevista_pagamento) {
       const deadlineStr = plantao.data_prevista_pagamento.split('T')[0]
-      if (deadlineStr < todayStr && plantao.status !== 'pago') return 'atrasado'
+      if (deadlineStr < todayStr) return 'atrasado'
     } else if (plantao.prazo_pagamento_dias && plantao.data) {
       const base = new Date(plantao.data.split('T')[0] + 'T00:00:00')
       base.setDate(base.getDate() + plantao.prazo_pagamento_dias)
       const deadlineStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
-      if (deadlineStr < todayStr && plantao.status !== 'pago') return 'atrasado'
+      if (deadlineStr < todayStr) return 'atrasado'
     }
-    return plantao.status
+    return st
   }
 
   const getStatusColor = (status: string) => {
@@ -1100,10 +1101,25 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{formatCurrency(plantao.valor)}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(plantao.status)}`}>{plantao.status}</span>
+                          {(() => { const smart = getSmartStatus(plantao); return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(smart)}`}>
+                              {smart === 'atrasado' && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01" /></svg>}
+                              {smart === 'pago' && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>}
+                              {getStatusLabel(smart)}
+                            </span>
+                          )})()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="flex gap-1">
+                            {getSmartStatus(plantao) !== 'pago' && (
+                              <button onClick={() => handleMarkAsPaid(plantao)} disabled={markingPaidId === plantao.id}
+                                className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors disabled:opacity-40" title="Dar Baixa">
+                                {markingPaidId === plantao.id
+                                  ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-500 border-t-transparent" />
+                                  : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                }
+                              </button>
+                            )}
                             <button onClick={() => handleEditPlantao(plantao)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
                               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
