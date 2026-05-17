@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
@@ -70,6 +70,9 @@ export default function DashboardPage() {
   const [dashboardFilter, setDashboardFilter] = useState<'current' | '3months' | 'hospital'>('current')
   const [hospitalFilter, setHospitalFilter] = useState<string>('')
   const [metaMensal, setMetaMensal] = useState<number>(30000)
+  const [metaSaving, setMetaSaving] = useState(false)
+  const [metaSaved, setMetaSaved] = useState(false)
+  const metaSavedTimeout = useRef<NodeJS.Timeout | null>(null)
 
   // --- TanStack Query: lista principal de plantões do usuário ---
   const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
@@ -135,6 +138,36 @@ export default function DashboardPage() {
   // ora; pode ser migrado para useQuery quando necessário).
   useEffect(() => {
     if (user) fetchLocaisFavoritos(user.id)
+  }, [user])
+
+  // ── Fetch meta mensal do Supabase ──
+  useEffect(() => {
+    if (!user) return
+    const fetchMeta = async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('meta_mensal')
+        .eq('user_id', user.id)
+        .single()
+      if (data?.meta_mensal != null) setMetaMensal(data.meta_mensal)
+    }
+    fetchMeta()
+  }, [user])
+
+  // ── Salvar meta mensal no Supabase (onBlur / Enter) ──
+  const saveMetaMensal = useCallback(async (valor: number) => {
+    if (!user) return
+    setMetaSaving(true)
+    try {
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ user_id: user.id, meta_mensal: valor }, { onConflict: 'user_id' })
+      if (!error) {
+        setMetaSaved(true)
+        if (metaSavedTimeout.current) clearTimeout(metaSavedTimeout.current)
+        metaSavedTimeout.current = setTimeout(() => setMetaSaved(false), 2000)
+      }
+    } finally { setMetaSaving(false) }
   }, [user])
 
   const fetchLocaisFavoritos = async (userId: string) => {
@@ -787,11 +820,19 @@ export default function DashboardPage() {
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Meta Mensal</h3>
                     <div className="flex items-center gap-1.5">
+                      {metaSaved && (
+                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full animate-pulse">✓ Salvo</span>
+                      )}
+                      {metaSaving && (
+                        <span className="text-[10px] text-gray-400">Salvando...</span>
+                      )}
                       <span className="text-xs text-gray-400">Meta:</span>
                       <input
                         type="number"
                         value={metaMensal}
                         onChange={(e) => setMetaMensal(Number(e.target.value) || 0)}
+                        onBlur={() => saveMetaMensal(metaMensal)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
                         className="w-24 text-right text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
                       />
                     </div>
