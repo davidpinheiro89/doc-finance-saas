@@ -864,7 +864,7 @@ export default function DashboardPage() {
               {/* ── Meta Mensal + Ranking por Hospital ── */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Meta Mensal */}
-                <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6">
+                <div className="lg:col-span-2 bg-gradient-to-br from-white to-orange-50/30 rounded-2xl border border-gray-200/60 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Meta Mensal</h3>
                     <div className="flex items-center gap-1.5">
@@ -920,7 +920,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Ranking de Hospitais */}
-                <div className="lg:col-span-3 bg-white rounded-2xl border border-gray-200/60 shadow-sm p-6">
+                <div className="lg:col-span-3 bg-gradient-to-br from-white to-violet-50/20 rounded-2xl border border-gray-200/60 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
                   <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Top Hospitais por R$/Hora</h3>
                   {metrics.hospitalRanking.length === 0 ? (
                     <p className="text-sm text-gray-400 py-4 text-center">Registre plantões com horas para ver o ranking</p>
@@ -930,24 +930,28 @@ export default function DashboardPage() {
                         const maxValorHora = metrics.hospitalRanking[0]?.valorHora || 1
                         const pct = (h.valorHora / maxValorHora) * 100
                         return (
-                          <div key={h.name} className="group">
-                            <div className="flex items-center justify-between mb-1">
-                              <div className="flex items-center gap-2 min-w-0">
-                                <span className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                                  i === 0 ? 'bg-orange-100 text-orange-600' : 'bg-gray-100 text-gray-500'
+                          <div key={h.name} className="group cursor-default">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shadow-sm ${
+                                  i === 0 ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white' : 'bg-gray-100 text-gray-500'
                                 }`}>{i + 1}</span>
                                 <span className="text-sm font-medium text-gray-800 truncate">{h.name}</span>
                               </div>
                               <div className="text-right flex-shrink-0 ml-3">
                                 <span className="text-sm font-bold text-gray-900">{formatCurrency(h.valorHora)}/h</span>
-                                <span className="text-xs text-gray-400 ml-2">{h.count}x</span>
+                                <span className="text-[10px] text-gray-400 ml-1.5 bg-gray-100 px-1.5 py-0.5 rounded-md">{h.count} plantões</span>
                               </div>
                             </div>
-                            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                               <div
-                                className={`h-full rounded-full transition-all duration-500 ${i === 0 ? 'bg-orange-500' : 'bg-orange-300'}`}
+                                className={`h-full rounded-full transition-all duration-700 ease-out ${i === 0 ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 'bg-gradient-to-r from-orange-200 to-orange-300'}`}
                                 style={{ width: `${pct}%` }}
                               />
+                            </div>
+                            {/* Tooltip on hover */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mt-1">
+                              <p className="text-[10px] text-gray-400">Total: {formatCurrency(h.total)} em {h.count} plantão(ões)</p>
                             </div>
                           </div>
                         )
@@ -992,7 +996,7 @@ export default function DashboardPage() {
           )}
 
           {/* ── Próximos Plantões ── */}
-          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
             <div className="flex justify-between items-center p-6 pb-0">
               <div>
                 <h2 className="text-lg font-bold text-gray-900">Próximos Plantões</h2>
@@ -1000,7 +1004,7 @@ export default function DashboardPage() {
               </div>
               <button
                 onClick={() => setShowModal(true)}
-                className="bg-orange-500 hover:bg-orange-600 text-white font-semibold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all duration-200"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all duration-200"
               >
                 + Novo Plantão
               </button>
@@ -1020,9 +1024,9 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-gray-100">
+                    <tr className="bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
                       {['Data', 'Hospital', 'Valor', 'Horas', 'Status', 'Ações'].map((h) => (
-                        <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                        <th key={h} className="px-6 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
@@ -1064,10 +1068,17 @@ export default function DashboardPage() {
           </div>
 
           {/* ── Histórico ── */}
-          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
             <div className="p-6 pb-0">
-              <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
-              <p className="text-xs text-gray-500 mt-0.5">{historicalPlantoes.length} plantão(ões) realizado(s)</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                  <svg className="h-4.5 w-4.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">{historicalPlantoes.length} plantão(ões) realizado(s)</p>
+                </div>
+              </div>
             </div>
 
             {historicalPlantoes.length === 0 ? (
@@ -1081,9 +1092,9 @@ export default function DashboardPage() {
               <div className="overflow-x-auto">
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-gray-100">
+                    <tr className="bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
                       {['Data', 'Hospital', 'Valor', 'Status', 'Ações'].map((h) => (
-                        <th key={h} className="px-6 py-3 text-left text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{h}</th>
+                        <th key={h} className="px-6 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
                       ))}
                     </tr>
                   </thead>
