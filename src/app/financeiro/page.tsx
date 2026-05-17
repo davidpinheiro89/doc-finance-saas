@@ -30,6 +30,23 @@ export default function FinanceiroPage() {
     categoria: 'transporte',
     recorrente: false
   })
+  const [customCategories, setCustomCategories] = useState<string[]>([])
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [showEditNewCategoryInput, setShowEditNewCategoryInput] = useState(false)
+  const [editNewCategoryName, setEditNewCategoryName] = useState('')
+
+  const defaultCategories = [
+    { value: 'transporte', label: 'Transporte' },
+    { value: 'alimentacao', label: 'Alimentação' },
+    { value: 'material', label: 'Material Médico' },
+    { value: 'outros', label: 'Outros' },
+  ]
+
+  const allCategories = [
+    ...defaultCategories,
+    ...customCategories.map(c => ({ value: c, label: c })),
+  ]
 
   useEffect(() => {
     // Initial fetch + refetch when filters change
@@ -77,6 +94,18 @@ export default function FinanceiroPage() {
       }
 
       setDespesas(data || [])
+      // Auto-detect custom categories from existing data
+      const knownValues = new Set(defaultCategories.map(c => c.value))
+      const extraCats = (data || [])
+        .map(d => d.categoria)
+        .filter(c => c && !knownValues.has(c))
+      const uniqueExtra = Array.from(new Set(extraCats))
+      if (uniqueExtra.length > 0) {
+        setCustomCategories(prev => {
+          const merged = new Set([...prev, ...uniqueExtra])
+          return Array.from(merged)
+        })
+      }
       console.log('Estado despesas atualizado com:', data?.length || 0, 'itens')
     } catch (error) {
       setDespesas([])
@@ -712,15 +741,48 @@ export default function FinanceiroPage() {
                       Categoria
                     </label>
                     <select
-                      value={newExpense.categoria}
-                      onChange={(e) => setNewExpense({...newExpense, categoria: e.target.value})}
+                      value={showNewCategoryInput ? '__new__' : newExpense.categoria}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setShowNewCategoryInput(true)
+                        } else {
+                          setShowNewCategoryInput(false)
+                          setNewExpense({...newExpense, categoria: e.target.value})
+                        }
+                      }}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
-                      <option value="transporte">Transporte</option>
-                      <option value="alimentacao">Alimentação</option>
-                      <option value="material">Material Médico</option>
-                      <option value="outros">Outros</option>
+                      {allCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                      <option value="__new__">+ Nova Categoria...</option>
                     </select>
+                    {showNewCategoryInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Nome da categoria"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = newCategoryName.trim()
+                            if (!name) return
+                            setCustomCategories(prev => [...prev, name])
+                            setNewExpense({...newExpense, categoria: name})
+                            setNewCategoryName('')
+                            setShowNewCategoryInput(false)
+                          }}
+                          className="px-3 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -865,15 +927,52 @@ export default function FinanceiroPage() {
                       Categoria
                     </label>
                     <select
-                      value={editingExpense.categoria}
-                      onChange={(e) => setEditingExpense({...editingExpense, categoria: e.target.value})}
+                      value={showEditNewCategoryInput ? '__new__' : editingExpense.categoria}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setShowEditNewCategoryInput(true)
+                        } else {
+                          setShowEditNewCategoryInput(false)
+                          setEditingExpense({...editingExpense, categoria: e.target.value})
+                        }
+                      }}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
-                      <option value="transporte">Transporte</option>
-                      <option value="alimentacao">Alimentação</option>
-                      <option value="material">Material Médico</option>
-                      <option value="outros">Outros</option>
+                      {allCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                      {/* Show current category if it's custom and not yet in allCategories */}
+                      {!allCategories.find(c => c.value === editingExpense.categoria) && (
+                        <option value={editingExpense.categoria}>{editingExpense.categoria}</option>
+                      )}
+                      <option value="__new__">+ Nova Categoria...</option>
                     </select>
+                    {showEditNewCategoryInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={editNewCategoryName}
+                          onChange={(e) => setEditNewCategoryName(e.target.value)}
+                          placeholder="Nome da categoria"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = editNewCategoryName.trim()
+                            if (!name) return
+                            setCustomCategories(prev => [...prev, name])
+                            setEditingExpense({...editingExpense, categoria: name})
+                            setEditNewCategoryName('')
+                            setShowEditNewCategoryInput(false)
+                          }}
+                          className="px-3 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Checkbox for recurring expenses */}
