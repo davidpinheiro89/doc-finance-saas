@@ -35,6 +35,7 @@ export default function EscalaPage() {
   })
   const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
+  const [conflictData, setConflictData] = useState<{ hospitals: string[]; dateStr: string } | null>(null)
   const router = useRouter()
 
   // ── Helpers ──
@@ -89,9 +90,27 @@ export default function EscalaPage() {
   }
 
   const handleOpenPlantaoForm = () => {
+    if (!selectedDate) return
+    const dateStr = fmt(selectedDate)
+    const existing = plantoes.filter(p => {
+      const d = (p.data || '').split('T')[0]
+      return d === dateStr && p.classificacao !== 'folga' && p.classificacao !== 'disponivel'
+    })
+    if (existing.length > 0) {
+      setConflictData({ hospitals: existing.map(p => p.hospital), dateStr })
+      setShowActionModal(false)
+      return
+    }
     setShowActionModal(false)
     setShowPlantaoForm(true)
-    if (selectedDate) setFormData(prev => ({ ...prev, data: fmt(selectedDate) }))
+    setFormData(prev => ({ ...prev, data: dateStr }))
+  }
+
+  const handleConfirmConflict = () => {
+    if (!selectedDate) return
+    setConflictData(null)
+    setShowPlantaoForm(true)
+    setFormData(prev => ({ ...prev, data: fmt(selectedDate) }))
   }
 
   const handleClearDay = async () => {
@@ -390,6 +409,53 @@ export default function EscalaPage() {
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </span>
                   Apagar Informação do Dia
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Conflict Confirmation Modal ── */}
+        {conflictData && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setConflictData(null)}>
+            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
+                  <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Conflito de Agenda</h3>
+                  <p className="text-xs text-gray-400">Já existe plantão neste dia</p>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-200/60 rounded-xl p-4 mb-5">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Você já tem {conflictData.hospitals.length > 1 ? 'plantões cadastrados' : 'um plantão cadastrado'} neste dia em:
+                </p>
+                <div className="mt-2 space-y-1">
+                  {conflictData.hospitals.map((h, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                      <span className="text-sm font-semibold text-gray-900">{h}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-sm text-gray-600 mt-3">Deseja realmente adicionar mais um plantão nesta data?</p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConflictData(null)}
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmConflict}
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all"
+                >
+                  Sim, Adicionar
                 </button>
               </div>
             </div>
