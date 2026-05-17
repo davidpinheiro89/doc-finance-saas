@@ -473,6 +473,15 @@ export default function DashboardPage() {
         autoStatus = 'pendente'
       }
 
+      // Auto-calculate prazo_pagamento_dias from date difference
+      let prazoDias: number | null = formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null
+      if (formData.data_prevista_pagamento && formData.data && !prazoDias) {
+        const diff = Math.round(
+          (new Date(formData.data_prevista_pagamento + 'T00:00:00').getTime() - new Date(formData.data + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)
+        )
+        prazoDias = diff > 0 ? diff : null
+      }
+
       let plantaoData: any = {
         user_id: user!.id,
         hospital: formData.hospital.trim(),
@@ -482,7 +491,7 @@ export default function DashboardPage() {
         horas: formData.horas ? parseFloat(formData.horas) : 0,
         endereco: formData.endereco?.trim() || null,
         data_prevista_pagamento: formData.data_prevista_pagamento || null,
-        prazo_pagamento_dias: formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null,
+        prazo_pagamento_dias: prazoDias,
         classificacao: formData.classificacao || null,
         especialidade: formData.especialidade || null
       }
@@ -1222,23 +1231,79 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* Prazo de Pagamento */}
+              {/* Data Prevista de Pagamento */}
               <div>
-                <label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
-                  Prazo de Pagamento (dias)
+                <label htmlFor="data_prevista_pagamento" className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Prevista de Pagamento
                 </label>
                 <input
-                  type="number"
-                  id="prazo_pagamento_dias"
-                  name="prazo_pagamento_dias"
-                  value={formData.prazo_pagamento_dias}
+                  type="date"
+                  id="data_prevista_pagamento"
+                  name="data_prevista_pagamento"
+                  value={formData.data_prevista_pagamento}
                   onChange={handleInputChange}
-                  min="1"
-                  max="365"
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="30"
+                  className="block w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-transparent text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">Dias após a data do plantão para pagamento</p>
+                {/* Atalhos rápidos */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.data) { alert('Preencha a data do plantão primeiro.'); return }
+                      const base = new Date(formData.data + 'T00:00:00')
+                      base.setDate(base.getDate() + 30)
+                      const iso = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: iso, prazo_pagamento_dias: '30' }))
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.prazo_pagamento_dias === '30'
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    30 dias
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.data) { alert('Preencha a data do plantão primeiro.'); return }
+                      const base = new Date(formData.data + 'T00:00:00')
+                      const nextMonth = new Date(base.getFullYear(), base.getMonth() + 1, 15)
+                      const iso = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-15`
+                      const diffDays = Math.round((nextMonth.getTime() - base.getTime()) / (1000 * 60 * 60 * 24))
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: iso, prazo_pagamento_dias: String(diffDays) }))
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.data_prevista_pagamento && formData.data_prevista_pagamento.endsWith('-15') && formData.prazo_pagamento_dias !== '30'
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    Próximo Mês (dia 15)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: '', prazo_pagamento_dias: '' }))
+                      document.getElementById('data_prevista_pagamento')?.focus()
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.data_prevista_pagamento && formData.prazo_pagamento_dias !== '30' && !formData.data_prevista_pagamento.endsWith('-15')
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    Customizado
+                  </button>
+                </div>
+                {formData.data_prevista_pagamento && formData.data && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    {(() => {
+                      const diff = Math.round((new Date(formData.data_prevista_pagamento + 'T00:00:00').getTime() - new Date(formData.data + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
+                      return diff > 0 ? `≈ ${diff} dias após o plantão` : 'Data anterior ao plantão'
+                    })()}
+                  </p>
+                )}
               </div>
 
               {/* Endereço */}
