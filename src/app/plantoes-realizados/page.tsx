@@ -179,6 +179,7 @@ export default function PlantoesRealizadosPage() {
         .from('plantoes')
         .update({ status: 'pago' })
         .eq('id', plantaoId)
+        .eq('user_id', user!.id)
 
       if (error) {
         console.error('Error marking plantão as paid:', error)

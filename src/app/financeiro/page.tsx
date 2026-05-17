@@ -49,11 +49,10 @@ export default function FinanceiroPage() {
   ]
 
   useEffect(() => {
-    // Initial fetch + refetch when filters change
     if (user) {
-      fetchData(user!.id)
+      fetchData(user.id)
     }
-  }, [user, selectedMonth, selectedYear, despesas.length])
+  }, [user, selectedMonth, selectedYear])
 
   const fetchData = async (userId: string) => {
     await Promise.all([
@@ -174,12 +173,7 @@ export default function FinanceiroPage() {
       })
       setShowAddExpense(false)
       
-      // Sync with database immediately
       await fetchDespesas(user!.id)
-      console.log('Despesa adicionada com sucesso:', newExpense)
-      
-      // Force immediate refresh to ensure new expense appears in list
-      setTimeout(() => fetchDespesas(user!.id), 500)
     } catch (error) {
       alert('Erro ao adicionar despesa. Tente novamente.')
     }
@@ -204,6 +198,7 @@ export default function FinanceiroPage() {
           recorrente: editingExpense.recorrente
         })
         .eq('id', editingExpense.id)
+        .eq('user_id', user!.id)
 
       if (error) {
         alert('Erro ao atualizar despesa: ' + error.message)
@@ -249,6 +244,7 @@ export default function FinanceiroPage() {
           .from('despesas')
           .delete()
           .eq('id', despesa.id)
+          .eq('user_id', user!.id)
 
         if (error) {
           alert('Erro ao excluir despesa: ' + error.message)

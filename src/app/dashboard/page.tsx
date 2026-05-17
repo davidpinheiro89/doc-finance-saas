@@ -447,8 +447,8 @@ export default function DashboardPage() {
       router.refresh()
       
       alert('Plantão apagado com sucesso!')
-    } catch (error: any) {
-      console.error('Erro ao apagar:', error.message || error)
+    } catch (error) {
+      console.error('Erro ao apagar:', error instanceof Error ? error.message : error)
       alert('Erro ao apagar plantão. Tente novamente.')
     } finally {
       setDeletingId(null)
@@ -515,7 +515,7 @@ export default function DashboardPage() {
         prazoDias = diff > 0 ? diff : null
       }
 
-      let plantaoData: any = {
+      const plantaoData: Record<string, string | number | null> = {
         user_id: user!.id,
         hospital: formData.hospital.trim(),
         data: formData.data,

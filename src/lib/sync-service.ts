@@ -92,7 +92,7 @@ class SyncService {
         await this.syncUpdate(data)
         break
       case 'delete':
-        await this.syncDelete(data.id)
+        await this.syncDelete(data.id, data.user_id)
         break
       default:
         throw new Error(`Unknown operation: ${operation}`)
@@ -145,11 +145,12 @@ class SyncService {
     await offlineDB.markAsSynced(data.id)
   }
 
-  private async syncDelete(id: string): Promise<void> {
+  private async syncDelete(id: string, userId: string): Promise<void> {
     const { error } = await supabase
       .from('plantoes')
       .delete()
       .eq('id', id)
+      .eq('user_id', userId)
 
     if (error) throw error
   }
