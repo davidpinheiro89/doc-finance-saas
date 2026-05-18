@@ -116,64 +116,72 @@ export default function PlantoesRealizadosPage() {
     return `${day}/${month}/${year}`
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pago':
-        return 'bg-green-100 text-green-800'
-      case 'confirmado':
-        return 'bg-blue-100 text-blue-800'
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'realizado':
-        return 'bg-purple-100 text-purple-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusText = (plantao: Plantao) => {
-    // Unique status logic - show only one status per plantão
-    if (plantao.status === 'pago') {
-      return 'Pago'
-    }
-    
-    // If payment hasn't been received or is within deadline
-    // (status 'pago' already returned above, so no need to re-check)
-    if (plantao.prazo_pagamento_dias) {
-      return 'Aguardando'
-    }
-    
-    // If plantão was done but no payment info
-    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
-      return 'Realizado'
-    }
-    
-    // Default to actual status
-    return plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)
+  const getPaymentDeadline = (plantao: Plantao) => {
+    if (!plantao.prazo_pagamento_dias) return null
+    const plantaoDate = new Date(plantao.data + 'T00:00:00')
+    const deadline = new Date(plantaoDate)
+    deadline.setDate(deadline.getDate() + plantao.prazo_pagamento_dias)
+    return deadline
   }
 
   const isOverdue = (plantao: Plantao) => {
-    if (plantao.status === 'pago' || !plantao.prazo_pagamento_dias) {
-      return false
+    if (plantao.status === 'pago') return false
+    const deadline = getPaymentDeadline(plantao)
+    if (!deadline) return false
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return today > deadline
+  }
+
+  const getDaysUntilPayment = (plantao: Plantao) => {
+    const deadline = getPaymentDeadline(plantao)
+    if (!deadline) return null
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return Math.round((deadline.getTime() - today.getTime()) / 86400000)
+  }
+
+  type SmartStatus = { label: string; color: string; tooltip: string }
+
+  const getSmartStatus = (plantao: Plantao): SmartStatus => {
+    if (plantao.status === 'pago') {
+      return { label: 'Pago', color: 'bg-emerald-50 text-emerald-700 border-emerald-200/60', tooltip: 'Pagamento recebido' }
     }
-    
-    const plantaoDate = new Date(plantao.data)
-    const paymentDeadline = new Date(plantaoDate)
-    paymentDeadline.setDate(paymentDeadline.getDate() + plantao.prazo_pagamento_dias)
-    
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    return today > paymentDeadline
+
+    if (isOverdue(plantao)) {
+      const deadline = getPaymentDeadline(plantao)!
+      const daysLate = Math.abs(getDaysUntilPayment(plantao) || 0)
+      return {
+        label: 'Atrasado',
+        color: 'bg-red-50 text-red-700 border-red-200/60',
+        tooltip: `Venceu em ${formatDate(deadline.toISOString().split('T')[0])} — ${daysLate} dia(s) de atraso`
+      }
+    }
+
+    if (plantao.prazo_pagamento_dias) {
+      const daysLeft = getDaysUntilPayment(plantao)
+      if (daysLeft !== null && daysLeft <= 5 && daysLeft >= 0) {
+        return {
+          label: 'Vence em breve',
+          color: 'bg-amber-50 text-amber-700 border-amber-200/60',
+          tooltip: `Pagamento previsto em ${daysLeft} dia(s)`
+        }
+      }
+      const deadline = getPaymentDeadline(plantao)!
+      return {
+        label: 'Aguardando',
+        color: 'bg-sky-50 text-sky-700 border-sky-200/60',
+        tooltip: `Pagamento previsto para ${formatDate(deadline.toISOString().split('T')[0])}`
+      }
+    }
+
+    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
+      return { label: 'Realizado', color: 'bg-violet-50 text-violet-700 border-violet-200/60', tooltip: 'Plantão realizado — sem prazo de pagamento definido' }
+    }
+
+    return { label: 'Pendente', color: 'bg-gray-50 text-gray-600 border-gray-200/60', tooltip: 'Status pendente' }
   }
 
   const handleMarkAsPaid = async (plantaoId: string) => {
-    if (!confirm('Confirmar recebimento deste plantão?')) {
-      return
-    }
-
     setConfirmingPayment(plantaoId)
-    
     try {
       const { error } = await supabase
         .from('plantoes')
@@ -187,12 +195,8 @@ export default function PlantoesRealizadosPage() {
         return
       }
 
-      // Refresh plantões list
       if (user) await fetchPlantoes(user.id)
-      
-      alert('Pagamento confirmado com sucesso!')
-    } catch (error) {
-      console.error('Error marking plantão as paid:', error)
+    } catch {
       alert('Erro ao confirmar pagamento. Tente novamente.')
     } finally {
       setConfirmingPayment(null)
@@ -412,30 +416,72 @@ export default function PlantoesRealizadosPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ação
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredPlantoes.map((plantao) => (
-                      <tr key={plantao.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(plantao.data)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.hospital}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(plantao.valor)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.horas || 0}h
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                            {getStatusText(plantao)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredPlantoes.map((plantao) => {
+                      const status = getSmartStatus(plantao)
+                      const canMarkPaid = plantao.status !== 'pago'
+                      return (
+                        <tr key={plantao.id} className={`hover:bg-gray-50/80 transition-colors ${isOverdue(plantao) ? 'bg-red-50/30' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(plantao.data)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {plantao.hospital}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                            {formatCurrency(plantao.valor)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {plantao.horas || 0}h
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="group relative inline-block">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border ${status.color}`}>
+                                {status.label === 'Pago' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                )}
+                                {status.label === 'Atrasado' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" /></svg>
+                                )}
+                                {status.label === 'Vence em breve' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" /></svg>
+                                )}
+                                {status.label}
+                              </span>
+                              {/* Tooltip */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-[10px] rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-10 shadow-lg">
+                                {status.tooltip}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-gray-900 rotate-45" />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            {canMarkPaid ? (
+                              <button
+                                onClick={() => handleMarkAsPaid(plantao.id)}
+                                disabled={confirmingPayment === plantao.id}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 rounded-lg transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Confirmar recebimento"
+                              >
+                                {confirmingPayment === plantao.id ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-emerald-500 border-t-transparent" />
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                )}
+                                <span className="hidden sm:inline">Dar Baixa</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
