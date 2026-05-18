@@ -8,6 +8,32 @@ import Sidebar from '../../components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { fetchPlantoesByUser, plantoesKeys, type PlantaoListItem } from '@/lib/queries/plantoes'
 
+// ── Block Type & Color config ──
+const BLOCK_TYPES = [
+  { key: 'plantao', label: 'Plantão', revenue: true },
+  { key: 'folga', label: 'Folga', revenue: false },
+  { key: 'pos-plantao', label: 'Pós-Plantão', revenue: false },
+  { key: 'ferias', label: 'Férias', revenue: false },
+  { key: 'personalizado', label: 'Personalizado', revenue: false },
+] as const
+
+const BLOCK_COLORS = [
+  { key: 'emerald', label: 'Esmeralda', dot: 'bg-emerald-500', bg: 'bg-emerald-50', border: 'border-emerald-200/60', text: 'text-emerald-800' },
+  { key: 'indigo', label: 'Índigo', dot: 'bg-indigo-500', bg: 'bg-indigo-50', border: 'border-indigo-200/60', text: 'text-indigo-800' },
+  { key: 'amber', label: 'Âmbar', dot: 'bg-amber-500', bg: 'bg-amber-50', border: 'border-amber-200/60', text: 'text-amber-800' },
+  { key: 'rose', label: 'Rosa', dot: 'bg-rose-500', bg: 'bg-rose-50', border: 'border-rose-200/60', text: 'text-rose-800' },
+  { key: 'gray', label: 'Cinza', dot: 'bg-gray-500', bg: 'bg-gray-100', border: 'border-gray-200/60', text: 'text-gray-700' },
+  { key: 'violet', label: 'Violeta', dot: 'bg-violet-500', bg: 'bg-violet-50', border: 'border-violet-200/60', text: 'text-violet-800' },
+  { key: 'sky', label: 'Céu', dot: 'bg-sky-500', bg: 'bg-sky-50', border: 'border-sky-200/60', text: 'text-sky-800' },
+  { key: 'orange', label: 'Laranja', dot: 'bg-orange-500', bg: 'bg-orange-50', border: 'border-orange-200/60', text: 'text-orange-800' },
+] as const
+
+type BlockColorKey = typeof BLOCK_COLORS[number]['key']
+
+const getColorConfig = (colorKey: string | null) => {
+  return BLOCK_COLORS.find(c => c.key === colorKey) || BLOCK_COLORS[0]
+}
+
 export default function EscalaPage() {
   const { user, loading } = useAuthGuard()
   const queryClient = useQueryClient()
@@ -38,6 +64,10 @@ export default function EscalaPage() {
   const [conflictData, setConflictData] = useState<{ hospitals: string[]; dateStr: string } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [savingPlantao, setSavingPlantao] = useState(false)
+  // Block type & color
+  const [blockType, setBlockType] = useState<string>('plantao')
+  const [blockColor, setBlockColor] = useState<BlockColorKey>('emerald')
+  const [customBlockName, setCustomBlockName] = useState('')
   // Recurrence
   const [recurrenceEnabled, setRecurrenceEnabled] = useState(false)
   const [recurrenceFreq, setRecurrenceFreq] = useState<'weekly' | 'biweekly'>('weekly')
@@ -45,6 +75,8 @@ export default function EscalaPage() {
   const [recurrenceLimitDate, setRecurrenceLimitDate] = useState('')
   const [recurrenceLimitCount, setRecurrenceLimitCount] = useState(4)
   const router = useRouter()
+
+  const isRevenueBlock = BLOCK_TYPES.find(b => b.key === blockType)?.revenue ?? true
 
   // ── Helpers ──
   const fmt = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -72,6 +104,23 @@ export default function EscalaPage() {
     if (events.some(e => e.classificacao === 'folga')) return 'folga'
     if (events.some(e => e.classificacao === 'disponivel')) return 'disponivel'
     return 'plantao'
+  }
+
+  // Check if an event is a custom non-revenue block (not standard folga/disponivel)
+  const isCustomBlock = (p: PlantaoListItem) => {
+    const cls = p.classificacao || ''
+    return cls !== '' && cls !== 'folga' && cls !== 'disponivel' &&
+      !['Sala Verde', 'Sala Amarela', 'Sala Vermelha', 'Outro'].includes(cls) &&
+      p.valor === 0
+  }
+
+  // Get display label for an event
+  const getEventLabel = (p: PlantaoListItem) => {
+    if (isCustomBlock(p)) {
+      const label = BLOCK_TYPES.find(b => b.key === p.classificacao)?.label
+      return label || p.hospital || p.classificacao || 'Evento'
+    }
+    return p.hospital
   }
 
   // ── Actions ──
@@ -168,8 +217,21 @@ export default function EscalaPage() {
   const handleSavePlantao = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
-    if (!formData.hospital || !formData.data || !formData.valor) {
-      alert('Preencha hospital, data e valor.'); return
+
+    // Resolve the display label for this block
+    const blockLabel = blockType === 'personalizado'
+      ? customBlockName.trim() || 'Personalizado'
+      : BLOCK_TYPES.find(b => b.key === blockType)?.label || 'Plantão'
+
+    // Validation depends on block type
+    if (isRevenueBlock) {
+      if (!formData.hospital || !formData.data || !formData.valor) {
+        alert('Preencha hospital, data e valor.'); return
+      }
+    } else {
+      if (!formData.data) {
+        alert('Preencha a data.'); return
+      }
     }
 
     let prazoDias: number | null = formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null
@@ -190,15 +252,32 @@ export default function EscalaPage() {
         d.setDate(d.getDate() + prazoDias)
         dataPrevPgto = fmt(d)
       }
+
+      // Non-revenue blocks: override hospital/valor/horas, store color in especialidade
+      const hospitalName = isRevenueBlock
+        ? formData.hospital.trim()
+        : (blockLabel)
+      const valor = isRevenueBlock ? parseFloat(formData.valor) : 0
+      const horas = isRevenueBlock ? (formData.horas ? parseFloat(formData.horas) : 0) : 0
+
+      // Store block metadata: classificacao = block type key, especialidade = color key
+      // For revenue (plantao), keep original behavior
+      const classificacao = isRevenueBlock
+        ? (formData.classificacao || null)
+        : blockType === 'personalizado' ? customBlockName.trim() || 'personalizado' : blockType
+      const especialidade = isRevenueBlock
+        ? (formData.especialidade || null)
+        : blockColor
+
       return {
-        user_id: user.id, hospital: formData.hospital.trim(), data: dateStr,
-        valor: parseFloat(formData.valor), status: autoStatus,
-        horas: formData.horas ? parseFloat(formData.horas) : 0,
-        endereco: formData.endereco?.trim() || null,
-        data_prevista_pagamento: dataPrevPgto,
-        prazo_pagamento_dias: prazoDias,
-        classificacao: formData.classificacao || null,
-        especialidade: formData.especialidade || null
+        user_id: user.id, hospital: hospitalName, data: dateStr,
+        valor, status: autoStatus,
+        horas,
+        endereco: isRevenueBlock ? (formData.endereco?.trim() || null) : null,
+        data_prevista_pagamento: isRevenueBlock ? dataPrevPgto : null,
+        prazo_pagamento_dias: isRevenueBlock ? prazoDias : null,
+        classificacao,
+        especialidade
       }
     })
 
@@ -208,6 +287,9 @@ export default function EscalaPage() {
       if (error) { alert('Erro: ' + error.message); return }
       setShowPlantaoForm(false)
       setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '' })
+      setBlockType('plantao')
+      setBlockColor('emerald')
+      setCustomBlockName('')
       setRecurrenceEnabled(false)
       setRecurrenceLimitCount(4)
       setRecurrenceLimitDate('')
@@ -344,6 +426,7 @@ export default function EscalaPage() {
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />Plantão</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-gray-400" />Folga</span>
             <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400" />Disponível</span>
+            <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-indigo-500" />Personalizado</span>
           </div>
 
           {/* Calendar grid */}
@@ -410,11 +493,12 @@ export default function EscalaPage() {
                     <div className="md:hidden flex flex-wrap gap-[3px] items-center">
                       {dayType === 'folga' && <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />}
                       {dayType === 'disponivel' && <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />}
-                      {realPlantoes.slice(0, 3).map((p, i) => (
-                        <span key={p.id} className={`w-2.5 h-2.5 rounded-full ${
-                          i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-500' : 'bg-violet-500'
-                        }`} />
-                      ))}
+                      {realPlantoes.slice(0, 3).map((p) => {
+                        const color = isCustomBlock(p)
+                          ? getColorConfig(p.especialidade).dot
+                          : 'bg-emerald-500'
+                        return <span key={p.id} className={`w-2.5 h-2.5 rounded-full ${color}`} />
+                      })}
                       {realPlantoes.length > 3 && (
                         <span className="text-[8px] text-gray-400 font-bold">+{realPlantoes.length - 3}</span>
                       )}
@@ -434,20 +518,15 @@ export default function EscalaPage() {
                           <span className="truncate">Disponível</span>
                         </div>
                       )}
-                      {realPlantoes.slice(0, 3).map((p, i) => (
-                        <div key={p.id} className={`flex items-center gap-1 px-1.5 py-[3px] rounded-md text-[10px] font-medium leading-tight ${
-                          i === 0
-                            ? 'bg-emerald-50 border border-emerald-200/60 text-emerald-800'
-                            : i === 1
-                              ? 'bg-blue-50 border border-blue-200/60 text-blue-800'
-                              : 'bg-violet-50 border border-violet-200/60 text-violet-800'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-                            i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-500' : 'bg-violet-500'
-                          }`} />
-                          <span className="truncate">{p.hospital}</span>
-                        </div>
-                      ))}
+                      {realPlantoes.slice(0, 3).map((p) => {
+                        const cc = isCustomBlock(p) ? getColorConfig(p.especialidade) : getColorConfig('emerald')
+                        return (
+                          <div key={p.id} className={`flex items-center gap-1 px-1.5 py-[3px] rounded-md text-[10px] font-medium leading-tight ${cc.bg} border ${cc.border} ${cc.text}`}>
+                            <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cc.dot}`} />
+                            <span className="truncate">{getEventLabel(p)}</span>
+                          </div>
+                        )
+                      })}
                       {realPlantoes.length > 3 && (
                         <p className="text-[9px] text-gray-400 pl-1 leading-tight">+{realPlantoes.length - 3} mais</p>
                       )}
@@ -634,14 +713,51 @@ export default function EscalaPage() {
                 <div className="w-10 h-1 rounded-full bg-gray-300" />
               </div>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-lg font-bold text-gray-900">Novo Plantão</h3>
+                <h3 className="text-lg font-bold text-gray-900">Novo Evento</h3>
                 <button onClick={() => setShowPlantaoForm(false)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
 
               <form onSubmit={handleSavePlantao} className="space-y-4">
-                {/* Hospital */}
+                {/* ── Tipo de Bloco ── */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-2">Tipo de Evento</label>
+                  <div className="flex flex-wrap gap-2">
+                    {BLOCK_TYPES.map(bt => (
+                      <button key={bt.key} type="button" onClick={() => setBlockType(bt.key)}
+                        className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
+                          blockType === bt.key
+                            ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm'
+                            : 'border-gray-200 text-gray-600 hover:border-gray-300 active:bg-gray-100'
+                        }`}>
+                        {bt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {blockType === 'personalizado' && (
+                    <input type="text" value={customBlockName} onChange={(e) => setCustomBlockName(e.target.value)}
+                      className="mt-2 block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                      placeholder="Nome do evento (ex: Congresso, Consultório)" />
+                  )}
+                </div>
+
+                {/* ── Seletor de Cor ── */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-2">Cor do Evento</label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {BLOCK_COLORS.map(c => (
+                      <button key={c.key} type="button" onClick={() => setBlockColor(c.key)}
+                        className={`w-7 h-7 rounded-full ${c.dot} transition-all ${
+                          blockColor === c.key ? 'ring-2 ring-offset-2 ring-orange-400 scale-110' : 'opacity-60 hover:opacity-100 hover:scale-105'
+                        }`}
+                        title={c.label} />
+                    ))}
+                  </div>
+                </div>
+
+                {/* Hospital — only for revenue blocks */}
+                {isRevenueBlock && (
                 <div className="relative">
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Hospital/Local *</label>
                   <input type="text" name="hospital" value={formData.hospital} onChange={(e) => handleHospitalChange(e.target.value)}
@@ -657,22 +773,26 @@ export default function EscalaPage() {
                     </div>
                   )}
                 </div>
+                )}
 
                 {/* Date + Value row */}
-                <div className="grid grid-cols-2 gap-3">
+                <div className={`grid gap-3 ${isRevenueBlock ? 'grid-cols-2' : 'grid-cols-1'}`}>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Data *</label>
                     <input type="date" name="data" value={formData.data} onChange={handleInputChange}
                       className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" required />
                   </div>
+                  {isRevenueBlock && (
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Valor (R$) *</label>
                     <input type="number" name="valor" value={formData.valor} onChange={handleInputChange} step="0.01" min="0"
                       className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="0,00" required />
                   </div>
+                  )}
                 </div>
 
-                {/* Hours + Specialty */}
+                {/* Hours + Specialty — only for revenue */}
+                {isRevenueBlock && (
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Duração (h)</label>
@@ -690,8 +810,11 @@ export default function EscalaPage() {
                     </select>
                   </div>
                 </div>
+                )}
 
-                {/* CEP + Endereço */}
+                {/* CEP + Endereço — only for revenue */}
+                {isRevenueBlock && (
+                <>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">CEP</label>
                   <div className="flex gap-2">
@@ -743,6 +866,8 @@ export default function EscalaPage() {
                     <option value="Outro">Outro</option>
                   </select>
                 </div>
+                </>
+                )}
 
                 {/* ── Recorrência ── */}
                 <div className="border border-gray-200/60 rounded-xl p-4 space-y-3 bg-gray-50/50">
