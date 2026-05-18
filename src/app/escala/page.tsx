@@ -12,7 +12,7 @@ export default function EscalaPage() {
   const { user, loading } = useAuthGuard()
   const queryClient = useQueryClient()
 
-  const { data: plantoes = [] } = useQuery({
+  const { data: plantoes = [], isPending: isPlantoesPending } = useQuery({
     queryKey: user ? plantoesKeys.byUser(user.id) : ['plantoes', 'anon'],
     queryFn: () => fetchPlantoesByUser(user!.id),
     enabled: !!user,
@@ -268,6 +268,8 @@ export default function EscalaPage() {
     )
   }
 
+  const isDataLoading = loading || (!!user && isPlantoesPending)
+
   // ── Calendar rendering data ──
   const daysInMonth = getDaysInMonth(currentMonth)
   const firstDay = getFirstDayOfMonth(currentMonth)
@@ -348,15 +350,36 @@ export default function EscalaPage() {
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
             {/* Weekday headers */}
             <div className="grid grid-cols-7 border-b border-gray-100">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
-                <div key={d} className="py-3 text-center text-[11px] font-semibold text-gray-400 uppercase tracking-wider">{d}</div>
+              {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((d, i) => (
+                <div key={i} className="py-2.5 md:py-3 text-center text-[10px] md:text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+                  <span className="md:hidden">{d}</span>
+                  <span className="hidden md:inline">{['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][i]}</span>
+                </div>
               ))}
             </div>
 
             {/* Days */}
+            {isDataLoading ? (
+              <div className="grid grid-cols-7">
+                {Array.from({ length: 35 }).map((_, i) => (
+                  <div key={i} className="min-h-[56px] md:min-h-[110px] border-b border-r border-gray-50 p-1.5">
+                    <div className="animate-pulse">
+                      <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-gray-200 mb-1" />
+                      <div className="hidden md:block space-y-1">
+                        <div className="h-3 w-full rounded bg-gray-100" />
+                        <div className="h-3 w-3/4 rounded bg-gray-100" />
+                      </div>
+                      <div className="md:hidden flex gap-1 mt-1">
+                        <div className="w-2 h-2 rounded-full bg-gray-200" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
             <div className="grid grid-cols-7">
               {calendarDays.map((day, idx) => {
-                if (day === null) return <div key={`empty-${idx}`} className="min-h-[90px] md:min-h-[110px] border-b border-r border-gray-50 bg-gray-50/30" />
+                if (day === null) return <div key={`empty-${idx}`} className="min-h-[56px] md:min-h-[110px] border-b border-r border-gray-50 bg-gray-50/30" />
 
                 const events = getPlantoesForDay(day)
                 const dayType = getDayType(events)
@@ -368,23 +391,37 @@ export default function EscalaPage() {
                   <div
                     key={`day-${day}`}
                     onClick={() => handleDayClick(day)}
-                    className={`min-h-[90px] md:min-h-[110px] border-b border-r border-gray-50 p-1.5 cursor-pointer transition-all duration-150 hover:bg-orange-50/40 relative group ${
+                    className={`min-h-[56px] md:min-h-[110px] border-b border-r border-gray-50 p-1 md:p-1.5 cursor-pointer transition-all duration-150 hover:bg-orange-50/40 active:bg-orange-100/40 relative group ${
                       isToday ? 'bg-orange-50/60 ring-1 ring-inset ring-orange-200' : ''
                     } ${dayType === 'folga' ? 'bg-gray-50' : ''} ${dayType === 'disponivel' ? 'bg-amber-50/40' : ''}`}
                   >
                     {/* Day number */}
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${
+                    <div className="flex items-center justify-between mb-0.5 md:mb-1">
+                      <span className={`text-[11px] md:text-xs font-semibold w-5 h-5 md:w-6 md:h-6 flex items-center justify-center rounded-full ${
                         isToday ? 'bg-orange-500 text-white' : 'text-gray-700 group-hover:text-orange-600'
                       }`}>{day}</span>
-                      {/* Quick add indicator on hover */}
-                      <span className="opacity-0 group-hover:opacity-100 transition-opacity text-gray-300">
+                      {/* Quick add indicator on hover — hidden on mobile */}
+                      <span className="hidden md:block opacity-0 group-hover:opacity-100 transition-opacity text-gray-300">
                         <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       </span>
                     </div>
 
-                    {/* Events — stacked vertically for multi-plantão support */}
-                    <div className="flex flex-col gap-[3px] overflow-hidden max-h-[62px] md:max-h-[78px]">
+                    {/* Mobile: compact dot indicators */}
+                    <div className="md:hidden flex flex-wrap gap-[3px] items-center">
+                      {dayType === 'folga' && <span className="w-2.5 h-2.5 rounded-full bg-gray-400" />}
+                      {dayType === 'disponivel' && <span className="w-2.5 h-2.5 rounded-full bg-amber-400" />}
+                      {realPlantoes.slice(0, 3).map((p, i) => (
+                        <span key={p.id} className={`w-2.5 h-2.5 rounded-full ${
+                          i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-500' : 'bg-violet-500'
+                        }`} />
+                      ))}
+                      {realPlantoes.length > 3 && (
+                        <span className="text-[8px] text-gray-400 font-bold">+{realPlantoes.length - 3}</span>
+                      )}
+                    </div>
+
+                    {/* Desktop: full text badges */}
+                    <div className="hidden md:flex flex-col gap-[3px] overflow-hidden max-h-[78px]">
                       {dayType === 'folga' && (
                         <div className="flex items-center gap-1 px-1.5 py-[3px] rounded-md bg-gray-200/80 text-[10px] font-medium text-gray-500 leading-tight">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
@@ -419,13 +456,18 @@ export default function EscalaPage() {
                 )
               })}
             </div>
+            )}
           </div>
         </main>
 
-        {/* ── Action Modal (Day Click) ── */}
+        {/* ── Action Modal (Day Click) — Drawer on mobile ── */}
         {showActionModal && selectedDate && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setShowActionModal(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:px-4" onClick={() => setShowActionModal(false)}>
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl max-w-sm w-full p-6 pb-8 md:pb-6 border border-gray-200/60 animate-[slideUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+              {/* Drag handle for mobile */}
+              <div className="md:hidden flex justify-center mb-3">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
               <div className="flex items-center justify-between mb-5">
                 <div>
                   <h3 className="text-lg font-bold text-gray-900">
@@ -435,7 +477,7 @@ export default function EscalaPage() {
                     {selectedDate.toLocaleDateString('pt-BR', { weekday: 'long' })}
                   </p>
                 </div>
-                <button onClick={() => setShowActionModal(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                <button onClick={() => setShowActionModal(false)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -461,19 +503,19 @@ export default function EscalaPage() {
               })()}
 
               <div className="space-y-2">
-                <button onClick={handleOpenPlantaoForm} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 text-emerald-800 font-medium text-sm transition-colors">
-                  <span className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center text-white text-xs">🏥</span>
+                <button onClick={handleOpenPlantaoForm} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 active:bg-emerald-200 border border-emerald-200/60 text-emerald-800 font-medium text-sm transition-colors">
+                  <span className="w-9 h-9 rounded-lg bg-emerald-500 flex items-center justify-center text-white text-xs">🏥</span>
                   Adicionar Plantão
                 </button>
-                <button onClick={() => handleAddStatus('disponivel')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200/60 text-amber-800 font-medium text-sm transition-colors">
-                  <span className="w-8 h-8 rounded-lg bg-amber-400 flex items-center justify-center text-white text-xs">✓</span>
+                <button onClick={() => handleAddStatus('disponivel')} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-amber-50 hover:bg-amber-100 active:bg-amber-200 border border-amber-200/60 text-amber-800 font-medium text-sm transition-colors">
+                  <span className="w-9 h-9 rounded-lg bg-amber-400 flex items-center justify-center text-white text-xs">✓</span>
                   Marcar Disponível
                 </button>
-                <button onClick={() => handleAddStatus('folga')} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-200/60 text-gray-700 font-medium text-sm transition-colors">
-                  <span className="w-8 h-8 rounded-lg bg-gray-400 flex items-center justify-center text-white text-xs">☽</span>
+                <button onClick={() => handleAddStatus('folga')} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl bg-gray-50 hover:bg-gray-100 active:bg-gray-200 border border-gray-200/60 text-gray-700 font-medium text-sm transition-colors">
+                  <span className="w-9 h-9 rounded-lg bg-gray-400 flex items-center justify-center text-white text-xs">☽</span>
                   Marcar Folga
                 </button>
-                <button onClick={handleClearDay} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 border border-gray-200/60 text-red-600 font-medium text-sm transition-colors">
+                <button onClick={handleClearDay} className="w-full flex items-center gap-3 px-4 py-3.5 rounded-xl hover:bg-red-50 active:bg-red-100 border border-gray-200/60 text-red-600 font-medium text-sm transition-colors">
                   <span className="w-8 h-8 rounded-lg bg-red-100 flex items-center justify-center text-red-500 text-xs">
                     <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   </span>
@@ -484,10 +526,10 @@ export default function EscalaPage() {
           </div>
         )}
 
-        {/* ── Conflict Confirmation Modal ── */}
+        {/* ── Conflict Confirmation Modal — Drawer on mobile ── */}
         {conflictData && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setConflictData(null)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:px-4" onClick={() => setConflictData(null)}>
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl max-w-sm w-full p-6 pb-8 md:pb-6 border border-gray-200/60 animate-[slideUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0">
                   <svg className="h-5 w-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
@@ -531,10 +573,10 @@ export default function EscalaPage() {
           </div>
         )}
 
-        {/* ── Delete Confirmation Modal ── */}
+        {/* ── Delete Confirmation Modal — Drawer on mobile ── */}
         {showDeleteConfirm && selectedDate && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4" onClick={() => setShowDeleteConfirm(false)}>
-            <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:px-4" onClick={() => setShowDeleteConfirm(false)}>
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl max-w-sm w-full p-6 pb-8 md:pb-6 border border-gray-200/60 animate-[slideUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center flex-shrink-0">
                   <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -583,13 +625,17 @@ export default function EscalaPage() {
           </div>
         )}
 
-        {/* ── Plantão Form Modal ── */}
+        {/* ── Plantão Form Modal — Drawer on mobile ── */}
         {showPlantaoForm && (
-          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-gray-200/60 max-h-[90vh] overflow-y-auto">
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:px-4">
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl max-w-md w-full p-6 pb-8 md:pb-6 border border-gray-200/60 max-h-[92vh] md:max-h-[90vh] overflow-y-auto animate-[slideUp_0.25s_ease-out]">
+              {/* Drag handle for mobile */}
+              <div className="md:hidden flex justify-center mb-3">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-bold text-gray-900">Novo Plantão</h3>
-                <button onClick={() => setShowPlantaoForm(false)} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                <button onClick={() => setShowPlantaoForm(false)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>

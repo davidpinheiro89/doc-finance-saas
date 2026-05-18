@@ -1153,7 +1153,7 @@ export default function DashboardPage() {
 
               {/* Filter bar */}
               <div className="flex flex-wrap items-center gap-2">
-                {/* Status chips */}
+                {/* Status chips — larger touch targets on mobile */}
                 {([
                   { key: 'all', label: 'Todos' },
                   { key: 'pago', label: 'Pagos' },
@@ -1161,14 +1161,14 @@ export default function DashboardPage() {
                   { key: 'atrasado', label: 'Atrasados' },
                 ] as const).map(({ key, label }) => (
                   <button key={key} onClick={() => setHistoryStatusFilter(key)}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                    className={`px-3.5 py-2 md:px-3 md:py-1.5 text-xs font-medium rounded-lg border transition-all ${
                       historyStatusFilter === key
                         ? key === 'atrasado'
                           ? 'bg-red-50 border-red-300 text-red-700 shadow-sm'
                           : key === 'pago'
                             ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
                             : 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm'
-                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 active:bg-gray-100'
                     }`}>
                     {label}
                   </button>
@@ -1176,7 +1176,7 @@ export default function DashboardPage() {
 
                 {/* Hospital select */}
                 <select value={historyHospitalFilter} onChange={(e) => setHistoryHospitalFilter(e.target.value)}
-                  className="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 max-w-[200px] truncate">
+                  className="ml-auto px-3 py-2 md:py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 max-w-[180px] sm:max-w-[200px] truncate">
                   <option value="">Todos os hospitais</option>
                   {historyUniqueHospitals.map(h => <option key={h} value={h}>{h}</option>)}
                 </select>
@@ -1184,14 +1184,16 @@ export default function DashboardPage() {
                 {/* Clear filters */}
                 {(historyHospitalFilter || historyStatusFilter !== 'all') && (
                   <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
-                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar filtros">
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar filtros">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                   </button>
                 )}
               </div>
             </div>
 
-            {filteredHistoricalPlantoes.length === 0 ? (
+            {isPlantoesPending ? (
+              <div className="p-6"><SkeletonTableRows rows={5} cols={5} /></div>
+            ) : filteredHistoricalPlantoes.length === 0 ? (
               <div className="text-center py-12 px-6">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
                   <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
@@ -1238,23 +1240,23 @@ export default function DashboardPage() {
                             </span>
                           )})()}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex gap-1">
+                        <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-0.5">
                             {getSmartStatus(plantao) !== 'pago' && (
                               <button onClick={() => handleMarkAsPaid(plantao)} disabled={markingPaidId === plantao.id}
-                                className="p-1.5 rounded-lg hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 transition-colors disabled:opacity-40" title="Dar Baixa">
+                                className="p-2 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition-colors disabled:opacity-40" title="Dar Baixa">
                                 {markingPaidId === plantao.id
-                                  ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-emerald-500 border-t-transparent" />
-                                  : <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                  ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent" />
+                                  : <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 }
                               </button>
                             )}
-                            <button onClick={() => handleEditPlantao(plantao)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            <button onClick={() => handleEditPlantao(plantao)} className="p-2 rounded-lg hover:bg-orange-50 active:bg-orange-100 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
-                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
-                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-500 border-t-transparent" /> : (
-                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
+                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-red-500 border-t-transparent" /> : (
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                               )}
                             </button>
                           </div>
