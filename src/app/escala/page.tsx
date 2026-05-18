@@ -37,6 +37,13 @@ export default function EscalaPage() {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [conflictData, setConflictData] = useState<{ hospitals: string[]; dateStr: string } | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [savingPlantao, setSavingPlantao] = useState(false)
+  // Recurrence
+  const [recurrenceEnabled, setRecurrenceEnabled] = useState(false)
+  const [recurrenceFreq, setRecurrenceFreq] = useState<'weekly' | 'biweekly'>('weekly')
+  const [recurrenceLimitType, setRecurrenceLimitType] = useState<'date' | 'count'>('count')
+  const [recurrenceLimitDate, setRecurrenceLimitDate] = useState('')
+  const [recurrenceLimitCount, setRecurrenceLimitCount] = useState(4)
   const router = useRouter()
 
   // ── Helpers ──
@@ -131,34 +138,82 @@ export default function EscalaPage() {
     } catch { alert('Erro ao limpar. Tente novamente.') }
   }
 
+  const generateRecurrenceDates = (startDate: string): string[] => {
+    const dates: string[] = [startDate]
+    const intervalDays = recurrenceFreq === 'weekly' ? 7 : 14
+    const base = new Date(startDate + 'T00:00:00')
+
+    if (recurrenceLimitType === 'count') {
+      for (let i = 1; i < recurrenceLimitCount; i++) {
+        const next = new Date(base)
+        next.setDate(next.getDate() + intervalDays * i)
+        dates.push(fmt(next))
+      }
+    } else {
+      const limitDate = recurrenceLimitDate
+      let i = 1
+      while (true) {
+        const next = new Date(base)
+        next.setDate(next.getDate() + intervalDays * i)
+        const nextStr = fmt(next)
+        if (nextStr > limitDate) break
+        dates.push(nextStr)
+        i++
+        if (i > 52) break // safety limit
+      }
+    }
+    return dates
+  }
+
   const handleSavePlantao = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
     if (!formData.hospital || !formData.data || !formData.valor) {
       alert('Preencha hospital, data e valor.'); return
     }
-    const autoStatus = formData.data < todayStr ? 'realizado' : 'pendente'
+
     let prazoDias: number | null = formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null
     if (formData.data_prevista_pagamento && formData.data && !prazoDias) {
       const diff = Math.round((new Date(formData.data_prevista_pagamento + 'T00:00:00').getTime() - new Date(formData.data + 'T00:00:00').getTime()) / 86400000)
       prazoDias = diff > 0 ? diff : null
     }
-    try {
-      const { error } = await supabase.from('plantoes').insert([{
-        user_id: user.id, hospital: formData.hospital.trim(), data: formData.data,
+
+    // Generate dates (single or recurrence batch)
+    const dates = recurrenceEnabled ? generateRecurrenceDates(formData.data) : [formData.data]
+
+    const rows = dates.map(dateStr => {
+      const autoStatus = dateStr < todayStr ? 'realizado' : 'pendente'
+      // Recalculate data_prevista_pagamento relative to each date if prazoDias is set
+      let dataPrevPgto: string | null = formData.data_prevista_pagamento || null
+      if (prazoDias && dateStr !== formData.data) {
+        const d = new Date(dateStr + 'T00:00:00')
+        d.setDate(d.getDate() + prazoDias)
+        dataPrevPgto = fmt(d)
+      }
+      return {
+        user_id: user.id, hospital: formData.hospital.trim(), data: dateStr,
         valor: parseFloat(formData.valor), status: autoStatus,
         horas: formData.horas ? parseFloat(formData.horas) : 0,
         endereco: formData.endereco?.trim() || null,
-        data_prevista_pagamento: formData.data_prevista_pagamento || null,
+        data_prevista_pagamento: dataPrevPgto,
         prazo_pagamento_dias: prazoDias,
         classificacao: formData.classificacao || null,
         especialidade: formData.especialidade || null
-      }]).select()
+      }
+    })
+
+    setSavingPlantao(true)
+    try {
+      const { error } = await supabase.from('plantoes').insert(rows).select()
       if (error) { alert('Erro: ' + error.message); return }
       setShowPlantaoForm(false)
       setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '' })
+      setRecurrenceEnabled(false)
+      setRecurrenceLimitCount(4)
+      setRecurrenceLimitDate('')
       invalidatePlantoes()
     } catch { alert('Erro ao salvar plantão.') }
+    finally { setSavingPlantao(false) }
   }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -328,28 +383,36 @@ export default function EscalaPage() {
                       </span>
                     </div>
 
-                    {/* Events */}
-                    <div className="space-y-0.5 overflow-hidden">
+                    {/* Events — stacked vertically for multi-plantão support */}
+                    <div className="flex flex-col gap-[3px] overflow-hidden max-h-[62px] md:max-h-[78px]">
                       {dayType === 'folga' && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-200/80 text-[10px] font-medium text-gray-500">
+                        <div className="flex items-center gap-1 px-1.5 py-[3px] rounded-md bg-gray-200/80 text-[10px] font-medium text-gray-500 leading-tight">
                           <span className="w-1.5 h-1.5 rounded-full bg-gray-400 flex-shrink-0" />
                           <span className="truncate">Folga</span>
                         </div>
                       )}
                       {dayType === 'disponivel' && (
-                        <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100/80 text-[10px] font-medium text-amber-700">
+                        <div className="flex items-center gap-1 px-1.5 py-[3px] rounded-md bg-amber-100/80 text-[10px] font-medium text-amber-700 leading-tight">
                           <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
                           <span className="truncate">Disponível</span>
                         </div>
                       )}
-                      {realPlantoes.slice(0, 2).map(p => (
-                        <div key={p.id} className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-50 border border-emerald-100 text-[10px] font-medium text-emerald-800">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
+                      {realPlantoes.slice(0, 3).map((p, i) => (
+                        <div key={p.id} className={`flex items-center gap-1 px-1.5 py-[3px] rounded-md text-[10px] font-medium leading-tight ${
+                          i === 0
+                            ? 'bg-emerald-50 border border-emerald-200/60 text-emerald-800'
+                            : i === 1
+                              ? 'bg-blue-50 border border-blue-200/60 text-blue-800'
+                              : 'bg-violet-50 border border-violet-200/60 text-violet-800'
+                        }`}>
+                          <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
+                            i === 0 ? 'bg-emerald-500' : i === 1 ? 'bg-blue-500' : 'bg-violet-500'
+                          }`} />
                           <span className="truncate">{p.hospital}</span>
                         </div>
                       ))}
-                      {realPlantoes.length > 2 && (
-                        <p className="text-[9px] text-gray-400 pl-1">+{realPlantoes.length - 2} mais</p>
+                      {realPlantoes.length > 3 && (
+                        <p className="text-[9px] text-gray-400 pl-1 leading-tight">+{realPlantoes.length - 3} mais</p>
                       )}
                     </div>
                   </div>
@@ -635,15 +698,111 @@ export default function EscalaPage() {
                   </select>
                 </div>
 
+                {/* ── Recorrência ── */}
+                <div className="border border-gray-200/60 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">Repetir este plantão</p>
+                      <p className="text-[10px] text-gray-400">Cadastre em lote para o mês</p>
+                    </div>
+                    <button type="button" onClick={() => setRecurrenceEnabled(!recurrenceEnabled)}
+                      className={`relative w-11 h-6 rounded-full transition-colors duration-200 ${recurrenceEnabled ? 'bg-orange-500' : 'bg-gray-300'}`}>
+                      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform duration-200 ${recurrenceEnabled ? 'translate-x-5' : ''}`} />
+                    </button>
+                  </div>
+
+                  {recurrenceEnabled && (
+                    <div className="space-y-3 pt-1">
+                      {/* Frequency */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Frequência</label>
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setRecurrenceFreq('weekly')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                              recurrenceFreq === 'weekly' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                            }`}>
+                            Semanalmente
+                          </button>
+                          <button type="button" onClick={() => setRecurrenceFreq('biweekly')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                              recurrenceFreq === 'biweekly' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                            }`}>
+                            Quinzenalmente
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Limit type */}
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1.5">Limite de repetição</label>
+                        <div className="flex gap-2 mb-2">
+                          <button type="button" onClick={() => setRecurrenceLimitType('count')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                              recurrenceLimitType === 'count' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                            }`}>
+                            Nº de semanas
+                          </button>
+                          <button type="button" onClick={() => setRecurrenceLimitType('date')}
+                            className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                              recurrenceLimitType === 'date' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                            }`}>
+                            Até uma data
+                          </button>
+                        </div>
+
+                        {recurrenceLimitType === 'count' ? (
+                          <div className="flex items-center gap-2">
+                            <input type="number" min={2} max={26} value={recurrenceLimitCount}
+                              onChange={(e) => setRecurrenceLimitCount(Math.max(2, Math.min(26, Number(e.target.value))))}
+                              className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                            <span className="text-xs text-gray-500">ocorrências ({recurrenceFreq === 'weekly' ? 'semanas' : 'quinzenas'})</span>
+                          </div>
+                        ) : (
+                          <input type="date" value={recurrenceLimitDate}
+                            onChange={(e) => setRecurrenceLimitDate(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                        )}
+                      </div>
+
+                      {/* Preview of dates */}
+                      {formData.data && (
+                        <div className="bg-white rounded-lg border border-gray-200/60 p-3">
+                          <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1.5">Datas que serão criadas:</p>
+                          <div className="flex flex-wrap gap-1.5">
+                            {generateRecurrenceDates(formData.data).slice(0, 8).map((d, i) => (
+                              <span key={d} className={`px-2 py-0.5 text-[10px] font-medium rounded-md ${
+                                i === 0 ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-600'
+                              }`}>
+                                {d.split('-').reverse().join('/')}
+                              </span>
+                            ))}
+                            {generateRecurrenceDates(formData.data).length > 8 && (
+                              <span className="px-2 py-0.5 text-[10px] text-gray-400">+{generateRecurrenceDates(formData.data).length - 8} mais</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
                 {/* Actions */}
                 <div className="flex gap-3 pt-2">
                   <button type="button" onClick={() => setShowPlantaoForm(false)}
                     className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-colors">
                     Cancelar
                   </button>
-                  <button type="submit"
-                    className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all">
-                    Salvar Plantão
+                  <button type="submit" disabled={savingPlantao}
+                    className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all disabled:opacity-60 disabled:cursor-not-allowed">
+                    {savingPlantao ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
+                        Salvando...
+                      </span>
+                    ) : recurrenceEnabled
+                      ? `Salvar ${generateRecurrenceDates(formData.data || todayStr).length} Plantões`
+                      : 'Salvar Plantão'
+                    }
                   </button>
                 </div>
               </form>
