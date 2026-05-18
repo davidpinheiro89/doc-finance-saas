@@ -5,6 +5,8 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
 import { SkeletonMetricCard, SkeletonTableRows } from '@/components/Skeleton'
+import DashboardAlerts from '@/components/DashboardAlerts'
+import NotificationPermission from '@/components/NotificationPermission'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -1016,6 +1018,14 @@ export default function DashboardPage() {
                 </div>
               </div>
             </>
+          )}
+
+          {/* ── Central de Alertas ── */}
+          {!isPlantoesPending && (
+            <div className="space-y-3">
+              <DashboardAlerts plantoes={plantoes} getSmartStatus={getSmartStatus} isLoading={isPlantoesPending} />
+              <NotificationPermission />
+            </div>
           )}
 
           {/* ── Plantões de Hoje ── */}
