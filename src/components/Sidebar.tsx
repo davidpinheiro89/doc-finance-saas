@@ -33,6 +33,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
     { name: 'Escala', href: '/escala', icon: '🗓️' },
     { name: 'Financeiro', href: '/financeiro', icon: '💰' },
     { name: 'Imposto de Renda', href: '/ir', icon: '📄' },
+    { name: 'Meus Documentos', href: '/documentos', icon: '🛡️' },
   ]
 
   const sidebarContent = (

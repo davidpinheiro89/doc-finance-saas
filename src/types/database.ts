@@ -90,6 +90,41 @@ export type DespesaInsert = Omit<Despesa, 'id' | 'created_at' | 'updated_at'> &
 
 export type DespesaUpdate = Partial<Omit<Despesa, 'id' | 'user_id' | 'created_at'>>
 
+/** Categorias de documentos profissionais na wallet digital. */
+export type CategoriaDocumento =
+  | 'crm'
+  | 'diploma'
+  | 'residencia'
+  | 'rg'
+  | 'cpf'
+  | 'pis'
+  | 'titulo_especialista'
+  | 'comprovante_endereco'
+  | 'certidao_negativa'
+  | 'alvara'
+  | 'outro'
+
+/** Documento — linha da tabela `public.documentos`. */
+export interface Documento {
+  id: string
+  user_id: string
+  nome: string
+  categoria: CategoriaDocumento | string
+  arquivo_url: string | null
+  arquivo_nome: string | null
+  arquivo_tipo: string | null          // MIME type
+  arquivo_tamanho: number | null       // bytes
+  validade: string | null              // ISO YYYY-MM-DD, null = sem validade
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type DocumentoInsert = Omit<Documento, 'id' | 'created_at' | 'updated_at'> &
+  Partial<Pick<Documento, 'id' | 'created_at' | 'updated_at'>>
+
+export type DocumentoUpdate = Partial<Omit<Documento, 'id' | 'user_id' | 'created_at'>>
+
 /** Local favorito — linha da tabela `public.locais_favoritos`. */
 export interface LocalFavorito {
   id: string
