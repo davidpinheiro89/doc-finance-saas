@@ -73,6 +73,10 @@ export default function DashboardPage() {
   const [metaMensal, setMetaMensal] = useState<number>(30000)
   const [metaSaving, setMetaSaving] = useState(false)
   const [metaSaved, setMetaSaved] = useState(false)
+  // History filters
+  const [historyHospitalFilter, setHistoryHospitalFilter] = useState('')
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'pago' | 'aguardando' | 'atrasado'>('all')
+  const [historyShowAll, setHistoryShowAll] = useState(false)
   const metaSavedTimeout = useRef<NodeJS.Timeout | null>(null)
 
   // --- TanStack Query: lista principal de plantões do usuário ---
@@ -721,6 +725,57 @@ export default function DashboardPage() {
     p.status === 'pendente' || p.status === 'confirmado'
   ).length
 
+  // ── History filter logic ──
+  const historyUniqueHospitals = useMemo(() => {
+    const set = new Set(historicalPlantoes.map(p => p.hospital).filter(Boolean))
+    return Array.from(set).sort()
+  }, [historicalPlantoes])
+
+  const filteredHistoricalPlantoes = useMemo(() => {
+    return historicalPlantoes.filter(p => {
+      if (historyHospitalFilter && p.hospital !== historyHospitalFilter) return false
+      if (historyStatusFilter !== 'all') {
+        const smart = getSmartStatus(p)
+        if (historyStatusFilter === 'pago' && smart !== 'pago') return false
+        if (historyStatusFilter === 'aguardando' && smart !== 'realizado' && smart !== 'pendente' && smart !== 'confirmado') return false
+        if (historyStatusFilter === 'atrasado' && smart !== 'atrasado') return false
+      }
+      return true
+    })
+  }, [historicalPlantoes, historyHospitalFilter, historyStatusFilter])
+
+  // ── Export CSV ──
+  const handleExportCSV = () => {
+    const rows = filteredHistoricalPlantoes.map(p => {
+      const bruto = p.valor || 0
+      const retencao = bruto * 0.25
+      const liquido = bruto - retencao
+      return {
+        'Data': (p.data || '').split('T')[0].split('-').reverse().join('/'),
+        'Hospital': p.hospital || '',
+        'Carga Horária (h)': p.horas || 0,
+        'Valor Bruto (R$)': bruto.toFixed(2).replace('.', ','),
+        'Retenção Estimada (R$)': retencao.toFixed(2).replace('.', ','),
+        'Valor Líquido (R$)': liquido.toFixed(2).replace('.', ','),
+        'Status': getStatusLabel(getSmartStatus(p)),
+      }
+    })
+    if (rows.length === 0) { alert('Nenhum plantão para exportar com os filtros atuais.'); return }
+    const headers = Object.keys(rows[0])
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(r => headers.map(h => `"${r[h as keyof typeof r]}"`).join(';'))
+    ].join('\n')
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `plantoes_relatorio_${todayStr}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -1069,24 +1124,85 @@ export default function DashboardPage() {
 
           {/* ── Histórico ── */}
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
-            <div className="p-6 pb-0">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                  <svg className="h-4.5 w-4.5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            <div className="p-6 pb-4">
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {filteredHistoricalPlantoes.length === historicalPlantoes.length
+                        ? `${historicalPlantoes.length} plantão(ões)`
+                        : `${filteredHistoricalPlantoes.length} de ${historicalPlantoes.length} plantão(ões)`
+                      }
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
-                  <p className="text-xs text-gray-500 mt-0.5">{historicalPlantoes.length} plantão(ões) realizado(s)</p>
-                </div>
+                {/* Export button */}
+                <button onClick={handleExportCSV}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all group">
+                  <svg className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
+              </div>
+
+              {/* Filter bar */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status chips */}
+                {([
+                  { key: 'all', label: 'Todos' },
+                  { key: 'pago', label: 'Pagos' },
+                  { key: 'aguardando', label: 'Aguardando' },
+                  { key: 'atrasado', label: 'Atrasados' },
+                ] as const).map(({ key, label }) => (
+                  <button key={key} onClick={() => setHistoryStatusFilter(key)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      historyStatusFilter === key
+                        ? key === 'atrasado'
+                          ? 'bg-red-50 border-red-300 text-red-700 shadow-sm'
+                          : key === 'pago'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
+                            : 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+
+                {/* Hospital select */}
+                <select value={historyHospitalFilter} onChange={(e) => setHistoryHospitalFilter(e.target.value)}
+                  className="ml-auto px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 max-w-[200px] truncate">
+                  <option value="">Todos os hospitais</option>
+                  {historyUniqueHospitals.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+
+                {/* Clear filters */}
+                {(historyHospitalFilter || historyStatusFilter !== 'all') && (
+                  <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
+                    className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar filtros">
+                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
               </div>
             </div>
 
-            {historicalPlantoes.length === 0 ? (
+            {filteredHistoricalPlantoes.length === 0 ? (
               <div className="text-center py-12 px-6">
                 <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
                   <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <p className="text-gray-500 font-medium">Nenhum plantão realizado ainda</p>
+                <p className="text-gray-500 font-medium">
+                  {historicalPlantoes.length === 0 ? 'Nenhum plantão realizado ainda' : 'Nenhum plantão encontrado com esses filtros'}
+                </p>
+                {historicalPlantoes.length > 0 && (
+                  <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
+                    className="text-xs text-orange-600 hover:text-orange-700 font-medium mt-2 transition-colors">Limpar filtros</button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1099,8 +1215,10 @@ export default function DashboardPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {historicalPlantoes.slice(0, 10).map((plantao, idx) => (
-                      <tr key={plantao.id} className={`hover:bg-gray-50/60 transition-colors ${idx !== Math.min(historicalPlantoes.length, 10) - 1 ? 'border-b border-gray-50' : ''}`}>
+                    {(historyShowAll ? filteredHistoricalPlantoes : filteredHistoricalPlantoes.slice(0, 10)).map((plantao, idx) => {
+                      const visibleCount = historyShowAll ? filteredHistoricalPlantoes.length : Math.min(filteredHistoricalPlantoes.length, 10)
+                      return (
+                      <tr key={plantao.id} className={`hover:bg-gray-50/60 transition-colors ${idx !== visibleCount - 1 ? 'border-b border-gray-50' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-600">{formatDate(plantao.data)}</span>
                           {plantao.horas && <span className="block text-[10px] text-gray-400">{plantao.horas}h</span>}
@@ -1142,13 +1260,13 @@ export default function DashboardPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                    )})}
                   </tbody>
                 </table>
-                {historicalPlantoes.length > 10 && (
+                {filteredHistoricalPlantoes.length > 10 && (
                   <div className="text-center py-3 border-t border-gray-50">
-                    <button onClick={() => router.push('/plantoes-realizados')} className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">
-                      Ver todos os {historicalPlantoes.length} plantões →
+                    <button onClick={() => setHistoryShowAll(!historyShowAll)} className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">
+                      {historyShowAll ? 'Mostrar menos' : `Ver todos os ${filteredHistoricalPlantoes.length} plantões →`}
                     </button>
                   </div>
                 )}
