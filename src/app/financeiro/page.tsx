@@ -180,22 +180,39 @@ export default function FinanceiroPage() {
   }
 
   const handleEditExpense = (despesa: Despesa) => {
-    setEditingExpense(despesa)
+    setEditingExpense({
+      ...despesa,
+      data: (despesa.data || '').split('T')[0],
+    })
     setShowEditExpense(true)
   }
 
   const handleUpdateExpense = async () => {
     if (!editingExpense) return
 
+    if (!editingExpense.descricao || !editingExpense.valor || !editingExpense.data) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    const valorNum = typeof editingExpense.valor === 'string'
+      ? parseFloat(editingExpense.valor as unknown as string)
+      : editingExpense.valor
+
+    if (isNaN(valorNum) || valorNum <= 0) {
+      alert('Informe um valor válido')
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('despesas')
         .update({
-          descricao: editingExpense.descricao,
-          valor: editingExpense.valor,
+          descricao: editingExpense.descricao.trim(),
+          valor: valorNum,
           data: editingExpense.data,
           categoria: editingExpense.categoria,
-          recorrente: editingExpense.recorrente
+          recorrente: editingExpense.recorrente ?? false
         })
         .eq('id', editingExpense.id)
         .eq('user_id', user!.id)
@@ -903,7 +920,7 @@ export default function FinanceiroPage() {
                       type="number"
                       step="0.01"
                       value={editingExpense.valor}
-                      onChange={(e) => setEditingExpense({...editingExpense, valor: parseFloat(e.target.value)})}
+                      onChange={(e) => setEditingExpense({...editingExpense, valor: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0})}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
@@ -996,7 +1013,7 @@ export default function FinanceiroPage() {
                     Cancelar
                   </button>
                   <button
-                    onClick={handleAddExpense}
+                    onClick={handleUpdateExpense}
                     className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                   >
                     Salvar Despesa
