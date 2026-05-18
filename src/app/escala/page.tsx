@@ -69,6 +69,7 @@ export default function EscalaPage() {
   const [blockColor, setBlockColor] = useState<BlockColorKey>('emerald')
   const [customBlockName, setCustomBlockName] = useState('')
   // "Passar Plantão" share
+  const [editingId, setEditingId] = useState<string | null>(null)
   const [shareTarget, setShareTarget] = useState<PlantaoListItem | null>(null)
   const [shareShowValor, setShareShowValor] = useState(false)
   const [shareNota, setShareNota] = useState('')
@@ -287,9 +288,17 @@ export default function EscalaPage() {
 
     setSavingPlantao(true)
     try {
-      const { error } = await supabase.from('plantoes').insert(rows).select()
-      if (error) { alert('Erro: ' + error.message); return }
+      if (editingId) {
+        // Update existing record
+        const row = rows[0]
+        const { error } = await supabase.from('plantoes').update(row).eq('id', editingId).eq('user_id', user.id)
+        if (error) { alert('Erro: ' + error.message); return }
+      } else {
+        const { error } = await supabase.from('plantoes').insert(rows).select()
+        if (error) { alert('Erro: ' + error.message); return }
+      }
       setShowPlantaoForm(false)
+      setEditingId(null)
       setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '' })
       setBlockType('plantao')
       setBlockColor('emerald')
@@ -300,6 +309,34 @@ export default function EscalaPage() {
       invalidatePlantoes()
     } catch { alert('Erro ao salvar plantão.') }
     finally { setSavingPlantao(false) }
+  }
+
+  const handleEditShift = (p: PlantaoListItem) => {
+    const isCustom = isCustomBlock(p)
+    setEditingId(p.id)
+    setFormData({
+      hospital: isCustom ? '' : p.hospital,
+      data: (p.data || '').split('T')[0],
+      valor: p.valor > 0 ? String(p.valor) : '',
+      status: p.status || 'pendente',
+      horas: p.horas ? String(p.horas) : '',
+      endereco: p.endereco || '',
+      cep: '',
+      data_prevista_pagamento: p.data_prevista_pagamento || '',
+      prazo_pagamento_dias: p.prazo_pagamento_dias ? String(p.prazo_pagamento_dias) : '',
+      classificacao: isCustom ? '' : (p.classificacao || ''),
+      especialidade: isCustom ? '' : (p.especialidade || ''),
+    })
+    // Determine block type
+    const matchedBlock = BLOCK_TYPES.find(b => b.key === p.classificacao)
+    setBlockType(matchedBlock ? matchedBlock.key : (p.valor > 0 ? 'plantao' : 'plantao'))
+    // Determine block color
+    const matchedColor = BLOCK_COLORS.find(c => c.key === p.especialidade)
+    setBlockColor(matchedColor ? matchedColor.key : 'emerald')
+    setCustomBlockName(isCustom && !matchedBlock ? (p.classificacao || '') : '')
+    setRecurrenceEnabled(false)
+    setShowActionModal(false)
+    setShowPlantaoForm(true)
   }
 
   const handleOpenPassarPlantao = (p: PlantaoListItem) => {
@@ -612,14 +649,21 @@ export default function EscalaPage() {
                           </div>
                           <p className="text-sm font-bold text-emerald-600 ml-2">{formatCurrency(p.valor)}</p>
                         </div>
-                        {/* Passar Plantão button */}
-                        {p.valor > 0 && (
-                          <button onClick={() => handleOpenPassarPlantao(p)}
-                            className="mt-2 w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold text-emerald-700 bg-white/80 hover:bg-white border border-emerald-200/60 rounded-lg transition-all active:scale-[0.98]">
-                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-                            Passar Plantão
+                        {/* Action buttons */}
+                        <div className="mt-2 flex gap-2">
+                          <button onClick={() => handleEditShift(p)}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-sky-700 bg-white/80 hover:bg-sky-50 border border-sky-200/60 rounded-lg transition-all active:scale-[0.98]">
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            Editar
                           </button>
-                        )}
+                          {p.valor > 0 && (
+                            <button onClick={() => handleOpenPassarPlantao(p)}
+                              className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-emerald-700 bg-white/80 hover:bg-emerald-50 border border-emerald-200/60 rounded-lg transition-all active:scale-[0.98]">
+                              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                              Passar
+                            </button>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -759,8 +803,8 @@ export default function EscalaPage() {
                 <div className="w-10 h-1 rounded-full bg-gray-300" />
               </div>
               <div className="flex items-center justify-between mb-5">
-                <h3 className="text-lg font-bold text-gray-900">Novo Evento</h3>
-                <button onClick={() => setShowPlantaoForm(false)} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
+                <h3 className="text-lg font-bold text-gray-900">{editingId ? 'Editar Plantão' : 'Novo Evento'}</h3>
+                <button onClick={() => { setShowPlantaoForm(false); setEditingId(null) }} className="p-2.5 rounded-xl hover:bg-gray-100 text-gray-400 transition-colors">
                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
@@ -1016,9 +1060,11 @@ export default function EscalaPage() {
                         <span className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
                         Salvando...
                       </span>
-                    ) : recurrenceEnabled
-                      ? `Salvar ${generateRecurrenceDates(formData.data || todayStr).length} Plantões`
-                      : 'Salvar Plantão'
+                    ) : editingId
+                      ? 'Atualizar Plantão'
+                      : recurrenceEnabled
+                        ? `Salvar ${generateRecurrenceDates(formData.data || todayStr).length} Plantões`
+                        : 'Salvar Plantão'
                     }
                   </button>
                 </div>
