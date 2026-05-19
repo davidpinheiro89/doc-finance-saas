@@ -1013,9 +1013,28 @@ export default function EscalaPage() {
 
                         {recurrenceLimitType === 'count' ? (
                           <div className="flex items-center gap-2">
-                            <input type="number" min={2} max={26} value={recurrenceLimitCount}
-                              onChange={(e) => setRecurrenceLimitCount(Math.max(2, Math.min(26, Number(e.target.value))))}
-                              className="w-20 px-3 py-2 border border-gray-200 rounded-xl text-sm text-center focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                            <div className="flex items-center">
+                              <button type="button"
+                                onClick={() => setRecurrenceLimitCount(prev => Math.max(2, prev - 1))}
+                                className="w-9 h-9 flex items-center justify-center rounded-l-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-gray-600 font-bold text-lg transition-colors select-none">
+                                −
+                              </button>
+                              <input type="text" inputMode="numeric" pattern="[0-9]*"
+                                value={recurrenceLimitCount === 0 ? '' : recurrenceLimitCount}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/\D/g, '')
+                                  if (raw === '') { setRecurrenceLimitCount(0 as any); return }
+                                  const n = parseInt(raw, 10)
+                                  setRecurrenceLimitCount(Math.min(26, n))
+                                }}
+                                onBlur={() => { if (!recurrenceLimitCount || recurrenceLimitCount < 2) setRecurrenceLimitCount(2) }}
+                                className="w-12 h-9 border-y border-gray-200 text-sm text-center font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:z-10" />
+                              <button type="button"
+                                onClick={() => setRecurrenceLimitCount(prev => Math.min(26, (prev || 2) + 1))}
+                                className="w-9 h-9 flex items-center justify-center rounded-r-xl border border-gray-200 bg-gray-50 hover:bg-gray-100 active:bg-gray-200 text-gray-600 font-bold text-lg transition-colors select-none">
+                                +
+                              </button>
+                            </div>
                             <span className="text-xs text-gray-500">ocorrências ({recurrenceFreq === 'weekly' ? 'semanas' : 'quinzenas'})</span>
                           </div>
                         ) : (
