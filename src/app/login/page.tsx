@@ -92,6 +92,11 @@ export default function LoginPage() {
                   required
                 />
               </div>
+              <div className="mt-1.5 text-right">
+                <a href="/recuperar-senha" className="text-xs text-orange-500 hover:text-orange-600 font-medium">
+                  Esqueci minha senha
+                </a>
+              </div>
             </div>
 
             {/* Error Message */}
