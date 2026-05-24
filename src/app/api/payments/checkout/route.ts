@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
-const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL || 'https://sandbox.asaas.com/api/v3'
-const ASAAS_API_KEY = process.env.ASAAS_API_KEY!
+export const dynamic = 'force-dynamic'
 
 /**
  * POST /api/payments/checkout
@@ -20,10 +19,13 @@ const ASAAS_API_KEY = process.env.ASAAS_API_KEY!
  */
 export async function POST(request: NextRequest) {
   try {
+    const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
+    const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
+
     // ── 1. Autenticação via Supabase JWT ──
     const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
       {
         cookies: {
           get(name: string) {
@@ -114,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 4. Salvar dados no user_metadata do Supabase ──
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
+    const { error: updateError } = await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
       user_metadata: {
         ...user.user_metadata,
         asaas_customer_id: customerId,
