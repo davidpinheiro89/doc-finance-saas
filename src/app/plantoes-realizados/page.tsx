@@ -95,6 +95,7 @@ export default function PlantoesRealizadosPage() {
     return pastPlantoes
   }
 
+  // Folgas são filtradas via isFolga() — seção separada abaixo da tabela
   const allPastPlantoes = getPastPlantoes()
   const filteredPlantoes = allPastPlantoes.filter(p => !isFolga(p))
   const folgasNoPeriodo = allPastPlantoes.filter(p => isFolga(p))
