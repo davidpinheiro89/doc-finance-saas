@@ -1,31 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { supabaseClient as supabase } from '@/lib/supabase-client'
+import { useState } from 'react'
 
 export default function LandingPage() {
-  const router = useRouter()
-  const [checking, setChecking] = useState(true)
   const [faqOpen, setFaqOpen] = useState<number | null>(null)
-
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user?.user_metadata?.subscription_status === 'active') {
-        router.replace('/dashboard')
-      } else {
-        setChecking(false)
-      }
-    })
-  }, [router])
-
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-[#F8F8F8] flex items-center justify-center">
-        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-orange-500" />
-      </div>
-    )
-  }
 
   const problems = [
     { icon: '📋', text: 'Anota plantões em caderninho ou planilha?' },
