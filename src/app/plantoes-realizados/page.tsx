@@ -428,7 +428,7 @@ export default function PlantoesRealizadosPage() {
                   <tbody className="bg-white divide-y divide-gray-200">
                     {filteredPlantoes.map((plantao) => {
                       const status = getSmartStatus(plantao)
-                      const canMarkPaid = plantao.status !== 'pago'
+                      const canMarkPaid = plantao.status !== 'pago' && (status.label === 'Aguardando' || status.label === 'Vence em breve')
                       return (
                         <tr key={plantao.id} className={`hover:bg-gray-50/80 transition-colors ${isOverdue(plantao) ? 'bg-red-50/30' : ''}`}>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
