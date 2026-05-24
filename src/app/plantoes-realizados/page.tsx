@@ -15,6 +15,7 @@ export default function PlantoesRealizadosPage() {
     end: ''
   })
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null)
+  const [showFolgas, setShowFolgas] = useState(false)
 
   useEffect(() => {
     if (user) fetchPlantoes(user.id)
@@ -94,13 +95,22 @@ export default function PlantoesRealizadosPage() {
     return pastPlantoes
   }
 
-  const filteredPlantoes = getPastPlantoes()
+  const isFolga = (p: Plantao) => {
+    const cls = (p.classificacao || '').toLowerCase()
+    const name = (p.hospital || '').toLowerCase()
+    return cls === 'folga' || cls === 'disponivel' || name === 'folga' || name === 'disponível' || name === 'disponivel' || ((p.valor || 0) === 0 && (p.horas || 0) === 0)
+  }
 
-  // Calculate metrics
+  const allPastPlantoes = getPastPlantoes()
+  const filteredPlantoes = showFolgas ? allPastPlantoes : allPastPlantoes.filter(p => !isFolga(p))
+  const folhasCount = allPastPlantoes.filter(p => isFolga(p)).length
+
+  // Calculate metrics (always exclude folgas for accurate totals)
+  const remunerados = allPastPlantoes.filter(p => !isFolga(p))
   const metrics = {
-    quantidade: filteredPlantoes.length,
-    valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
+    quantidade: remunerados.length,
+    valorTotal: remunerados.reduce((sum, p) => sum + (p.valor || 0), 0),
+    cargaHoraria: remunerados.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
 
   const formatCurrency = (value: number) => {
@@ -273,6 +283,20 @@ export default function PlantoesRealizadosPage() {
                 </button>
               </div>
             </div>
+            {/* Toggle Folgas */}
+            {folhasCount > 0 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                <span className="text-sm text-gray-600">
+                  Exibir folgas e dias sem remuneração <span className="text-gray-400">({folhasCount})</span>
+                </span>
+                <button
+                  onClick={() => setShowFolgas(!showFolgas)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${showFolgas ? 'bg-orange-500' : 'bg-gray-300'}`}
+                >
+                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${showFolgas ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Cards de Resumo */}
