@@ -43,6 +43,7 @@ export default function LoginPage() {
             <span className="text-orange-500">BEM</span>
             <span className="text-slate-700"> plantonista</span>
           </h1>
+          <p className="text-sm text-gray-500 mt-2">Gestão financeira e de escalas para médicos plantonistas.</p>
         </div>
 
         {/* Login Card */}
