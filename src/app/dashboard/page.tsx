@@ -365,10 +365,15 @@ export default function DashboardPage() {
       .reduce((s, p) => s + (p.valor || 0), 0)
     const progressoMeta = metaMensal > 0 ? Math.min((faturamentoMes / metaMensal) * 100, 100) : 0
 
-    // Ranking de hospitais por valor/hora
+    // Ranking de hospitais por valor/hora (exclui folgas e registros sem valor)
     const hospitalMap: Record<string, { valor: number; horas: number; count: number }> = {}
     filtered.forEach((p) => {
       if (!p.hospital) return
+      if ((p.valor || 0) <= 0) return
+      const cls = (p.classificacao || '').toLowerCase()
+      if (cls === 'folga' || cls === 'disponivel') return
+      const name = p.hospital.toLowerCase()
+      if (name === 'folga' || name === 'disponível' || name === 'disponivel') return
       if (!hospitalMap[p.hospital]) hospitalMap[p.hospital] = { valor: 0, horas: 0, count: 0 }
       hospitalMap[p.hospital].valor += p.valor || 0
       hospitalMap[p.hospital].horas += p.horas || 0
@@ -376,6 +381,7 @@ export default function DashboardPage() {
     })
     const hospitalRanking = Object.entries(hospitalMap)
       .map(([name, d]) => ({ name, valorHora: d.horas > 0 ? d.valor / d.horas : 0, total: d.valor, count: d.count }))
+      .filter(h => h.valorHora > 0)
       .sort((a, b) => b.valorHora - a.valorHora)
       .slice(0, 5)
 
