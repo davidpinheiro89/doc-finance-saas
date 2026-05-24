@@ -459,7 +459,7 @@ export default function EscalaPage() {
                   <p className="text-xs text-gray-500 hidden sm:block">Calendário mensal interativo</p>
                 </div>
               </div>
-              {/* Month stats */}
+              {/* Month stats — desktop (inline no header) */}
               <div className="hidden sm:flex items-center gap-4">
                 <div className="text-right">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wider">Plantões</p>
@@ -475,6 +475,21 @@ export default function EscalaPage() {
                   <p className="text-[10px] text-gray-400 uppercase tracking-wider">Horas</p>
                   <p className="text-sm font-bold text-gray-800">{monthHours}h</p>
                 </div>
+              </div>
+            </div>
+            {/* Month stats — mobile (below title, always visible) */}
+            <div className="sm:hidden flex items-center justify-between gap-2 mt-2 px-1">
+              <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Plantões</p>
+                <p className="text-sm font-bold text-gray-800">{monthPlantoes.length}</p>
+              </div>
+              <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Faturamento</p>
+                <p className="text-sm font-bold text-emerald-600">{formatCurrency(monthRevenue)}</p>
+              </div>
+              <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Horas</p>
+                <p className="text-sm font-bold text-gray-800">{monthHours}h</p>
               </div>
             </div>
           </div>
