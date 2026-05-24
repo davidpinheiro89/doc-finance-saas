@@ -86,8 +86,14 @@ export default function ImpostoRendaPage() {
 
   const { yearlyPlantoes, yearlyDespesas } = getYearlyData()
 
-  // Exclui folgas dos cálculos fiscais
-  const remunerados = yearlyPlantoes.filter(p => !isFolga(p))
+  // Exclui folgas e remove duplicatas por id
+  const seen = new Set<string>()
+  const remunerados = yearlyPlantoes.filter(p => {
+    if (isFolga(p)) return false
+    if (seen.has(p.id)) return false
+    seen.add(p.id)
+    return true
+  })
 
   // Calculate yearly metrics
   const totalReceita = remunerados.reduce((sum, p) => sum + (p.valor || 0), 0)
@@ -447,7 +453,7 @@ export default function ImpostoRendaPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {yearlyPlantoes.map((plantao) => (
+                  {remunerados.map((plantao) => (
                     <tr key={plantao.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
