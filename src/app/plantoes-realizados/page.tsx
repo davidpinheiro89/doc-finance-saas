@@ -178,7 +178,7 @@ export default function PlantoesRealizadosPage() {
     }
 
     if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
-      return { label: 'Realizado', color: 'bg-violet-50 text-violet-700 border-violet-200/60', tooltip: 'Plantão realizado — sem prazo de pagamento definido' }
+      return { label: 'Realizado', color: 'bg-green-50 text-green-700 border-green-200/60', tooltip: 'Plantão realizado — sem prazo de pagamento definido' }
     }
 
     return { label: 'Pendente', color: 'bg-gray-50 text-gray-600 border-gray-200/60', tooltip: 'Status pendente' }
