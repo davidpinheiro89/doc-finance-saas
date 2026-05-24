@@ -88,21 +88,40 @@ export default function ImpostoRendaPage() {
   // Calculate yearly metrics
   const totalReceita = yearlyPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0)
   const totalDespesas = yearlyDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
-  
-  // Tax calculations for Brazilian income tax (simplified)
-  const deducaoSimplificada = Math.min(totalReceita * 0.20, 16755.98) // 20% or R$ 16.755,98 limit
-  const baseCalculo = Math.max(0, totalReceita - deducaoSimplificada)
-  
-  // Simplified tax calculation (actual rates may vary)
-  const impostoDevido = calculateTax(baseCalculo)
 
-  function calculateTax(base: number): number {
-    if (base <= 22847.76) return 0
-    if (base <= 33919.80) return (base - 22847.76) * 0.075
-    if (base <= 45012.60) return 1713.58 + (base - 33919.80) * 0.15
-    if (base <= 55976.16) return 4257.57 + (base - 45012.60) * 0.225
-    return 6555.61 + (base - 55976.16) * 0.275
+  // ── Tabela Progressiva Mensal IRPF (vigente desde fev/2024) ──
+  // Aplicada via carnê-leão para profissionais autônomos PF
+  function calculateMonthlyTax(monthlyBase: number): number {
+    if (monthlyBase <= 2259.20) return 0
+    if (monthlyBase <= 2826.65) return monthlyBase * 0.075 - 169.44
+    if (monthlyBase <= 3751.05) return monthlyBase * 0.15 - 381.44
+    if (monthlyBase <= 4664.68) return monthlyBase * 0.225 - 662.77
+    return monthlyBase * 0.275 - 896.00
   }
+
+  // Agrupa receita por mês e calcula imposto mensal (carnê-leão)
+  const monthlyIncome: Record<string, number> = {}
+  yearlyPlantoes.forEach(p => {
+    const month = (p.data || '').split('T')[0].slice(0, 7) // YYYY-MM
+    if (month) monthlyIncome[month] = (monthlyIncome[month] || 0) + (p.valor || 0)
+  })
+
+  let impostoDevido = 0
+  let totalDeducao = 0
+  const monthlyBreakdown = Object.entries(monthlyIncome)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, income]) => {
+      const deducao = income * 0.20 // Dedução simplificada de 20%
+      const base = Math.max(0, income - deducao)
+      const tax = Math.max(0, calculateMonthlyTax(base))
+      totalDeducao += deducao
+      impostoDevido += tax
+      return { month, income, deducao, base, tax }
+    })
+
+  // Limita dedução simplificada ao teto anual de R$16.754,34
+  const deducaoSimplificada = Math.min(totalDeducao, 16754.34)
+  const baseCalculo = Math.max(0, totalReceita - deducaoSimplificada)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
