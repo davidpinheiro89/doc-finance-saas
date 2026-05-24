@@ -12,6 +12,7 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const router = useRouter()
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -154,6 +155,24 @@ export default function RegisterPage() {
               </div>
             </div>
 
+            {/* Terms Checkbox */}
+            <div className="flex items-start gap-2.5">
+              <input
+                id="terms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500 cursor-pointer"
+                required
+              />
+              <label htmlFor="terms" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+                Li e aceito os{' '}
+                <a href="/termos" target="_blank" className="text-orange-500 hover:text-orange-600 font-medium underline">Termos de Uso</a>
+                {' '}e a{' '}
+                <a href="/privacidade" target="_blank" className="text-orange-500 hover:text-orange-600 font-medium underline">Política de Privacidade</a>.
+              </label>
+            </div>
+
             {/* Error Message */}
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
@@ -171,7 +190,7 @@ export default function RegisterPage() {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !acceptedTerms}
               className="w-full bg-orange-500 hover:bg-orange-600 text-white font-medium py-3 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? 'Criando conta...' : 'Criar Conta Médica'}
