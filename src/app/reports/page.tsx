@@ -6,6 +6,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import jsPDF from 'jspdf'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { formatHoras } from '@/lib/folga-utils'
 
 export default function ReportsPage() {
   const { user, loading } = useAuthGuard()
@@ -219,7 +220,7 @@ export default function ReportsPage() {
         const hospitalName = plantao.hospital.length > 20 ? plantao.hospital.substring(0, 20) + '...' : plantao.hospital
         pdf.text(hospitalName, 60, yPosition)
         
-        pdf.text(`${plantao.horas || 0}h`, 120, yPosition)
+        pdf.text(formatHoras(plantao.horas), 120, yPosition)
         pdf.text(formatCurrency(plantao.valor), 150, yPosition)
         
         // Status with color
@@ -481,7 +482,7 @@ export default function ReportsPage() {
                         {plantao.hospital}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {plantao.horas ? `${plantao.horas}h` : '-'}
+                        {plantao.horas ? formatHoras(plantao.horas) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {formatCurrency(plantao.valor)}

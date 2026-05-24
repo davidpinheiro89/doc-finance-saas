@@ -9,7 +9,7 @@ import DashboardAlerts from '@/components/DashboardAlerts'
 import NotificationPermission from '@/components/NotificationPermission'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
-import { isFolga } from '@/lib/folga-utils'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   fetchPlantoesByUser,
@@ -936,14 +936,14 @@ export default function DashboardPage() {
                   <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
                   <p className="text-sm font-medium text-violet-100">Valor Médio / Hora</p>
                   <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorHora)}</p>
-                  <p className="text-xs text-violet-200 mt-2">{metrics.horasTotal.toFixed(0)}h trabalhadas</p>
+                  <p className="text-xs text-violet-200 mt-2">{formatHoras(metrics.horasTotal)} trabalhadas</p>
                 </div>
 
                 {/* Carga Horária */}
                 <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 p-5 text-white shadow-lg shadow-sky-500/20 hover:shadow-xl hover:shadow-sky-500/30 transition-all duration-300">
                   <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
                   <p className="text-sm font-medium text-sky-100">Carga Horária</p>
-                  <p className="text-3xl font-bold mt-1 tracking-tight">{metrics.horasTotal.toFixed(1)}h</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatHoras(metrics.horasTotal)}</p>
                   <p className="text-xs text-sky-200 mt-2">{metrics.quantidade} plantões</p>
                 </div>
               </div>
@@ -1078,7 +1078,7 @@ export default function DashboardPage() {
                   <div key={plantao.id} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 flex items-center justify-between border border-orange-100/60 hover:bg-white transition-colors">
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-gray-900 truncate">{plantao.hospital}</p>
-                      <p className="text-xs text-gray-500">{plantao.horas ? `${plantao.horas}h` : ''}{plantao.especialidade ? ` · ${plantao.especialidade}` : ''}</p>
+                      <p className="text-xs text-gray-500">{plantao.horas ? formatHoras(plantao.horas) : ''}{plantao.especialidade ? ` · ${plantao.especialidade}` : ''}</p>
                     </div>
                     <div className="text-right ml-4">
                       <p className="font-bold text-emerald-600">{formatCurrency(plantao.valor || 0)}</p>

@@ -32,3 +32,12 @@ export function isFolga(p: FolgaCheckable): boolean {
 
   return false
 }
+
+/**
+ * Formata horas sem casas decimais desnecessárias.
+ * Ex: 12.0 → "12h", 6.5 → "6.5h", 0 → "0h"
+ */
+export function formatHoras(h: number | null | undefined): string {
+  const n = Number(h) || 0
+  return n % 1 === 0 ? `${Math.round(n)}h` : `${n}h`
+}

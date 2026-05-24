@@ -5,6 +5,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesFuturosPage() {
   const { user, loading } = useAuthGuard()
@@ -331,7 +332,7 @@ export default function PlantoesFuturosPage() {
                           {formatCurrency(plantao.valor)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.horas || 0}h
+                          {formatHoras(plantao.horas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>

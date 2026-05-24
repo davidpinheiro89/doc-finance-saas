@@ -5,7 +5,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
-import { isFolga } from '@/lib/folga-utils'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesRealizadosPage() {
   const { user, loading } = useAuthGuard()
@@ -441,7 +441,7 @@ export default function PlantoesRealizadosPage() {
                             {formatCurrency(plantao.valor)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                            {plantao.horas || 0}h
+                            {formatHoras(plantao.horas)}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
                             <div className="group relative inline-block">

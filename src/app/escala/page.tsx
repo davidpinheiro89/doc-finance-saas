@@ -7,6 +7,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import Sidebar from '../../components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { fetchPlantoesByUser, plantoesKeys, type PlantaoListItem } from '@/lib/queries/plantoes'
+import { formatHoras } from '@/lib/folga-utils'
 
 // ── Block Type & Color config ──
 const BLOCK_TYPES = [
@@ -357,7 +358,7 @@ export default function EscalaPage() {
     msg += `━━━━━━━━━━━━━━━━━━━\n\n`
     msg += `🏥 *${p.hospital}*\n`
     msg += `📅 ${dateBR}\n`
-    if (p.horas) msg += `⏱️ Carga: ${p.horas}h\n`
+    if (p.horas) msg += `⏱️ Carga: ${formatHoras(p.horas)}\n`
     if (p.endereco) msg += `📍 ${p.endereco}\n`
     if (shareShowValor && p.valor > 0) msg += `💰 Valor: R$ ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`
     if (shareNota.trim()) msg += `\n📝 _${shareNota.trim()}_\n`
@@ -660,7 +661,7 @@ export default function EscalaPage() {
                         <div className="flex items-center justify-between">
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-gray-900 truncate">{p.hospital}</p>
-                            <p className="text-[10px] text-gray-500">{p.horas}h · {p.especialidade || 'Geral'}</p>
+                            <p className="text-[10px] text-gray-500">{formatHoras(p.horas)} · {p.especialidade || 'Geral'}</p>
                           </div>
                           <p className="text-sm font-bold text-emerald-600 ml-2">{formatCurrency(p.valor)}</p>
                         </div>
@@ -1138,7 +1139,7 @@ export default function EscalaPage() {
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                   <span>📅 {new Date(shareTarget.data.split('T')[0] + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                  {shareTarget.horas ? <span>⏱️ {shareTarget.horas}h</span> : null}
+                  {shareTarget.horas ? <span>⏱️ {formatHoras(shareTarget.horas)}</span> : null}
                   {shareTarget.endereco ? <span className="truncate max-w-[200px]">📍 {shareTarget.endereco}</span> : null}
                 </div>
               </div>

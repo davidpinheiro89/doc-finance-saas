@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import type { PlantaoListItem } from '@/lib/queries/plantoes'
 import { todayLocalISO } from '@/lib/date-utils'
+import { formatHoras } from '@/lib/folga-utils'
 
 interface DashboardAlertsProps {
   plantoes: PlantaoListItem[]
@@ -58,7 +59,7 @@ export default function DashboardAlerts({ plantoes, getSmartStatus, isLoading }:
               </p>
               {tomorrowPlantoes.length === 1 ? (
                 <p className="text-xs text-gray-500 mt-0.5">
-                  {tomorrowPlantoes[0].horas ? `${tomorrowPlantoes[0].horas}h` : ''}
+                  {tomorrowPlantoes[0].horas ? formatHoras(tomorrowPlantoes[0].horas) : ''}
                   {tomorrowPlantoes[0].especialidade && tomorrowPlantoes[0].especialidade !== tomorrowPlantoes[0].classificacao
                     ? ` · ${tomorrowPlantoes[0].especialidade}` : ''}
                 </p>
