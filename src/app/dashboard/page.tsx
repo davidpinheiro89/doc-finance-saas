@@ -932,19 +932,19 @@ export default function DashboardPage() {
                 </div>
 
                 {/* Valor Médio/Hora */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-violet-600 p-5 text-white shadow-lg shadow-violet-500/20 hover:shadow-xl hover:shadow-violet-500/30 transition-all duration-300">
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300">
                   <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
-                  <p className="text-sm font-medium text-violet-100">Valor Médio / Hora</p>
+                  <p className="text-sm font-medium text-orange-100">Valor Médio / Hora</p>
                   <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorHora)}</p>
-                  <p className="text-xs text-violet-200 mt-2">{formatHoras(metrics.horasTotal)} trabalhadas</p>
+                  <p className="text-xs text-orange-200 mt-2">{formatHoras(metrics.horasTotal)} trabalhadas</p>
                 </div>
 
                 {/* Carga Horária */}
-                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-600 p-5 text-white shadow-lg shadow-sky-500/20 hover:shadow-xl hover:shadow-sky-500/30 transition-all duration-300">
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300">
                   <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
-                  <p className="text-sm font-medium text-sky-100">Carga Horária</p>
+                  <p className="text-sm font-medium text-emerald-100">Carga Horária</p>
                   <p className="text-3xl font-bold mt-1 tracking-tight">{formatHoras(metrics.horasTotal)}</p>
-                  <p className="text-xs text-sky-200 mt-2">{metrics.quantidade} plantões</p>
+                  <p className="text-xs text-emerald-200 mt-2">{metrics.quantidade} plantões</p>
                 </div>
               </div>
 
