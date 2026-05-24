@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 import jsPDF from 'jspdf'
 import type { Plantao, Despesa } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga } from '@/lib/folga-utils'
 
 export default function ImpostoRendaPage() {
   const { user, loading } = useAuthGuard()
@@ -85,8 +86,11 @@ export default function ImpostoRendaPage() {
 
   const { yearlyPlantoes, yearlyDespesas } = getYearlyData()
 
+  // Exclui folgas dos cálculos fiscais
+  const remunerados = yearlyPlantoes.filter(p => !isFolga(p))
+
   // Calculate yearly metrics
-  const totalReceita = yearlyPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0)
+  const totalReceita = remunerados.reduce((sum, p) => sum + (p.valor || 0), 0)
   const totalDespesas = yearlyDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
 
   // ── Tabela Progressiva Mensal IRPF (vigente desde fev/2024) ──
@@ -101,7 +105,7 @@ export default function ImpostoRendaPage() {
 
   // Agrupa receita por mês e calcula imposto mensal (carnê-leão)
   const monthlyIncome: Record<string, number> = {}
-  yearlyPlantoes.forEach(p => {
+  remunerados.forEach(p => {
     const month = (p.data || '').split('T')[0].slice(0, 7) // YYYY-MM
     if (month) monthlyIncome[month] = (monthlyIncome[month] || 0) + (p.valor || 0)
   })

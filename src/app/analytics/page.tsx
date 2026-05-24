@@ -6,6 +6,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga } from '@/lib/folga-utils'
 
 export default function AnalyticsPage() {
   const { user, loading } = useAuthGuard()
@@ -38,10 +39,11 @@ export default function AnalyticsPage() {
     setDateRange(prev => ({ ...prev, [field]: value }))
   }
 
-  // Filter plantões based on date range
+  // Filter plantões based on date range and exclude folgas
   const filteredPlantoes = useMemo(() => {
-    if (!dateRange.start && !dateRange.end) return plantoes
-    return plantoes.filter(plantao => {
+    const base = plantoes.filter(p => !isFolga(p))
+    if (!dateRange.start && !dateRange.end) return base
+    return base.filter(plantao => {
       const plantaoDate = new Date(plantao.data)
       const startDate = dateRange.start ? new Date(dateRange.start) : null
       const endDate = dateRange.end ? new Date(dateRange.end) : null

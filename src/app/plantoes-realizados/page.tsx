@@ -5,6 +5,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga } from '@/lib/folga-utils'
 
 export default function PlantoesRealizadosPage() {
   const { user, loading } = useAuthGuard()
@@ -15,7 +16,6 @@ export default function PlantoesRealizadosPage() {
     end: ''
   })
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null)
-  const [showFolgas, setShowFolgas] = useState(false)
 
   useEffect(() => {
     if (user) fetchPlantoes(user.id)
@@ -95,25 +95,15 @@ export default function PlantoesRealizadosPage() {
     return pastPlantoes
   }
 
-  const isFolga = (p: Plantao) => {
-    const cls = (p.classificacao || '').toLowerCase()
-    const name = (p.hospital || '').toLowerCase()
-    if (cls.includes('folg') || cls === 'disponivel' || cls === 'disponível') return true
-    if (name.includes('folg') || name === 'disponível' || name === 'disponivel') return true
-    if ((Number(p.valor) || 0) <= 0 && (Number(p.horas) || 0) <= 0) return true
-    return false
-  }
-
   const allPastPlantoes = getPastPlantoes()
-  const filteredPlantoes = showFolgas ? allPastPlantoes : allPastPlantoes.filter(p => !isFolga(p))
-  const folhasCount = allPastPlantoes.filter(p => isFolga(p)).length
+  const filteredPlantoes = allPastPlantoes.filter(p => !isFolga(p))
+  const folgasNoPeriodo = allPastPlantoes.filter(p => isFolga(p))
 
-  // Calculate metrics (always exclude folgas for accurate totals)
-  const remunerados = allPastPlantoes.filter(p => !isFolga(p))
+  // Calculate metrics (only remunerados)
   const metrics = {
-    quantidade: remunerados.length,
-    valorTotal: remunerados.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: remunerados.reduce((sum, p) => sum + (p.horas || 0), 0)
+    quantidade: filteredPlantoes.length,
+    valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
+    cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
 
   const formatCurrency = (value: number) => {
@@ -286,20 +276,6 @@ export default function PlantoesRealizadosPage() {
                 </button>
               </div>
             </div>
-            {/* Toggle Folgas */}
-            {folhasCount > 0 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
-                <span className="text-sm text-gray-600">
-                  Exibir folgas e dias sem remuneração <span className="text-gray-400">({folhasCount})</span>
-                </span>
-                <button
-                  onClick={() => setShowFolgas(!showFolgas)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ${showFolgas ? 'bg-orange-500' : 'bg-gray-300'}`}
-                >
-                  <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${showFolgas ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
-              </div>
-            )}
           </div>
 
           {/* Cards de Resumo */}
@@ -514,6 +490,31 @@ export default function PlantoesRealizadosPage() {
               </div>
             )}
           </div>
+
+          {/* ── Folgas no Período ── */}
+          {folgasNoPeriodo.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1">Folgas no Período</h3>
+              <p className="text-sm text-gray-500 mb-4">Dias de folga e disponibilidade registrados — não contabilizados nos totais financeiros.</p>
+              <div className="flex items-center gap-4">
+                <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-100 text-center">
+                  <p className="text-2xl font-bold text-gray-700">{folgasNoPeriodo.length}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">folga(s)</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {folgasNoPeriodo.map(f => (
+                    <span key={f.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200/60 rounded-lg text-xs text-gray-600">
+                      <span>☽</span>
+                      {formatDate((f.data || '').split('T')[0])}
+                      {f.hospital && f.hospital.toLowerCase() !== 'folga' && (
+                        <span className="text-gray-400">— {f.hospital}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>

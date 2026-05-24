@@ -9,6 +9,7 @@ import DashboardAlerts from '@/components/DashboardAlerts'
 import NotificationPermission from '@/components/NotificationPermission'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga } from '@/lib/folga-utils'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   fetchPlantoesByUser,
@@ -368,12 +369,7 @@ export default function DashboardPage() {
     // Ranking de hospitais por valor/hora (exclui folgas e registros sem valor)
     const hospitalMap: Record<string, { valor: number; horas: number; count: number }> = {}
     filtered.forEach((p) => {
-      if (!p.hospital) return
-      if ((p.valor || 0) <= 0) return
-      const cls = (p.classificacao || '').toLowerCase()
-      if (cls.includes('folg') || cls === 'disponivel' || cls === 'disponível') return
-      const name = p.hospital.toLowerCase()
-      if (name.includes('folg') || name === 'disponível' || name === 'disponivel') return
+      if (!p.hospital || isFolga(p)) return
       if (!hospitalMap[p.hospital]) hospitalMap[p.hospital] = { valor: 0, horas: 0, count: 0 }
       hospitalMap[p.hospital].valor += p.valor || 0
       hospitalMap[p.hospital].horas += p.horas || 0
