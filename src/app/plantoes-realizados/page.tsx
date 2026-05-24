@@ -98,7 +98,10 @@ export default function PlantoesRealizadosPage() {
   const isFolga = (p: Plantao) => {
     const cls = (p.classificacao || '').toLowerCase()
     const name = (p.hospital || '').toLowerCase()
-    return cls === 'folga' || cls === 'disponivel' || name === 'folga' || name === 'disponível' || name === 'disponivel' || ((p.valor || 0) === 0 && (p.horas || 0) === 0)
+    if (cls.includes('folg') || cls === 'disponivel' || cls === 'disponível') return true
+    if (name.includes('folg') || name === 'disponível' || name === 'disponivel') return true
+    if ((Number(p.valor) || 0) <= 0 && (Number(p.horas) || 0) <= 0) return true
+    return false
   }
 
   const allPastPlantoes = getPastPlantoes()
