@@ -5,8 +5,6 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { Documento, CategoriaDocumento } from '@/types/database'
-import jsPDF from 'jspdf'
-import autoTable from 'jspdf-autotable'
 
 // ── Document category config ──
 const DOC_CATEGORIES: {
@@ -266,74 +264,6 @@ export default function DocumentosPage() {
     }
   }
 
-  // ── Exportar PDF ──
-  const handleExportPDF = () => {
-    if (!user || documentos.length === 0) return
-
-    const userName = user.user_metadata?.full_name || user.user_metadata?.name || 'Médico(a)'
-    const crmValue = user.user_metadata?.crm || ''
-    const today = new Date().toLocaleDateString('pt-BR')
-    const todayISO = new Date().toISOString().split('T')[0]
-
-    const doc = new jsPDF()
-
-    // Header
-    doc.setFontSize(18)
-    doc.setTextColor(234, 88, 12) // orange-600
-    doc.text('BEM Plantonista', 14, 20)
-    doc.setFontSize(10)
-    doc.setTextColor(100, 100, 100)
-    doc.text('Carteira Digital de Documentos Profissionais', 14, 27)
-
-    // Doctor info
-    doc.setFontSize(13)
-    doc.setTextColor(30, 30, 30)
-    doc.text(userName, 14, 40)
-    if (crmValue) {
-      doc.setFontSize(10)
-      doc.setTextColor(80, 80, 80)
-      doc.text(`CRM: ${crmValue}`, 14, 47)
-    }
-
-    doc.setFontSize(9)
-    doc.setTextColor(120, 120, 120)
-    doc.text(`Gerado em: ${today}`, 14, crmValue ? 54 : 47)
-
-    // Separator
-    const startY = crmValue ? 60 : 53
-    doc.setDrawColor(230, 230, 230)
-    doc.line(14, startY, 196, startY)
-
-    // Table
-    const tableData = documentos.map(d => {
-      const cat = DOC_CATEGORIES.find(c => c.key === d.categoria)
-      return [
-        cat?.label || d.categoria,
-        d.nome,
-        d.validade ? formatDateBR(d.validade) : '—',
-      ]
-    })
-
-    autoTable(doc, {
-      startY: startY + 4,
-      head: [['Tipo', 'Documento', 'Validade']],
-      body: tableData,
-      styles: { fontSize: 9, cellPadding: 3 },
-      headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
-      alternateRowStyles: { fillColor: [255, 247, 237] },
-      margin: { left: 14, right: 14 },
-    })
-
-    // Footer
-    const pageHeight = doc.internal.pageSize.height
-    doc.setFontSize(8)
-    doc.setTextColor(160, 160, 160)
-    doc.text('Documento gerado automaticamente pelo BEM Plantonista', 14, pageHeight - 10)
-
-    const safeName = userName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
-    doc.save(`carteira-digital-${safeName}-${todayISO}.pdf`)
-  }
-
   // Group documents by category
   const docsByCategory = useMemo(() => {
     const map = new Map<string, Documento[]>()
@@ -437,11 +367,11 @@ export default function DocumentosPage() {
               WhatsApp
             </button>
 
-            {/* Exportar PDF */}
-            <button onClick={handleExportPDF} disabled={documentos.length === 0}
+            {/* Imprimir / Exportar PDF */}
+            <button onClick={() => window.open('/carteira/imprimir', '_blank')} disabled={documentos.length === 0}
               className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              Exportar PDF
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Imprimir / PDF
             </button>
           </div>
 

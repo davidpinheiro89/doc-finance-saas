@@ -59,7 +59,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // Rotas protegidas (requerem autenticação + assinatura ativa)
-  const protectedRoutes = ['/dashboard', '/escala', '/financeiro', '/ir', '/reports', '/analytics', '/plantoes-futuros', '/plantoes-realizados', '/documentos']
+  const protectedRoutes = ['/dashboard', '/escala', '/financeiro', '/ir', '/reports', '/analytics', '/plantoes-futuros', '/plantoes-realizados', '/documentos', '/carteira/imprimir']
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
 
   if (isProtectedRoute) {
@@ -81,5 +81,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/login/:path*', '/register/:path*', '/dashboard/:path*', '/escala/:path*', '/financeiro/:path*', '/ir/:path*', '/reports/:path*', '/analytics/:path*', '/plantoes-futuros/:path*', '/plantoes-realizados/:path*', '/documentos/:path*', '/assinatura/:path*'],
+  matcher: ['/', '/login/:path*', '/register/:path*', '/dashboard/:path*', '/escala/:path*', '/financeiro/:path*', '/ir/:path*', '/reports/:path*', '/analytics/:path*', '/plantoes-futuros/:path*', '/plantoes-realizados/:path*', '/documentos/:path*', '/assinatura/:path*', '/carteira/imprimir'],
 }
