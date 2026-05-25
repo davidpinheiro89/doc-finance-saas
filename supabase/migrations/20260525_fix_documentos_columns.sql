@@ -16,13 +16,17 @@ CREATE TABLE IF NOT EXISTS public.documentos (
   updated_at TIMESTAMPTZ DEFAULT now()
 );
 
--- Caso a tabela já exista mas faltem colunas:
+-- Caso a tabela já exista mas faltem colunas (TODAS as colunas que o código usa):
+ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS nome TEXT;
+ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS categoria TEXT DEFAULT 'outro';
+ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS arquivo_url TEXT;
 ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS arquivo_nome TEXT;
 ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS arquivo_tipo TEXT;
 ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS arquivo_tamanho BIGINT;
 ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS validade DATE;
 ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS notas TEXT;
-ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS arquivo_url TEXT;
+ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
+ALTER TABLE public.documentos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
 -- RLS (idempotente)
 ALTER TABLE public.documentos ENABLE ROW LEVEL SECURITY;
