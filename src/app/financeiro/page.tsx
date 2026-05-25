@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 // Chart imports removed to prevent loops
-import type { Plantao, Despesa } from '@/types/database'
+import type { Plantao, Despesa, Receita } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 
 export default function FinanceiroPage() {
@@ -36,6 +36,19 @@ export default function FinanceiroPage() {
   const [showEditNewCategoryInput, setShowEditNewCategoryInput] = useState(false)
   const [editNewCategoryName, setEditNewCategoryName] = useState('')
 
+  // ── Receitas state ──
+  const [receitas, setReceitas] = useState<Receita[]>([])
+  const [showAddReceita, setShowAddReceita] = useState(false)
+  const [newReceita, setNewReceita] = useState({ descricao: '', valor: '', data: '', categoria: 'consulta' })
+
+  const receitaCategories = [
+    { value: 'consulta', label: 'Consulta' },
+    { value: 'procedimento', label: 'Procedimento' },
+    { value: 'parecer', label: 'Parecer Médico' },
+    { value: 'aula', label: 'Aula / Palestra' },
+    { value: 'outros', label: 'Outros' },
+  ]
+
   const defaultCategories = [
     { value: 'transporte', label: 'Transporte' },
     { value: 'alimentacao', label: 'Alimentação' },
@@ -57,7 +70,8 @@ export default function FinanceiroPage() {
   const fetchData = async (userId: string) => {
     await Promise.all([
       fetchPlantoes(userId),
-      fetchDespesas(userId)
+      fetchDespesas(userId),
+      fetchReceitas(userId)
     ])
   }
 
@@ -109,6 +123,49 @@ export default function FinanceiroPage() {
     } catch (error) {
       setDespesas([])
     }
+  }
+
+  const fetchReceitas = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('receitas')
+        .select('*')
+        .eq('user_id', userId)
+        .order('data', { ascending: false })
+
+      if (error) { setReceitas([]); return }
+      setReceitas(data || [])
+    } catch { setReceitas([]) }
+  }
+
+  const handleAddReceita = async () => {
+    if (!newReceita.descricao || !newReceita.valor || !newReceita.data) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+    try {
+      const { error } = await supabase.from('receitas').insert({
+        descricao: newReceita.descricao.trim(),
+        valor: parseFloat(newReceita.valor),
+        data: newReceita.data,
+        categoria: newReceita.categoria,
+        recorrente: false,
+        user_id: user!.id,
+      })
+      if (error) { alert('Erro ao adicionar receita: ' + error.message); return }
+      setNewReceita({ descricao: '', valor: '', data: '', categoria: 'consulta' })
+      setShowAddReceita(false)
+      await fetchReceitas(user!.id)
+    } catch { alert('Erro ao adicionar receita. Tente novamente.') }
+  }
+
+  const handleDeleteReceita = async (receita: Receita) => {
+    if (!confirm('Tem certeza que deseja excluir esta receita?')) return
+    try {
+      const { error } = await supabase.from('receitas').delete().eq('id', receita.id).eq('user_id', user!.id)
+      if (error) { alert('Erro ao excluir receita: ' + error.message); return }
+      await fetchReceitas(user!.id)
+    } catch { alert('Erro ao excluir receita. Tente novamente.') }
   }
 
   const handleAddExpense = async () => {
@@ -297,7 +354,15 @@ export default function FinanceiroPage() {
     }
     return d.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
   })
-  console.log('Lista atualizada:', filteredDespesas.length, 'itens')
+
+  const filteredReceitas = receitas.filter(r => {
+    if (selectedMonth === 'todos') {
+      return r.data.startsWith(selectedYear + '-')
+    }
+    return r.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
+  })
+
+  const totalReceitas = filteredReceitas.reduce((sum, r) => sum + (r.valor || 0), 0)
 
   // Reactivated calculations for Insight card - using recorrente field correctly
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
@@ -311,6 +376,9 @@ export default function FinanceiroPage() {
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
   const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
+  
+  // Saldo final: (Plantões pagos + Receitas extras) - Despesas totais
+  const saldoFinal = (totalRecebido + totalReceitas) - totalGeralDespesas
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -403,22 +471,30 @@ export default function FinanceiroPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Dashboard Financeiro</h3>
                 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Total Fixo</p>
+                    <p className="text-sm text-gray-600 mb-1">Plantões Pagos</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRecebido)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Receitas Extras</p>
+                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(totalReceitas)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Despesas Fixas</p>
                     <p className="text-xl font-bold text-orange-600">{formatCurrency(totalDespesasFixas)}</p>
                   </div>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Total Variável</p>
+                    <p className="text-sm text-gray-600 mb-1">Despesas Variáveis</p>
                     <p className="text-xl font-bold text-red-600">{formatCurrency(totalDespesasVariaveis)}</p>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border-2 border-gray-300">
-                    <p className="text-sm text-gray-600 mb-1 font-medium">Total Geral</p>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Total Despesas</p>
                     <p className="text-xl font-bold text-gray-800">{formatCurrency(totalGeralDespesas)}</p>
                   </div>
-                  <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Recebido</p>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRecebido)}</p>
+                  <div className={`rounded-lg p-4 border-2 ${saldoFinal >= 0 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                    <p className="text-sm text-gray-600 mb-1 font-medium">Saldo Final</p>
+                    <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(saldoFinal)}</p>
                   </div>
                 </div>
 
@@ -694,6 +770,113 @@ export default function FinanceiroPage() {
                   </svg>
                 </div>
               </div>
+            </div>
+          </div>
+
+          {/* ── Seção de Receitas ── */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10 pointer-events-auto">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">Receitas Extras</h3>
+              <button
+                onClick={() => setShowAddReceita(true)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+              >
+                + Nova Receita
+              </button>
+            </div>
+
+            {/* Form Nova Receita */}
+            {showAddReceita && (
+              <div className="p-6 bg-emerald-50/40 border-b border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição *</label>
+                    <input
+                      type="text"
+                      value={newReceita.descricao}
+                      onChange={(e) => setNewReceita({ ...newReceita, descricao: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Ex: Consulta particular"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Valor (R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newReceita.valor}
+                      onChange={(e) => setNewReceita({ ...newReceita, valor: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Data *</label>
+                    <input
+                      type="date"
+                      value={newReceita.data}
+                      onChange={(e) => setNewReceita({ ...newReceita, data: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                    <select
+                      value={newReceita.categoria}
+                      onChange={(e) => setNewReceita({ ...newReceita, categoria: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      {receitaCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end space-x-3">
+                  <button onClick={() => setShowAddReceita(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Cancelar
+                  </button>
+                  <button onClick={handleAddReceita} className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Adicionar Receita
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tabela de Receitas */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredReceitas.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-8 text-center text-sm text-gray-400">Nenhuma receita extra registrada neste período</td></tr>
+                  ) : filteredReceitas.map((receita) => (
+                    <tr key={receita.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(receita.data)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{receita.descricao}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">{receita.categoria}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-emerald-700">{formatCurrency(receita.valor)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button onClick={() => handleDeleteReceita(receita)} className="text-red-600 hover:text-red-900">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
 

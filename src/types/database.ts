@@ -125,6 +125,24 @@ export type DocumentoInsert = Omit<Documento, 'id' | 'created_at' | 'updated_at'
 
 export type DocumentoUpdate = Partial<Omit<Documento, 'id' | 'user_id' | 'created_at'>>
 
+/** Receita extra — linha da tabela `public.receitas`. */
+export interface Receita {
+  id: string
+  user_id: string
+  descricao: string
+  valor: number
+  data: string                       // ISO YYYY-MM-DD
+  categoria: string                  // consulta, procedimento, parecer, outros
+  recorrente: boolean | null
+  created_at: string
+  updated_at: string
+}
+
+export type ReceitaInsert = Omit<Receita, 'id' | 'created_at' | 'updated_at'> &
+  Partial<Pick<Receita, 'id' | 'created_at' | 'updated_at'>>
+
+export type ReceitaUpdate = Partial<Omit<Receita, 'id' | 'user_id' | 'created_at'>>
+
 /** Local favorito — linha da tabela `public.locais_favoritos`. */
 export interface LocalFavorito {
   id: string
