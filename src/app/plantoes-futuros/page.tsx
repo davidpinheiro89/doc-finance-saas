@@ -5,7 +5,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
-import { formatHoras } from '@/lib/folga-utils'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesFuturosPage() {
   const { user, loading } = useAuthGuard()
@@ -48,22 +48,23 @@ export default function PlantoesFuturosPage() {
     }))
   }
 
-  // Filter future plantões (data de hoje em diante)
+  // Filter future plantões (data de hoje em diante), excluindo folgas
   const getFuturePlantoes = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Start of today
     
     const futurePlantoes = plantoes.filter(plantao => {
-      const plantaoDate = new Date(plantao.data)
+      if (isFolga(plantao)) return false
+      const plantaoDate = new Date(plantao.data + 'T00:00:00')
       return plantaoDate >= today
     })
 
     // Apply date range filter if set
     if (dateRange.start || dateRange.end) {
       return futurePlantoes.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        const startDate = dateRange.start ? new Date(dateRange.start) : null
-        const endDate = dateRange.end ? new Date(dateRange.end) : null
+        const plantaoDate = new Date(plantao.data + 'T00:00:00')
+        const startDate = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null
+        const endDate = dateRange.end ? new Date(dateRange.end + 'T00:00:00') : null
 
         if (startDate && endDate) {
           return plantaoDate >= startDate && plantaoDate <= endDate
@@ -110,12 +111,15 @@ export default function PlantoesFuturosPage() {
   }
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString)
+    // Parseia manualmente para evitar off-by-one UTC
+    const [year, month, day] = (dateString || '').split('T')[0].split('-').map(Number)
+    if (!year || !month || !day) return ''
+    const date = new Date(year, month - 1, day)
     return date.toLocaleDateString('pt-BR', {
+      weekday: 'short',
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
-      weekday: 'short'
+      year: 'numeric'
     })
   }
 
@@ -135,7 +139,7 @@ export default function PlantoesFuturosPage() {
   const getDaysUntil = (dateString: string) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const plantaoDate = new Date(dateString)
+    const plantaoDate = new Date(dateString + 'T00:00:00')
     const diffTime = plantaoDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
