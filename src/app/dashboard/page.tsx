@@ -347,7 +347,7 @@ export default function DashboardPage() {
 
   // ── Business Intelligence Metrics ──
   const metrics = useMemo(() => {
-    const filtered = getFilteredPlantoes
+    const filtered = getFilteredPlantoes.filter(p => !isFolga(p))
     const quantidade = filtered.length
     const valorBruto = filtered.reduce((s, p) => s + (p.valor || 0), 0)
     const horasTotal = filtered.reduce((s, p) => s + (p.horas || 0), 0)
@@ -362,7 +362,7 @@ export default function DashboardPage() {
     // Progresso da meta mensal (usa apenas mês atual)
     const { start: mesStart, end: mesEnd } = getCurrentMonthRangeLocal()
     const faturamentoMes = plantoes
-      .filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd })
+      .filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd && !isFolga(p) })
       .reduce((s, p) => s + (p.valor || 0), 0)
     const progressoMeta = metaMensal > 0 ? Math.min((faturamentoMes / metaMensal) * 100, 100) : 0
 
@@ -712,22 +712,31 @@ export default function DashboardPage() {
 
   const todayPlantoes = plantoes.filter((p: PlantaoListItem) => {
     const d = dataKey(p)
-    return d && d === todayStr
+    return d && d === todayStr && !isFolga(p)
   }).sort((a: PlantaoListItem, b: PlantaoListItem) => (a.hospital || '').localeCompare(b.hospital || ''))
 
   const upcomingPlantoes = plantoes.filter((p: PlantaoListItem) => {
     const d = dataKey(p)
-    return d && d > todayStr
+    return d && d > todayStr && !isFolga(p)
   }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(a).localeCompare(dataKey(b)))
 
   const historicalPlantoes = plantoes.filter((p: PlantaoListItem) => {
     const d = dataKey(p)
-    return d && d < todayStr
+    return d && d < todayStr && !isFolga(p)
   }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(b).localeCompare(dataKey(a)))
 
   const pendentesPagamento = plantoes.filter((p: PlantaoListItem) =>
-    p.status === 'pendente' || p.status === 'confirmado'
+    (p.status === 'pendente' || p.status === 'confirmado') && !isFolga(p)
   ).length
+
+  // Folgas no mês atual (para exibição separada)
+  const folgasNoMes = useMemo(() => {
+    const { start, end } = getCurrentMonthRangeLocal()
+    return plantoes.filter(p => {
+      const d = (p.data || '').split('T')[0]
+      return d >= start && d <= end && isFolga(p)
+    }).length
+  }, [plantoes])
 
   // ── History filter logic ──
   const historyUniqueHospitals = useMemo(() => {
@@ -948,6 +957,11 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Folgas no mês (exibição separada, sem somar nos KPIs) */}
+              {folgasNoMes > 0 && (
+                <p className="text-xs text-gray-400 text-right">Folgas no mês: {folgasNoMes}</p>
+              )}
+
               {/* ── Meta Mensal + Ranking por Hospital ── */}
               <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
                 {/* Meta Mensal */}
@@ -1130,7 +1144,7 @@ export default function DashboardPage() {
                       <tr key={plantao.id} className={`hover:bg-orange-50/40 transition-colors ${idx !== upcomingPlantoes.length - 1 ? 'border-b border-gray-50' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm font-semibold text-orange-600">{formatDate(plantao.data)}</span>
-                          {plantao.horas && <span className="block text-[10px] text-gray-400">{plantao.horas}h</span>}
+                          {Number(plantao.horas) > 0 && <span className="block text-[10px] text-gray-400">{formatHoras(plantao.horas)}</span>}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
@@ -1138,7 +1152,7 @@ export default function DashboardPage() {
                           {plantao.endereco && <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{plantao.endereco}</p>}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(plantao.valor)}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{plantao.horas || 0}h</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatHoras(plantao.horas)}</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(getSmartStatus(plantao))}`}>{getStatusLabel(getSmartStatus(plantao))}</span>
                         </td>
@@ -1263,7 +1277,7 @@ export default function DashboardPage() {
                       <tr key={plantao.id} className={`hover:bg-gray-50/60 transition-colors ${idx !== visibleCount - 1 ? 'border-b border-gray-50' : ''}`}>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-sm text-gray-600">{formatDate(plantao.data)}</span>
-                          {plantao.horas && <span className="block text-[10px] text-gray-400">{plantao.horas}h</span>}
+                          {Number(plantao.horas) > 0 && <span className="block text-[10px] text-gray-400">{formatHoras(plantao.horas)}</span>}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
