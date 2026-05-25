@@ -410,9 +410,10 @@ export default function DocumentosPage() {
                       </div>
                     ) : (
                       <button onClick={() => handleOpenUpload(cat.key)}
-                        className="w-full flex items-center justify-center gap-2 py-3 text-xs font-medium text-gray-400 hover:text-orange-600 border border-dashed border-gray-200 hover:border-orange-300 rounded-xl transition-all hover:bg-orange-50/40 active:bg-orange-100/40">
-                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        Enviar {cat.label}
+                        className="w-full flex flex-col items-center justify-center gap-1.5 py-4 text-xs font-medium text-gray-400 hover:text-orange-600 border border-dashed border-gray-200 hover:border-orange-300 rounded-xl transition-all hover:bg-orange-50/40 active:bg-orange-100/40">
+                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        <span>Clique para enviar {cat.label}</span>
+                        <span className="text-[10px] text-gray-300 font-normal">PDF, JPG ou PNG</span>
                       </button>
                     )}
                   </div>
@@ -478,28 +479,28 @@ export default function DocumentosPage() {
 
               {/* File input */}
               <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1.5">Arquivo (PDF, imagem) *</label>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Arquivo *</label>
                 <input ref={fileInputRef} type="file" accept=".pdf,.jpg,.jpeg,.png,.webp" onChange={handleFileSelect} className="hidden" />
                 <button type="button" onClick={() => fileInputRef.current?.click()}
-                  className={`w-full flex items-center justify-center gap-2 px-4 py-4 border-2 border-dashed rounded-xl text-sm transition-all ${
+                  className={`w-full flex flex-col items-center justify-center gap-1.5 px-4 py-5 border-2 border-dashed rounded-xl text-sm transition-all cursor-pointer ${
                     selectedFile
                       ? 'border-emerald-300 bg-emerald-50/50 text-emerald-700'
                       : 'border-gray-200 hover:border-orange-300 text-gray-500 hover:text-orange-600 hover:bg-orange-50/40'
                   }`}>
                   {selectedFile ? (
                     <>
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                      <span className="truncate">{selectedFile.name}</span>
-                      <span className="text-[10px] text-gray-400">({formatFileSize(selectedFile.size)})</span>
+                      <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      <span className="truncate max-w-[250px] font-medium">{selectedFile.name}</span>
+                      <span className="text-[10px] text-gray-400">({formatFileSize(selectedFile.size)}) — Clique para trocar</span>
                     </>
                   ) : (
                     <>
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                      Selecionar arquivo
+                      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="font-medium">Clique para selecionar o arquivo</span>
+                      <span className="text-[10px] text-gray-400">(PDF, JPG ou PNG · máx. 10 MB)</span>
                     </>
                   )}
                 </button>
-                <p className="text-[10px] text-gray-400 mt-1">Máximo: 10 MB · PDF, JPG, PNG</p>
               </div>
 
               {/* Submit */}
