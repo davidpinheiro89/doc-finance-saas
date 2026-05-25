@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { Documento, CategoriaDocumento } from '@/types/database'
@@ -32,6 +33,7 @@ const isImageUrl = (url: string | null) => {
 
 export default function CarteiraImprimirPage() {
   const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [fetching, setFetching] = useState(true)
 
@@ -103,7 +105,7 @@ export default function CarteiraImprimirPage() {
           </div>
           <div className="flex items-center gap-3">
             <button
-              onClick={() => window.history.back()}
+              onClick={() => router.push('/documentos')}
               className="px-4 py-2 text-sm font-medium rounded-lg border border-slate-600 hover:bg-slate-800 transition-colors"
             >
               Voltar
@@ -186,18 +188,25 @@ export default function CarteiraImprimirPage() {
                             />
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 px-4 py-3 bg-orange-50 rounded-lg border border-orange-100">
-                            <svg className="h-5 w-5 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-[#0F172A] truncate">{doc.arquivo_nome || 'Documento PDF'}</p>
-                              <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
-                                className="text-xs text-orange-600 hover:underline no-print">
-                                Abrir documento em nova aba
-                              </a>
-                              <p className="text-xs text-gray-400 hidden print:block">{doc.arquivo_url}</p>
+                          <div className="space-y-3">
+                            <div className="flex items-center gap-3 px-4 py-3 bg-orange-50 rounded-lg border border-orange-100">
+                              <svg className="h-5 w-5 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-[#0F172A] truncate">{doc.arquivo_nome || 'Documento PDF'}</p>
+                                <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
+                                  className="text-xs text-orange-600 hover:underline no-print">
+                                  Abrir documento em nova aba
+                                </a>
+                              </div>
                             </div>
+                            <iframe
+                              src={doc.arquivo_url!}
+                              title={doc.nome}
+                              className="w-full rounded-lg border border-gray-200"
+                              style={{ height: '500px' }}
+                            />
                           </div>
                         )}
                       </div>
