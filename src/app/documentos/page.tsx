@@ -5,6 +5,8 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { Documento, CategoriaDocumento } from '@/types/database'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
 
 // ── Document category config ──
 const DOC_CATEGORIES: {
@@ -210,6 +212,128 @@ export default function DocumentosPage() {
     })
   }
 
+  // ── Compartilhar link público ──
+  const [shareToast, setShareToast] = useState(false)
+  const [generatingLink, setGeneratingLink] = useState(false)
+
+  const handleSharePublicLink = async () => {
+    if (!user) return
+    setGeneratingLink(true)
+    try {
+      // Criar token na tabela carteira_publica
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 30)
+
+      const { data, error } = await supabase.from('carteira_publica').insert({
+        user_id: user.id,
+        expires_at: expiresAt.toISOString(),
+      }).select('token').single()
+
+      if (error || !data) { alert('Erro ao gerar link: ' + (error?.message || '')); return }
+
+      const url = `${window.location.origin}/carteira/${data.token}`
+      await navigator.clipboard.writeText(url)
+      setShareToast(true)
+      setTimeout(() => setShareToast(false), 4000)
+    } catch {
+      alert('Erro ao gerar link. Tente novamente.')
+    } finally {
+      setGeneratingLink(false)
+    }
+  }
+
+  const handleShareWhatsAppLink = async () => {
+    if (!user) return
+    setGeneratingLink(true)
+    try {
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 30)
+
+      const { data, error } = await supabase.from('carteira_publica').insert({
+        user_id: user.id,
+        expires_at: expiresAt.toISOString(),
+      }).select('token').single()
+
+      if (error || !data) { alert('Erro ao gerar link: ' + (error?.message || '')); return }
+
+      const url = `${window.location.origin}/carteira/${data.token}`
+      const msg = encodeURIComponent(`📋 Minha Carteira Digital Profissional:\n${url}`)
+      window.open(`https://wa.me/?text=${msg}`, '_blank')
+    } catch {
+      alert('Erro ao gerar link. Tente novamente.')
+    } finally {
+      setGeneratingLink(false)
+    }
+  }
+
+  // ── Exportar PDF ──
+  const handleExportPDF = () => {
+    if (!user || documentos.length === 0) return
+
+    const userName = user.user_metadata?.full_name || user.user_metadata?.name || 'Médico(a)'
+    const crmValue = user.user_metadata?.crm || ''
+    const today = new Date().toLocaleDateString('pt-BR')
+    const todayISO = new Date().toISOString().split('T')[0]
+
+    const doc = new jsPDF()
+
+    // Header
+    doc.setFontSize(18)
+    doc.setTextColor(234, 88, 12) // orange-600
+    doc.text('BEM Plantonista', 14, 20)
+    doc.setFontSize(10)
+    doc.setTextColor(100, 100, 100)
+    doc.text('Carteira Digital de Documentos Profissionais', 14, 27)
+
+    // Doctor info
+    doc.setFontSize(13)
+    doc.setTextColor(30, 30, 30)
+    doc.text(userName, 14, 40)
+    if (crmValue) {
+      doc.setFontSize(10)
+      doc.setTextColor(80, 80, 80)
+      doc.text(`CRM: ${crmValue}`, 14, 47)
+    }
+
+    doc.setFontSize(9)
+    doc.setTextColor(120, 120, 120)
+    doc.text(`Gerado em: ${today}`, 14, crmValue ? 54 : 47)
+
+    // Separator
+    const startY = crmValue ? 60 : 53
+    doc.setDrawColor(230, 230, 230)
+    doc.line(14, startY, 196, startY)
+
+    // Table
+    const tableData = documentos.map(d => {
+      const cat = DOC_CATEGORIES.find(c => c.key === d.categoria)
+      return [
+        cat?.label || d.categoria,
+        d.nome,
+        d.validade ? formatDateBR(d.validade) : '—',
+      ]
+    })
+
+    autoTable(doc, {
+      startY: startY + 4,
+      head: [['Tipo', 'Documento', 'Validade']],
+      body: tableData,
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [234, 88, 12], textColor: 255, fontStyle: 'bold' },
+      alternateRowStyles: { fillColor: [255, 247, 237] },
+      margin: { left: 14, right: 14 },
+    })
+
+    // Footer
+    const pageHeight = doc.internal.pageSize.height
+    doc.setFontSize(8)
+    doc.setTextColor(160, 160, 160)
+    doc.text('Documento gerado automaticamente pelo BEM Plantonista', 14, pageHeight - 10)
+
+    const safeName = userName.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()
+    doc.save(`carteira-digital-${safeName}-${todayISO}.pdf`)
+  }
+
   // Group documents by category
   const docsByCategory = useMemo(() => {
     const map = new Map<string, Documento[]>()
@@ -294,23 +418,40 @@ export default function DocumentosPage() {
               <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
               Novo Documento
             </button>
-            <button onClick={() => { setShareMode(!shareMode); setSelectedForShare(new Set()) }}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border transition-all active:scale-[0.98] ${
-                shareMode
-                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
-                  : 'border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-white'
-              }`}>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
-              {shareMode ? 'Cancelar' : 'Compartilhar'}
+
+            {/* Compartilhar Link Público */}
+            <button onClick={handleSharePublicLink} disabled={generatingLink || documentos.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+              {generatingLink ? (
+                <div className="animate-spin rounded-full h-4 w-4 border-2 border-gray-400 border-t-transparent" />
+              ) : (
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+              )}
+              Copiar Link
             </button>
-            {shareMode && selectedForShare.size > 0 && (
-              <button onClick={handleShareWhatsApp}
-                className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
-                Enviar via WhatsApp ({selectedForShare.size})
-              </button>
-            )}
+
+            {/* WhatsApp com link público */}
+            <button onClick={handleShareWhatsAppLink} disabled={generatingLink || documentos.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300 transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+              <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+              WhatsApp
+            </button>
+
+            {/* Exportar PDF */}
+            <button onClick={handleExportPDF} disabled={documentos.length === 0}
+              className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl border border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-white transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed">
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              Exportar PDF
+            </button>
           </div>
+
+          {/* Toast de link copiado */}
+          {shareToast && (
+            <div className="fixed bottom-6 right-6 z-50 animate-[slideUp_0.3s_ease-out] bg-emerald-600 text-white px-5 py-3 rounded-xl shadow-lg shadow-emerald-500/30 flex items-center gap-2">
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+              <span className="text-sm font-medium">Link copiado! Válido por 30 dias</span>
+            </div>
+          )}
 
           {/* ── Documents Grid ── */}
           {isLoading ? (
