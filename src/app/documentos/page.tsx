@@ -23,6 +23,7 @@ const DOC_CATEGORIES: {
   { key: 'comprovante_endereco', label: 'Comprovante de Endereço', icon: '🏠', description: 'Comprovante de residência atualizado' },
   { key: 'certidao_negativa', label: 'Certidão Negativa', icon: '✅', description: 'Certidão negativa ético-profissional' },
   { key: 'alvara', label: 'Alvará / Licença', icon: '📜', description: 'Alvará de funcionamento ou licença' },
+  { key: 'contrato_pj', label: 'Contratos PJ com Hospitais', icon: '🏥', description: 'Contratos de prestação de serviço PJ' },
   { key: 'outro', label: 'Outro', icon: '📎', description: 'Outros documentos profissionais' },
 ]
 

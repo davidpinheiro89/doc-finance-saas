@@ -102,6 +102,7 @@ export type CategoriaDocumento =
   | 'comprovante_endereco'
   | 'certidao_negativa'
   | 'alvara'
+  | 'contrato_pj'
   | 'outro'
 
 /** Documento — linha da tabela `public.documentos`. */

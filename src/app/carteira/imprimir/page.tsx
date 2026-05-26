@@ -17,6 +17,7 @@ const DOC_CATEGORIES: Record<string, { label: string; icon: string }> = {
   comprovante_endereco: { label: 'Comprovante de Endereço', icon: '🏠' },
   certidao_negativa: { label: 'Certidão Negativa', icon: '✅' },
   alvara: { label: 'Alvará / Licença', icon: '📜' },
+  contrato_pj: { label: 'Contratos PJ com Hospitais', icon: '🏥' },
   outro: { label: 'Outro', icon: '📎' },
 }
 
