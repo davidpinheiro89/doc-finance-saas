@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar'
 // Chart imports removed to prevent loops
 import type { Plantao, Despesa, Receita } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { toLocalISO } from '@/lib/date-utils'
 
 export default function FinanceiroPage() {
   const { user, loading } = useAuthGuard()
@@ -15,7 +16,7 @@ export default function FinanceiroPage() {
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showEditExpense, setShowEditExpense] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Despesa | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)) // YYYY-MM format
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }) // YYYY-MM format
   const [selectedYear, setSelectedYear] = useState<number>(2026)
   const [newExpense, setNewExpense] = useState<{
     descricao: string;
@@ -187,7 +188,7 @@ export default function FinanceiroPage() {
           expensesToInsert.push({
             descricao: `${newExpense.descricao} - ${expenseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
             valor: parseFloat(newExpense.valor),
-            data: expenseDate.toISOString().split('T')[0],
+            data: toLocalISO(expenseDate),
             categoria: newExpense.categoria,
             recorrente: true,
             user_id: user!.id

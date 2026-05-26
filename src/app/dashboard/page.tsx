@@ -558,7 +558,7 @@ export default function DashboardPage() {
           .select()
       } else {
         // Create new plantão
-        plantaoData.created_at = new Date().toISOString()
+        // created_at handled by Supabase DEFAULT now()
         plantaoData.user_id = user!.id
         console.log('Saving plantão to table "plantoes":', plantaoData)
         result = await supabase

@@ -5,6 +5,7 @@ import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import type { Documento, CategoriaDocumento } from '@/types/database'
+import { todayLocalISO } from '@/lib/date-utils'
 
 // ── Document category config ──
 const DOC_CATEGORIES: {
@@ -279,7 +280,7 @@ export default function DocumentosPage() {
   // Check if a document has expired
   const isExpired = (validade: string | null) => {
     if (!validade) return false
-    const today = new Date().toISOString().split('T')[0]
+    const today = todayLocalISO()
     return validade.split('T')[0] < today
   }
 
