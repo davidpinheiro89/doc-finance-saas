@@ -47,7 +47,7 @@ export default function AssinaturaPage() {
                 R$29<span className="text-xl">,90</span>
                 <span className="text-sm font-normal text-gray-500">/mês</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Após 3 meses: R$39,90/mês</p>
+              <p className="text-xs text-gray-500 mt-1">Após 3 meses: R$49,90/mês</p>
               <p className="text-[10px] text-orange-600 font-medium mt-1">Garantia de 7 dias · Cancele quando quiser</p>
             </div>
 
@@ -56,13 +56,13 @@ export default function AssinaturaPage() {
               <span className="absolute -top-2.5 right-4 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Melhor valor</span>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Anual</span>
-                <span className="text-[10px] text-emerald-600 font-semibold">Economia de R$238,41/ano</span>
+                <span className="text-[10px] text-emerald-600 font-semibold">Economia de ~50%</span>
               </div>
               <p className="text-3xl font-extrabold text-gray-900">
-                R$240<span className="text-xl">,39</span>
+                R$299<span className="text-xl">,00</span>
                 <span className="text-sm font-normal text-gray-500">/ano</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Equivale a R$20,03/mês</p>
+              <p className="text-xs text-gray-500 mt-1">Equivale a R$24,92/mês</p>
             </div>
           </div>
 

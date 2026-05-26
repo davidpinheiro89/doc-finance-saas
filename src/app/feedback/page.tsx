@@ -7,8 +7,8 @@ import Sidebar from '@/components/Sidebar'
 
 const PRICE_OPTIONS = [
   { value: 'sim_29_90', label: 'Sim, R$29,90/mês com certeza' },
-  { value: 'sim_manter_29_90', label: 'Sim, mas só se mantiver R$29,90 para sempre' },
-  { value: 'prefiro_anual', label: 'Prefiro o plano anual R$240,39/ano' },
+  { value: 'sim_49_90', label: 'Sim, pagaria R$49,90/mês (preço normal)' },
+  { value: 'prefiro_anual', label: 'Prefiro o plano anual R$299,00/ano' },
   { value: 'talvez', label: 'Talvez, preciso usar mais' },
   { value: 'nao_pagaria', label: 'Não pagaria por enquanto' },
 ]

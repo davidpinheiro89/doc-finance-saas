@@ -96,7 +96,7 @@ export default function LandingPage() {
               Conhecer recursos
             </a>
           </div>
-          <p className="mt-4 text-xs text-gray-400">Após 3 meses R$39,90/mês · Plano anual R$240,39 · 7 dias de garantia</p>
+          <p className="mt-4 text-xs text-gray-400">Após 3 meses R$49,90/mês · Plano anual R$299,00 (~R$24,92/mês) · 7 dias de garantia</p>
         </div>
       </section>
 
@@ -162,7 +162,7 @@ export default function LandingPage() {
                 <span className="text-base font-normal text-gray-500">/mês</span>
               </p>
               <p className="text-xs text-gray-500 mt-1">Nos primeiros 3 meses</p>
-              <p className="text-xs text-gray-400">Após: R$39,90/mês</p>
+              <p className="text-xs text-gray-400">Após: R$49,90/mês</p>
               <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
                 {[
                   'Painel financeiro completo',
@@ -199,11 +199,11 @@ export default function LandingPage() {
             <div className="p-7 pt-12 text-center">
               <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">Anual</p>
               <p className="text-4xl font-extrabold">
-                R$240<span className="text-2xl">,39</span>
+                R$299<span className="text-2xl">,00</span>
                 <span className="text-base font-normal text-gray-500">/ano</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Equivale a R$20,03/mês</p>
-              <p className="text-xs text-emerald-600 font-semibold">Economia de R$238,41/ano</p>
+              <p className="text-xs text-gray-500 mt-1">Equivale a R$24,92/mês</p>
+              <p className="text-xs text-emerald-600 font-semibold">Economia de ~50% vs mensal</p>
               <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
                 {[
                   'Painel financeiro completo',
