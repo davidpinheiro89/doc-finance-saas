@@ -357,8 +357,14 @@ export default function DashboardPage() {
     const TAX_RATE = 0.25
     const valorLiquido = valorBruto * (1 - TAX_RATE)
 
-    // Valor médio por hora trabalhada
+    // Valor médio por hora trabalhada (período filtrado)
     const valorHora = horasTotal > 0 ? valorBruto / horasTotal : 0
+
+    // Média histórica geral (todos os plantões do médico, para comparação)
+    const allNonFolga = plantoes.filter(p => !isFolga(p))
+    const allValor = allNonFolga.reduce((s, p) => s + (p.valor || 0), 0)
+    const allHoras = allNonFolga.reduce((s, p) => s + (p.horas || 0), 0)
+    const valorHoraHistorico = allHoras > 0 ? allValor / allHoras : 0
 
     // Progresso da meta mensal (usa apenas mês atual)
     const { start: mesStart, end: mesEnd } = getCurrentMonthRangeLocal()
@@ -382,7 +388,7 @@ export default function DashboardPage() {
       .sort((a, b) => b.valorHora - a.valorHora)
       .slice(0, 5)
 
-    return { quantidade, valorBruto, horasTotal, valorLiquido, valorHora, faturamentoMes, progressoMeta, hospitalRanking }
+    return { quantidade, valorBruto, horasTotal, valorLiquido, valorHora, valorHoraHistorico, faturamentoMes, progressoMeta, hospitalRanking }
   }, [getFilteredPlantoes, plantoes, metaMensal])
 
   const handleCepLookup = async () => {
@@ -946,7 +952,20 @@ export default function DashboardPage() {
                   <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
                   <p className="text-sm font-medium text-orange-100">Valor Médio / Hora</p>
                   <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorHora)}</p>
-                  <p className="text-xs text-orange-200 mt-2">{formatHoras(metrics.horasTotal)} trabalhadas</p>
+                  <p className="text-xs text-orange-200 mt-2">
+                    {metrics.valorHoraHistorico > 0 && metrics.valorHora > 0 ? (
+                      <>
+                        Sua média histórica: {formatCurrency(metrics.valorHoraHistorico)}/h
+                        {metrics.valorHora > metrics.valorHoraHistorico
+                          ? <span className="ml-1 text-green-200">▲ acima</span>
+                          : metrics.valorHora < metrics.valorHoraHistorico
+                          ? <span className="ml-1 text-red-200">▼ abaixo</span>
+                          : null}
+                      </>
+                    ) : (
+                      <>{formatHoras(metrics.horasTotal)} trabalhadas no período</>
+                    )}
+                  </p>
                 </div>
 
                 {/* Carga Horária */}
