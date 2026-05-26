@@ -96,7 +96,7 @@ export default function LandingPage() {
               Conhecer recursos
             </a>
           </div>
-          <p className="mt-4 text-xs text-gray-400">7 dias de garantia · Cancele quando quiser</p>
+          <p className="mt-4 text-xs text-gray-400">Após 3 meses R$39,90/mês · Plano anual R$240,39 · 7 dias de garantia</p>
         </div>
       </section>
 
@@ -145,44 +145,91 @@ export default function LandingPage() {
 
       {/* ── Preços ── */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
-        <h3 className="text-2xl sm:text-3xl font-bold text-center mb-3">Plano único, acesso total</h3>
+        <h3 className="text-2xl sm:text-3xl font-bold text-center mb-3">Escolha seu plano</h3>
         <p className="text-center text-gray-500 mb-10 max-w-lg mx-auto">
-          Sem planos confusos. Um preço justo com tudo incluso.
+          Acesso total a todos os recursos. Sem surpresas.
         </p>
-        <div className="max-w-sm mx-auto bg-white rounded-2xl border-2 border-orange-500 shadow-xl shadow-orange-500/10 overflow-hidden">
-          <div className="bg-orange-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
-            Preço de lançamento
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
+          {/* Plano Mensal */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="bg-orange-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
+              Lançamento
+            </div>
+            <div className="p-7 text-center">
+              <p className="text-xs font-bold text-orange-600 uppercase tracking-wide mb-2">Mensal</p>
+              <p className="text-4xl font-extrabold">
+                R$29<span className="text-2xl">,90</span>
+                <span className="text-base font-normal text-gray-500">/mês</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Nos primeiros 3 meses</p>
+              <p className="text-xs text-gray-400">Após: R$39,90/mês</p>
+              <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
+                {[
+                  'Painel financeiro completo',
+                  'Calendário de escalas',
+                  'Compartilhamento via WhatsApp',
+                  'Carteira de documentos',
+                  'Estimativa de IR (carnê-leão)',
+                  'Relatórios e exportação PDF',
+                  'Suporte por e-mail',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="/register"
+                className="mt-6 block w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors shadow-lg shadow-orange-500/25 text-sm"
+              >
+                Começar agora
+              </a>
+              <p className="text-[10px] text-gray-400 mt-2">Garantia de 7 dias · Cancele quando quiser</p>
+            </div>
           </div>
-          <div className="p-8 text-center">
-            <p className="text-sm text-gray-500 line-through">R$49,90/mês</p>
-            <p className="text-4xl font-extrabold mt-1">
-              R$29<span className="text-2xl">,90</span>
-              <span className="text-base font-normal text-gray-500">/mês</span>
-            </p>
-            <ul className="mt-6 space-y-2.5 text-sm text-left text-gray-700">
-              {[
-                'Painel financeiro completo',
-                'Calendário de escalas',
-                'Compartilhamento via WhatsApp',
-                'Carteira de documentos',
-                'Estimativa de IR (carnê-leão)',
-                'Relatórios e exportação PDF',
-                'Suporte por e-mail',
-              ].map((item, i) => (
-                <li key={i} className="flex items-center gap-2.5">
-                  <svg className="h-4 w-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                  </svg>
-                  {item}
-                </li>
-              ))}
-            </ul>
-            <a
-              href="/register"
-              className="mt-8 block w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors shadow-lg shadow-orange-500/25"
-            >
-              Criar minha conta
-            </a>
+
+          {/* Plano Anual */}
+          <div className="relative bg-white rounded-2xl border-2 border-emerald-400 shadow-xl shadow-emerald-500/10 overflow-hidden">
+            <span className="absolute -top-0 right-0 left-0 bg-emerald-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
+              Melhor valor
+            </span>
+            <div className="p-7 pt-12 text-center">
+              <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">Anual</p>
+              <p className="text-4xl font-extrabold">
+                R$240<span className="text-2xl">,39</span>
+                <span className="text-base font-normal text-gray-500">/ano</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Equivale a R$20,03/mês</p>
+              <p className="text-xs text-emerald-600 font-semibold">Economia de R$238,41/ano</p>
+              <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
+                {[
+                  'Painel financeiro completo',
+                  'Calendário de escalas',
+                  'Compartilhamento via WhatsApp',
+                  'Carteira de documentos',
+                  'Estimativa de IR (carnê-leão)',
+                  'Relatórios e exportação PDF',
+                  'Suporte por e-mail',
+                ].map((item, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <svg className="h-4 w-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                    </svg>
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <a
+                href="/register"
+                className="mt-6 block w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition-colors shadow-lg shadow-emerald-500/25 text-sm"
+              >
+                Assinar plano anual
+              </a>
+              <p className="text-[10px] text-gray-400 mt-2">Garantia de 7 dias · Cancele quando quiser</p>
+            </div>
           </div>
         </div>
       </section>

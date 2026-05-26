@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * Fluxo:
  *   1. Autentica via Supabase JWT (cookie de sessão)
  *   2. Cria (ou reutiliza) cliente no Asaas
- *   3. Cria assinatura recorrente mensal R$49,90 via cartão de crédito
+ *   3. Cria assinatura recorrente mensal R$29,90 via cartão de crédito
  *   4. Salva asaas_customer_id + subscription_status='pending' no user_metadata
  *   5. Retorna invoiceUrl do Asaas para o médico inserir dados do cartão
  */
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         customer: customerId,
         billingType: 'CREDIT_CARD',
-        value: 49.90,
+        value: 29.90,
         nextDueDate: dueDateStr,
         cycle: 'MONTHLY',
         description: 'BEM Plantonista — Assinatura Mensal',

@@ -35,14 +35,35 @@ export default function AssinaturaPage() {
             Para acessar o painel, ative sua assinatura do BEM Plantonista.
           </p>
 
-          {/* Pricing highlight */}
-          <div className="bg-orange-50 border border-orange-200/60 rounded-xl p-5 mb-6">
-            <p className="text-sm text-gray-500 line-through">R$49,90/mês</p>
-            <p className="text-3xl font-extrabold text-gray-900 mt-0.5">
-              R$29<span className="text-xl">,90</span>
-              <span className="text-sm font-normal text-gray-500">/mês</span>
-            </p>
-            <p className="text-xs text-orange-600 font-medium mt-1">Preço de lançamento · Garantia de 7 dias</p>
+          {/* Pricing options */}
+          <div className="space-y-3 mb-6">
+            {/* Plano Mensal */}
+            <div className="bg-orange-50 border border-orange-200/60 rounded-xl p-5 text-left">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-orange-600 uppercase tracking-wide">Mensal</span>
+                <span className="text-[10px] text-gray-400">Primeiros 3 meses</span>
+              </div>
+              <p className="text-3xl font-extrabold text-gray-900">
+                R$29<span className="text-xl">,90</span>
+                <span className="text-sm font-normal text-gray-500">/mês</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Após 3 meses: R$39,90/mês</p>
+              <p className="text-[10px] text-orange-600 font-medium mt-1">Garantia de 7 dias · Cancele quando quiser</p>
+            </div>
+
+            {/* Plano Anual */}
+            <div className="relative bg-emerald-50 border-2 border-emerald-400 rounded-xl p-5 text-left">
+              <span className="absolute -top-2.5 right-4 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Melhor valor</span>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Anual</span>
+                <span className="text-[10px] text-emerald-600 font-semibold">Economia de R$238,41/ano</span>
+              </div>
+              <p className="text-3xl font-extrabold text-gray-900">
+                R$240<span className="text-xl">,39</span>
+                <span className="text-sm font-normal text-gray-500">/ano</span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">Equivale a R$20,03/mês</p>
+            </div>
           </div>
 
           <a
