@@ -56,34 +56,34 @@ export default function CarteiraPublicaPage() {
   const fetchCarteira = async () => {
     setLoading(true)
     try {
-      // 1. Buscar o link público
-      const { data: link, error: linkError } = await supabase
-        .from('carteira_publica')
-        .select('user_id, expires_at')
-        .eq('token', token)
-        .single()
+      // Chamar RPC que valida token + expiração e retorna documentos (SECURITY DEFINER, bypassa RLS)
+      const { data: docs, error } = await supabase
+        .rpc('get_carteira_publica', { p_token: token })
 
-      if (linkError || !link) { setNotFound(true); return }
+      if (error) {
+        // Se o token não é UUID válido, o Postgres retorna erro
+        setNotFound(true)
+        return
+      }
 
-      // 2. Verificar expiração
-      if (new Date(link.expires_at) < new Date()) { setExpired(true); return }
+      if (!docs || docs.length === 0) {
+        // Pode ser token inválido, expirado, ou sem documentos.
+        // Verificar se o link existe para dar mensagem correta.
+        const { data: link } = await supabase
+          .from('carteira_publica')
+          .select('expires_at')
+          .eq('token', token)
+          .single()
 
-      // 3. Buscar documentos do usuário
-      const { data: docs } = await supabase
-        .from('documentos')
-        .select('id, nome, categoria, arquivo_url, validade')
-        .eq('user_id', link.user_id)
-        .order('created_at', { ascending: false })
+        if (!link) { setNotFound(true); return }
+        if (new Date(link.expires_at) < new Date()) { setExpired(true); return }
 
-      setDocumentos(docs || [])
+        // Link válido, mas o médico não tem documentos
+        setDocumentos([])
+        return
+      }
 
-      // 4. Buscar nome do médico (user_metadata via auth.users não é acessível pelo anon)
-      // Usamos o nome do primeiro documento ou fallback
-      // Para ter o nome, vamos buscar de uma forma alternativa
-      // Por enquanto usamos info que temos
-      setDoctorName('Médico(a)')
-      setCrm('')
-
+      setDocumentos(docs)
     } catch {
       setNotFound(true)
     } finally {
