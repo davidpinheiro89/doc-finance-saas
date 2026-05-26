@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
@@ -9,6 +10,7 @@ import { isFolga, formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesFuturosPage() {
   const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dateRange, setDateRange] = useState({
@@ -279,12 +281,25 @@ export default function PlantoesFuturosPage() {
             </div>
             
             {filteredPlantoes.length === 0 ? (
-              <div className="p-8 text-center">
-                <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500">Nenhum plantão futuro agendado</p>
-                <p className="text-sm text-gray-400 mt-2">Adicione plantões futuros para vê-los aqui</p>
+              <div className="py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-5">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Nenhum plantão agendado ainda</h3>
+                <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+                  Adicione seus próximos plantões para acompanhar sua agenda e projetar seu faturamento
+                </p>
+                <button
+                  onClick={() => router.push('/escala')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Agendar Primeiro Plantão
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
