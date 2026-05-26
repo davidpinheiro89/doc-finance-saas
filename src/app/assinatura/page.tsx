@@ -67,7 +67,7 @@ export default function AssinaturaPage() {
           </div>
 
           <a
-            href="https://wa.me/5511999999999?text=Ol%C3%A1%2C%20gostaria%20de%20ativar%20minha%20assinatura%20do%20BEM%20Plantonista."
+            href="https://wa.me/5511985904388?text=Ol%C3%A1%2C%20gostaria%20de%20ativar%20minha%20assinatura%20do%20BEM%20Plantonista."
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors shadow-lg shadow-orange-500/25 mb-3"
