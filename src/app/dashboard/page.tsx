@@ -74,6 +74,7 @@ export default function DashboardPage() {
   const [dashboardFilter, setDashboardFilter] = useState<'current' | '3months' | 'hospital'>('current')
   const [hospitalFilter, setHospitalFilter] = useState<string>('')
   const [metaMensal, setMetaMensal] = useState<number>(30000)
+  const [metaEditing, setMetaEditing] = useState(false)
   const [metaSaving, setMetaSaving] = useState(false)
   const [metaSaved, setMetaSaved] = useState(false)
   // History filters
@@ -975,15 +976,31 @@ export default function DashboardPage() {
                       {metaSaving && (
                         <span className="text-[10px] text-gray-400">Salvando...</span>
                       )}
-                      <span className="text-xs text-gray-400">Meta:</span>
-                      <input
-                        type="number"
-                        value={metaMensal}
-                        onChange={(e) => setMetaMensal(Number(e.target.value) || 0)}
-                        onBlur={() => saveMetaMensal(metaMensal)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } }}
-                        className="w-24 text-right text-xs font-medium text-gray-700 border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
-                      />
+                      {metaEditing ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400">R$</span>
+                          <input
+                            autoFocus
+                            type="number"
+                            value={metaMensal}
+                            onChange={(e) => setMetaMensal(Number(e.target.value) || 0)}
+                            onBlur={() => { saveMetaMensal(metaMensal); setMetaEditing(false) }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') setMetaEditing(false) }}
+                            className="w-28 text-right text-xs font-medium text-gray-700 border border-orange-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setMetaEditing(true)}
+                          title="Clique para editar sua meta mensal"
+                          className="group flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-orange-50 transition-colors"
+                        >
+                          <span className="text-xs font-medium text-gray-600">{formatCurrency(metaMensal)}</span>
+                          <svg className="h-3.5 w-3.5 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
                     </div>
                   </div>
 
