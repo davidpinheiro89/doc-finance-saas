@@ -7,6 +7,8 @@ import Sidebar from '@/components/Sidebar'
 import { SkeletonMetricCard, SkeletonTableRows } from '@/components/Skeleton'
 import DashboardAlerts from '@/components/DashboardAlerts'
 import NotificationPermission from '@/components/NotificationPermission'
+import OnboardingModal from '@/components/OnboardingModal'
+import { useOnboarding } from '@/hooks/useOnboarding'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga, formatHoras } from '@/lib/folga-utils'
@@ -82,6 +84,9 @@ export default function DashboardPage() {
   const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'pago' | 'aguardando' | 'atrasado'>('all')
   const [historyShowAll, setHistoryShowAll] = useState(false)
   const metaSavedTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  // --- Onboarding (primeiro acesso) ---
+  const onboarding = useOnboarding(user)
 
   // --- TanStack Query: lista principal de plantões do usuário ---
   const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
@@ -837,6 +842,15 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
+      {onboarding.showOnboarding && (
+        <OnboardingModal
+          step={onboarding.step}
+          setStep={onboarding.setStep}
+          saveProfile={onboarding.saveProfile}
+          completeOnboarding={onboarding.completeOnboarding}
+          skipOnboarding={onboarding.skipOnboarding}
+        />
+      )}
       <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
 
       <div className="flex-1 overflow-auto w-full relative z-10">
