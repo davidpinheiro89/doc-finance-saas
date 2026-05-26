@@ -8,16 +8,48 @@ import type { Plantao, Despesa } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga } from '@/lib/folga-utils'
 
+type RegimeTributario = 'pessoa_fisica' | 'simples_nacional' | 'lucro_presumido'
+
+const REGIME_OPTIONS: { key: RegimeTributario; label: string; description: string }[] = [
+  { key: 'pessoa_fisica', label: 'Pessoa Física', description: 'Carnê-Leão com tabela progressiva IRPF' },
+  { key: 'simples_nacional', label: 'Simples Nacional', description: 'Anexo III/V — alíquota efetiva sobre faturamento' },
+  { key: 'lucro_presumido', label: 'Lucro Presumido', description: 'Presunção de 32% + IRPJ 15% + CSLL 9% + PIS/COFINS 3,65%' },
+]
+
 export default function ImpostoRendaPage() {
   const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
+  const [regime, setRegime] = useState<RegimeTributario>('pessoa_fisica')
+  const [regimeSaving, setRegimeSaving] = useState(false)
 
   useEffect(() => {
-    if (user) fetchData(user.id)
+    if (user) {
+      fetchData(user.id)
+      fetchRegime(user.id)
+    }
   }, [user])
+
+  const fetchRegime = async (userId: string) => {
+    const { data } = await supabase
+      .from('user_settings')
+      .select('regime_tributario')
+      .eq('user_id', userId)
+      .single()
+    if (data?.regime_tributario) setRegime(data.regime_tributario as RegimeTributario)
+  }
+
+  const saveRegime = async (value: RegimeTributario) => {
+    if (!user) return
+    setRegime(value)
+    setRegimeSaving(true)
+    await supabase
+      .from('user_settings')
+      .upsert({ user_id: user.id, regime_tributario: value }, { onConflict: 'user_id' })
+    setRegimeSaving(false)
+  }
 
   const fetchData = async (userId: string) => {
     await Promise.all([
@@ -100,7 +132,6 @@ export default function ImpostoRendaPage() {
   const totalDespesas = yearlyDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
 
   // ── Tabela Progressiva Mensal IRPF (vigente desde fev/2024) ──
-  // Aplicada via carnê-leão para profissionais autônomos PF
   function calculateMonthlyTax(monthlyBase: number): number {
     if (monthlyBase <= 2259.20) return 0
     if (monthlyBase <= 2826.65) return monthlyBase * 0.075 - 169.44
@@ -109,30 +140,66 @@ export default function ImpostoRendaPage() {
     return monthlyBase * 0.275 - 896.00
   }
 
-  // Agrupa receita por mês e calcula imposto mensal (carnê-leão)
+  // ── Simples Nacional — Anexo III faixa 1-6 (serviços médicos) ──
+  function calcSimplesNacional(faturamento12m: number): number {
+    // Alíquotas efetivas aproximadas do Anexo III/V para serviços de saúde
+    if (faturamento12m <= 180000) return faturamento12m * 0.06
+    if (faturamento12m <= 360000) return faturamento12m * 0.112
+    if (faturamento12m <= 720000) return faturamento12m * 0.135
+    if (faturamento12m <= 1800000) return faturamento12m * 0.16
+    if (faturamento12m <= 3600000) return faturamento12m * 0.21
+    return faturamento12m * 0.33 // acima do teto
+  }
+
+  // ── Lucro Presumido — presunção 32% para serviços ──
+  function calcLucroPresumido(receita: number): { irpj: number; csll: number; pis_cofins: number; total: number } {
+    const basePresumida = receita * 0.32
+    const irpj = basePresumida * 0.15 + Math.max(0, (basePresumida - 60000) * 0.10) // adicional 10% sobre excedente de R$20k/mês (R$60k/tri)
+    const csll = basePresumida * 0.09
+    const pis_cofins = receita * 0.0365 // PIS 0,65% + COFINS 3%
+    return { irpj, csll, pis_cofins, total: irpj + csll + pis_cofins }
+  }
+
+  // Agrupa receita por mês
   const monthlyIncome: Record<string, number> = {}
   remunerados.forEach(p => {
-    const month = (p.data || '').split('T')[0].slice(0, 7) // YYYY-MM
+    const month = (p.data || '').split('T')[0].slice(0, 7)
     if (month) monthlyIncome[month] = (monthlyIncome[month] || 0) + (p.valor || 0)
   })
 
+  // ── Cálculo conforme regime ──
   let impostoDevido = 0
   let totalDeducao = 0
+  let deducaoSimplificada = 0
+  let baseCalculo = 0
+  let aliquotaEfetiva = 0
+  let detalheLucroPresumido = { irpj: 0, csll: 0, pis_cofins: 0, total: 0 }
+
   const monthlyBreakdown = Object.entries(monthlyIncome)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([month, income]) => {
-      const deducao = income * 0.20 // Dedução simplificada de 20%
+      const deducao = income * 0.20
       const base = Math.max(0, income - deducao)
       const tax = Math.max(0, calculateMonthlyTax(base))
       totalDeducao += deducao
-      impostoDevido += tax
       return { month, income, deducao, base, tax }
     })
 
-  // Limita dedução simplificada ao teto anual de R$16.754,34
-  const deducaoSimplificada = Math.min(totalDeducao, 16754.34)
-  const baseCalculo = Math.max(0, totalReceita - deducaoSimplificada)
-  const aliquotaEfetiva = totalReceita > 0 ? (impostoDevido / totalReceita) * 100 : 0
+  if (regime === 'pessoa_fisica') {
+    impostoDevido = monthlyBreakdown.reduce((s, r) => s + r.tax, 0)
+    deducaoSimplificada = Math.min(totalDeducao, 16754.34)
+    baseCalculo = Math.max(0, totalReceita - deducaoSimplificada)
+    aliquotaEfetiva = totalReceita > 0 ? (impostoDevido / totalReceita) * 100 : 0
+  } else if (regime === 'simples_nacional') {
+    impostoDevido = calcSimplesNacional(totalReceita)
+    baseCalculo = totalReceita
+    aliquotaEfetiva = totalReceita > 0 ? (impostoDevido / totalReceita) * 100 : 0
+  } else {
+    detalheLucroPresumido = calcLucroPresumido(totalReceita)
+    impostoDevido = detalheLucroPresumido.total
+    baseCalculo = totalReceita * 0.32
+    aliquotaEfetiva = totalReceita > 0 ? (impostoDevido / totalReceita) * 100 : 0
+  }
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -273,6 +340,38 @@ export default function ImpostoRendaPage() {
             <p className="text-gray-600 mt-2">Resumo anual para declaração de imposto de renda</p>
           </div>
 
+          {/* Regime Tributário Selector */}
+          <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Regime Tributário</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Selecione como você recolhe impostos</p>
+              </div>
+              {regimeSaving && <span className="text-[10px] text-gray-400">Salvando...</span>}
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {REGIME_OPTIONS.map(opt => (
+                <button
+                  key={opt.key}
+                  onClick={() => saveRegime(opt.key)}
+                  className={`relative text-left p-4 rounded-xl border-2 transition-all ${
+                    regime === opt.key
+                      ? 'border-orange-500 bg-orange-50/50 shadow-sm'
+                      : 'border-gray-200 hover:border-orange-300 hover:bg-orange-50/20'
+                  }`}
+                >
+                  {regime === opt.key && (
+                    <span className="absolute top-2 right-2 w-5 h-5 bg-orange-500 rounded-full flex items-center justify-center">
+                      <svg className="h-3 w-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                    </span>
+                  )}
+                  <p className={`text-sm font-semibold ${regime === opt.key ? 'text-orange-700' : 'text-gray-800'}`}>{opt.label}</p>
+                  <p className="text-[11px] text-gray-500 mt-1 leading-tight">{opt.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Year Selector */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
             <div className="flex items-center justify-between">
@@ -301,7 +400,12 @@ export default function ImpostoRendaPage() {
 
           {/* Breakdown do Cálculo */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-            <h3 className="text-lg font-semibold text-gray-800 mb-4">Cálculo do Imposto — {selectedYear}</h3>
+            <h3 className="text-lg font-semibold text-gray-800 mb-4">
+              Cálculo do Imposto — {selectedYear}
+              <span className="ml-2 text-xs font-normal px-2 py-0.5 rounded-full bg-orange-100 text-orange-700">
+                {REGIME_OPTIONS.find(r => r.key === regime)?.label}
+              </span>
+            </h3>
             <div className="space-y-3">
               <div className="flex justify-between items-center py-2">
                 <span className="text-sm text-gray-600">Receita Bruta (plantões)</span>
@@ -311,12 +415,44 @@ export default function ImpostoRendaPage() {
                 <span className="text-sm text-gray-600">Despesas registradas</span>
                 <span className="text-sm font-bold text-red-600">- {formatCurrency(totalDespesas)}</span>
               </div>
-              <div className="border-t border-gray-100 pt-2 flex justify-between items-center py-2">
-                <span className="text-sm text-gray-600">Dedução simplificada (20%, máx. R$16.754,34/ano)</span>
-                <span className="text-sm font-bold text-orange-600">- {formatCurrency(deducaoSimplificada)}</span>
-              </div>
+
+              {regime === 'pessoa_fisica' && (
+                <div className="border-t border-gray-100 pt-2 flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-600">Dedução simplificada (20%, máx. R$16.754,34/ano)</span>
+                  <span className="text-sm font-bold text-orange-600">- {formatCurrency(deducaoSimplificada)}</span>
+                </div>
+              )}
+
+              {regime === 'lucro_presumido' && (
+                <>
+                  <div className="border-t border-gray-100 pt-2 flex justify-between items-center py-2">
+                    <span className="text-sm text-gray-600">Base presumida (32% da receita)</span>
+                    <span className="text-sm font-bold text-yellow-600">{formatCurrency(baseCalculo)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-gray-600">IRPJ (15% + adicional 10%)</span>
+                    <span className="text-sm font-bold text-blue-600">{formatCurrency(detalheLucroPresumido.irpj)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-gray-600">CSLL (9%)</span>
+                    <span className="text-sm font-bold text-blue-600">{formatCurrency(detalheLucroPresumido.csll)}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-gray-600">PIS + COFINS (3,65%)</span>
+                    <span className="text-sm font-bold text-blue-600">{formatCurrency(detalheLucroPresumido.pis_cofins)}</span>
+                  </div>
+                </>
+              )}
+
+              {regime === 'simples_nacional' && (
+                <div className="border-t border-gray-100 pt-2 flex justify-between items-center py-2">
+                  <span className="text-sm text-gray-600">Faturamento acumulado 12 meses (base DAS)</span>
+                  <span className="text-sm font-bold text-yellow-600">{formatCurrency(totalReceita)}</span>
+                </div>
+              )}
+
               <div className="border-t border-gray-200 pt-3 flex justify-between items-center py-2">
-                <span className="text-sm font-semibold text-gray-800">Base de Cálculo anual</span>
+                <span className="text-sm font-semibold text-gray-800">Base de Cálculo</span>
                 <span className="text-lg font-bold text-yellow-600">{formatCurrency(baseCalculo)}</span>
               </div>
               <div className="flex justify-between items-center py-2">
@@ -324,14 +460,16 @@ export default function ImpostoRendaPage() {
                 <span className="text-lg font-bold text-blue-600">{aliquotaEfetiva.toFixed(2)}%</span>
               </div>
               <div className="border-t-2 border-gray-300 pt-3 flex justify-between items-center py-2">
-                <span className="text-base font-bold text-gray-900">Imposto Devido (carnê-leão)</span>
+                <span className="text-base font-bold text-gray-900">
+                  {regime === 'pessoa_fisica' ? 'Imposto Devido (carnê-leão)' : regime === 'simples_nacional' ? 'DAS Estimado (anual)' : 'Impostos Totais (IRPJ+CSLL+PIS/COFINS)'}
+                </span>
                 <span className="text-2xl font-extrabold text-blue-700">{formatCurrency(impostoDevido)}</span>
               </div>
             </div>
           </div>
 
-          {/* Resumo Mensal — Carnê-Leão */}
-          {monthlyBreakdown.length > 0 && (
+          {/* Resumo Mensal — Carnê-Leão (só PF) */}
+          {regime === 'pessoa_fisica' && monthlyBreakdown.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8">
               <div className="px-6 py-4 border-b border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800">Detalhamento Mensal (Carnê-Leão)</h3>
