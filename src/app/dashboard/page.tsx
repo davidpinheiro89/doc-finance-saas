@@ -826,7 +826,7 @@ export default function DashboardPage() {
               Identificamos que você ainda não possui uma assinatura ativa no BEM Plantonista. Ative seu plano piloto para liberar o acesso completo à sua escala e controle financeiro.
             </p>
             <a
-              href="https://wa.me/5511999999999?text=Olá, gostaria de ativar minha conta do BEM Plantonista."
+              href="https://wa.me/5511985904388?text=Olá, gostaria de ativar minha conta do BEM Plantonista."
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all active:scale-[0.98]"
