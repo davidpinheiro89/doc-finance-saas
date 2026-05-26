@@ -502,8 +502,8 @@ export default function EscalaPage() {
             <button onClick={() => navigateMonth('prev')} className="p-2.5 rounded-xl hover:bg-white border border-gray-200/60 shadow-sm transition-all hover:shadow-md">
               <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             </button>
-            <h2 className="text-xl font-bold text-gray-900 capitalize">
-              {currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+            <h2 className="text-xl font-bold text-gray-900">
+              {(() => { const s = currentMonth.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1) })()}
             </h2>
             <button onClick={() => navigateMonth('next')} className="p-2.5 rounded-xl hover:bg-white border border-gray-200/60 shadow-sm transition-all hover:shadow-md">
               <svg className="h-5 w-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
