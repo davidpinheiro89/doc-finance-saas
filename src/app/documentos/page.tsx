@@ -56,6 +56,8 @@ export default function DocumentosPage() {
   const [shareMode, setShareMode] = useState(false)
   const [selectedForShare, setSelectedForShare] = useState<Set<string>>(new Set())
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Documento | null>(null)
+  const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -152,24 +154,39 @@ export default function DocumentosPage() {
     }
   }
 
-  const handleDelete = async (doc: Documento) => {
-    if (!user) return
-    if (!confirm(`Excluir "${doc.nome}"? Esta ação não pode ser desfeita.`)) return
+  const showToast = (msg: string, type: 'success' | 'error') => {
+    setToast({ msg, type })
+    setTimeout(() => setToast(null), 3000)
+  }
 
+  const handleDeleteClick = (doc: Documento) => {
+    setDeleteTarget(doc)
+  }
+
+  const confirmDelete = async () => {
+    if (!user || !deleteTarget) return
+    const doc = deleteTarget
+    setDeleteTarget(null)
     setDeletingId(doc.id)
     try {
       // Delete from storage if URL exists
       if (doc.arquivo_url) {
-        const path = doc.arquivo_url.split('/documentos/')[1]
+        const urlWithoutParams = doc.arquivo_url.split('?')[0]
+        const path = urlWithoutParams.split('/documentos/')[1]
         if (path) {
           await supabase.storage.from('documentos').remove([decodeURIComponent(path)])
         }
       }
       // Delete row
-      await supabase.from('documentos').delete().eq('id', doc.id).eq('user_id', user.id)
-      await fetchDocumentos(user.id)
+      const { error } = await supabase.from('documentos').delete().eq('id', doc.id).eq('user_id', user.id)
+      if (error) {
+        showToast('Erro ao excluir: ' + error.message, 'error')
+        return
+      }
+      setDocumentos(prev => prev.filter(d => d.id !== doc.id))
+      showToast('Documento excluído com sucesso', 'success')
     } catch {
-      alert('Erro ao excluir documento.')
+      showToast('Erro ao excluir documento. Tente novamente.', 'error')
     } finally {
       setDeletingId(null)
     }
@@ -466,7 +483,7 @@ export default function DocumentosPage() {
                                   <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                                 </a>
                               )}
-                              <button onClick={() => handleDelete(doc)} disabled={deletingId === doc.id}
+                              <button onClick={() => handleDeleteClick(doc)} disabled={deletingId === doc.id}
                                 className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
                                 {deletingId === doc.id
                                   ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-500 border-t-transparent" />
@@ -593,6 +610,52 @@ export default function DocumentosPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Delete Confirmation Modal ── */}
+      {deleteTarget && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-[60] p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-gray-200/60" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center flex-shrink-0">
+                <svg className="h-5 w-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Excluir documento?</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Esta ação não pode ser desfeita.</p>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-5 pl-[52px]">
+              <span className="font-medium">{deleteTarget.nome}</span> será removido permanentemente.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 text-sm font-medium border border-gray-300 text-gray-600 rounded-xl hover:bg-gray-50 transition-colors">
+                Cancelar
+              </button>
+              <button onClick={confirmDelete}
+                className="flex-1 py-2.5 text-sm font-semibold text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors">
+                Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Toast ── */}
+      {toast && (
+        <div className={`fixed bottom-6 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl shadow-lg text-sm font-medium flex items-center gap-2 animate-[slideUp_0.2s_ease-out] ${
+          toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-red-600 text-white'
+        }`}>
+          {toast.type === 'success' ? (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+          ) : (
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          )}
+          {toast.msg}
         </div>
       )}
     </div>
