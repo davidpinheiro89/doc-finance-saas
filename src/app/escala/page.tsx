@@ -433,11 +433,24 @@ export default function EscalaPage() {
   // Fill remaining slots to complete last row
   while (calendarDays.length % 7 !== 0) calendarDays.push(null)
 
-  // Month stats
-  const monthPlantoes = plantoes.filter(p => {
-    const d = (p.data || '').split('T')[0]
-    const prefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
-    return d.startsWith(prefix) && p.classificacao !== 'folga' && p.classificacao !== 'disponivel'
+  // Month stats — only revenue-generating blocks count as "plantões"
+  const monthPrefix = `${currentMonth.getFullYear()}-${String(currentMonth.getMonth() + 1).padStart(2, '0')}`
+  const nonRevenueKeys = new Set<string>(BLOCK_TYPES.filter(b => !b.revenue).map(b => b.key))
+
+  const isRevenueEvent = (p: PlantaoListItem) => {
+    const cls = (p.classificacao || '').toLowerCase()
+    if (cls === 'folga' || cls === 'disponivel' || cls === 'disponível') return false
+    if (nonRevenueKeys.has(cls)) return false
+    // Custom non-revenue blocks: valor === 0 and classificacao not in standard revenue categories
+    if (p.valor === 0 && cls !== '' && !['Sala Verde', 'Sala Amarela', 'Sala Vermelha', 'Outro'].includes(p.classificacao || '')) return false
+    return true
+  }
+
+  const monthEvents = plantoes.filter(p => (p.data || '').split('T')[0].startsWith(monthPrefix))
+  const monthPlantoes = monthEvents.filter(isRevenueEvent)
+  const monthFolgas = monthEvents.filter(p => {
+    const cls = (p.classificacao || '').toLowerCase()
+    return cls === 'folga'
   })
   const monthRevenue = monthPlantoes.reduce((s, p) => s + (p.valor || 0), 0)
   const monthHours = monthPlantoes.reduce((s, p) => s + (p.horas || 0), 0)
@@ -468,6 +481,11 @@ export default function EscalaPage() {
                 </div>
                 <div className="w-px h-8 bg-gray-200" />
                 <div className="text-right">
+                  <p className="text-[10px] text-gray-400 uppercase tracking-wider">Folgas</p>
+                  <p className="text-sm font-bold text-gray-500">{monthFolgas.length}</p>
+                </div>
+                <div className="w-px h-8 bg-gray-200" />
+                <div className="text-right">
                   <p className="text-[10px] text-gray-400 uppercase tracking-wider">Faturamento</p>
                   <p className="text-sm font-bold text-emerald-600">{formatCurrency(monthRevenue)}</p>
                 </div>
@@ -483,6 +501,10 @@ export default function EscalaPage() {
               <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
                 <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Plantões</p>
                 <p className="text-sm font-bold text-gray-800">{monthPlantoes.length}</p>
+              </div>
+              <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
+                <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Folgas</p>
+                <p className="text-sm font-bold text-gray-500">{monthFolgas.length}</p>
               </div>
               <div className="flex-1 bg-gray-50 rounded-lg px-2.5 py-1.5 text-center border border-gray-100">
                 <p className="text-[9px] text-gray-400 uppercase tracking-wider leading-tight">Faturamento</p>
