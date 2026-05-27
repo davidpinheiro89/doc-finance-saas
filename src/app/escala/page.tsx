@@ -354,20 +354,30 @@ export default function EscalaPage() {
     const dateBR = dateObj.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
     const userName = user?.user_metadata?.full_name || 'Colega'
 
-    let msg = `🔄 *PLANTÃO DISPONÍVEL*\n`
-    msg += `━━━━━━━━━━━━━━━━━━━\n\n`
-    msg += `🏥 *${p.hospital}*\n`
-    msg += `📅 ${dateBR}\n`
-    if (p.horas) msg += `⏱️ Carga: ${formatHoras(p.horas)}\n`
-    if (p.endereco) msg += `📍 ${p.endereco}\n`
-    if (shareShowValor && p.valor > 0) msg += `💰 Valor: R$ ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}\n`
-    if (shareNota.trim()) msg += `\n📝 _${shareNota.trim()}_\n`
-    msg += `\n━━━━━━━━━━━━━━━━━━━\n`
-    msg += `👨‍⚕️ Contato: *${userName}*\n`
-    msg += `📲 Interessados, enviem mensagem!\n\n`
-    msg += `_Organizado com *BEM Plantonista* — o app financeiro do médico plantonista._\n`
-    msg += `_Conheça: https://bem-plantonista.vercel.app_`
+    const lines: string[] = []
+    lines.push('*PLANTAO DISPONIVEL*')
+    lines.push('----------------------------')
+    lines.push('')
+    lines.push(`Hospital: *${p.hospital}*`)
+    lines.push(`Data: ${dateBR}`)
+    if (p.horas) lines.push(`Carga: ${formatHoras(p.horas)}`)
+    if (p.endereco) lines.push(`Local: ${p.endereco}`)
+    if (shareShowValor && p.valor > 0) {
+      lines.push(`Valor: R$ ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
+    }
+    if (shareNota.trim()) {
+      lines.push('')
+      lines.push(`Obs: ${shareNota.trim()}`)
+    }
+    lines.push('')
+    lines.push('----------------------------')
+    lines.push(`Contato: *${userName}*`)
+    lines.push('Interessados, enviem mensagem!')
+    lines.push('')
+    lines.push('_Organizado com BEM Plantonista_')
+    lines.push('https://bem-plantonista.vercel.app')
 
+    const msg = lines.join('\n')
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
     setShareTarget(null)
   }
