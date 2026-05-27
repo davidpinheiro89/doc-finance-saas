@@ -32,9 +32,13 @@ export default function AssinaturaPage() {
     setError('')
     setLoadingPlan(plan)
     try {
+      const { data: { session: sess } } = await supabase.auth.getSession()
       const res = await fetch('/api/payments/checkout', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(sess?.access_token ? { Authorization: `Bearer ${sess.access_token}` } : {}),
+        },
         body: JSON.stringify({ cpfCnpj: cleanCpf, plan }),
       })
       const data = await res.json()

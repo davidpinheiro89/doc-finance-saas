@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { getSupabaseAdmin } from '@/lib/supabase-admin'
 
 export const dynamic = 'force-dynamic'
@@ -22,27 +22,24 @@ export async function POST(request: NextRequest) {
     const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
     const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
 
-    // ── 1. Autenticação via Supabase JWT ──
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-      {
-        cookies: {
-          get(name: string) {
-            return request.cookies.get(name)?.value
-          },
-          set(_name: string, _value: string, _options: CookieOptions) {},
-          remove(_name: string, _options: CookieOptions) {},
-        },
-      }
-    )
+    // ── 1. Autenticação via Bearer token ──
+    const authHeader = request.headers.get('authorization') || ''
+    const token = authHeader.replace('Bearer ', '')
 
-    const { data: { session }, error: authError } = await supabase.auth.getSession()
-    if (authError || !session?.user) {
+    if (!token) {
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
 
-    const user = session.user
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+      { global: { headers: { Authorization: `Bearer ${token}` } } }
+    )
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
+    }
     const { cpfCnpj, plan = 'monthly' } = await request.json()
 
     const isAnnual = plan === 'annual'
