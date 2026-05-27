@@ -846,7 +846,6 @@ export default function DashboardPage() {
         <OnboardingModal
           step={onboarding.step}
           setStep={onboarding.setStep}
-          saveProfile={onboarding.saveProfile}
           completeOnboarding={onboarding.completeOnboarding}
           skipOnboarding={onboarding.skipOnboarding}
         />

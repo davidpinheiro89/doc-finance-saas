@@ -1,64 +1,38 @@
 'use client'
 
 import { useState } from 'react'
-import type { OnboardingProfile } from '@/hooks/useOnboarding'
+import { useRouter } from 'next/navigation'
 
 interface OnboardingModalProps {
   step: number
   setStep: (s: number) => void
-  saveProfile: (profile: OnboardingProfile) => Promise<void>
   completeOnboarding: () => Promise<void>
   skipOnboarding: () => Promise<void>
 }
 
-const ESPECIALIDADES = [
-  'Clínica Médica',
-  'Emergência',
-  'UTI',
-  'Cardiologia',
-  'Pediatria',
-  'Cirurgia Geral',
-  'Anestesiologia',
-  'Ortopedia',
-  'Ginecologia',
-  'Outro',
-]
-
-const PLANTOES_OPTIONS = [
-  { value: '1-4', label: '1 a 4 plantões' },
-  { value: '5-8', label: '5 a 8 plantões' },
-  { value: '9-12', label: '9 a 12 plantões' },
-  { value: '13+', label: '13 ou mais' },
-]
-
 export default function OnboardingModal({
   step,
   setStep,
-  saveProfile,
   completeOnboarding,
   skipOnboarding,
 }: OnboardingModalProps) {
-  const [profile, setProfile] = useState<OnboardingProfile>({
-    especialidade: '',
-    valor_medio_plantao: '',
-    plantoes_por_mes: '',
-  })
   const [saving, setSaving] = useState(false)
-
-  const handleSaveProfile = async () => {
-    setSaving(true)
-    try {
-      await saveProfile(profile)
-      setStep(3)
-    } finally {
-      setSaving(false)
-    }
-  }
+  const router = useRouter()
 
   const handleComplete = async () => {
     setSaving(true)
     try {
       await completeOnboarding()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleGoToEscala = async () => {
+    setSaving(true)
+    try {
+      await completeOnboarding()
+      router.push('/escala')
     } finally {
       setSaving(false)
     }
@@ -106,9 +80,7 @@ export default function OnboardingModal({
           {step === 1 && <Step1 onNext={() => setStep(2)} />}
           {step === 2 && (
             <Step2
-              profile={profile}
-              setProfile={setProfile}
-              onSave={handleSaveProfile}
+              onGoToEscala={handleGoToEscala}
               onSkip={() => setStep(3)}
               saving={saving}
             />
@@ -150,109 +122,44 @@ function Step1({ onNext }: { onNext: () => void }) {
   )
 }
 
-/* ── Step 2: Configure seu perfil ── */
+/* ── Step 2: Cadastre seu primeiro plantão ── */
 function Step2({
-  profile,
-  setProfile,
-  onSave,
+  onGoToEscala,
   onSkip,
   saving,
 }: {
-  profile: OnboardingProfile
-  setProfile: (p: OnboardingProfile) => void
-  onSave: () => void
+  onGoToEscala: () => void
   onSkip: () => void
   saving: boolean
 }) {
   return (
-    <div>
-      <div className="text-center mb-5 mt-1">
-        <div className="mx-auto w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center mb-3">
-          <span className="text-2xl">⚙️</span>
-        </div>
-        <h2 className="text-lg font-bold text-gray-900">
-          Configure seu perfil
-        </h2>
-        <p className="text-xs text-gray-500 mt-0.5">
-          Opcional — você pode preencher depois
-        </p>
+    <div className="text-center">
+      <div className="mx-auto w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4 mt-2">
+        <span className="text-3xl">📅</span>
       </div>
-
-      <div className="space-y-4">
-        {/* Especialidade */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Especialidade
-          </label>
-          <select
-            value={profile.especialidade}
-            onChange={(e) =>
-              setProfile({ ...profile, especialidade: e.target.value })
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-          >
-            <option value="">Selecione...</option>
-            {ESPECIALIDADES.map((esp) => (
-              <option key={esp} value={esp}>
-                {esp}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Valor médio */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Valor médio por plantão (R$)
-          </label>
-          <input
-            type="number"
-            placeholder="Ex: 1200"
-            value={profile.valor_medio_plantao}
-            onChange={(e) =>
-              setProfile({ ...profile, valor_medio_plantao: e.target.value })
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-          />
-        </div>
-
-        {/* Plantões por mês */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
-            Quantos plantões faz por mês?
-          </label>
-          <select
-            value={profile.plantoes_por_mes}
-            onChange={(e) =>
-              setProfile({ ...profile, plantoes_por_mes: e.target.value })
-            }
-            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:ring-2 focus:ring-orange-500 focus:border-orange-500 outline-none"
-          >
-            <option value="">Selecione...</option>
-            {PLANTOES_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div className="flex gap-3 mt-6">
-        <button
-          onClick={onSkip}
-          className="flex-1 py-2.5 border border-gray-300 text-gray-600 font-medium rounded-xl hover:bg-gray-50 transition-colors text-sm"
-        >
-          Pular
-        </button>
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="flex-1 py-2.5 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors text-sm"
-        >
-          {saving ? 'Salvando...' : 'Salvar e Continuar'}
-        </button>
-      </div>
+      <h2 className="text-lg font-bold text-gray-900">
+        Cadastre seu primeiro plantão
+      </h2>
+      <p className="text-sm text-gray-500 mt-1">
+        Leva menos de 1 minuto e você já começa a ver seus dados
+      </p>
+      <p className="text-sm text-gray-600 mt-4 leading-relaxed">
+        Na tela de Escala, toque em qualquer dia do calendário para
+        adicionar um plantão com hospital, data e valor.
+      </p>
+      <button
+        onClick={onGoToEscala}
+        disabled={saving}
+        className="mt-6 w-full py-3 bg-orange-500 hover:bg-orange-600 disabled:opacity-60 text-white font-semibold rounded-xl transition-colors"
+      >
+        {saving ? 'Abrindo...' : 'Cadastrar agora →'}
+      </button>
+      <button
+        onClick={onSkip}
+        className="mt-3 w-full text-sm text-gray-400 hover:text-gray-600 transition-colors"
+      >
+        Fazer depois
+      </button>
     </div>
   )
 }
