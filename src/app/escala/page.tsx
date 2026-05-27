@@ -375,7 +375,7 @@ export default function EscalaPage() {
     lines.push('Interessados, enviem mensagem!')
     lines.push('')
     lines.push('_Organizado com BEM Plantonista_')
-    lines.push('https://bem-plantonista.vercel.app')
+    lines.push('https://bemplantonista.com.br')
 
     const msg = lines.join('\n')
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank')
