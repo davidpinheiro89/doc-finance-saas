@@ -359,8 +359,10 @@ export default function EscalaPage() {
     lines.push('----------------------------')
     lines.push('')
     lines.push(`Hospital: *${p.hospital}*`)
+    if (p.especialidade) lines.push(`Especialidade: ${p.especialidade}`)
+    if (p.classificacao && p.classificacao !== 'plantao') lines.push(`Setor: ${p.classificacao}`)
     lines.push(`Data: ${dateBR}`)
-    if (p.horas) lines.push(`Carga: ${formatHoras(p.horas)}`)
+    if (p.horas) lines.push(`Duracao: ${formatHoras(p.horas)}`)
     if (p.endereco) lines.push(`Local: ${p.endereco}`)
     if (shareShowValor && p.valor > 0) {
       lines.push(`Valor: R$ ${p.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`)
