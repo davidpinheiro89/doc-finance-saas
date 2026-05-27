@@ -25,6 +25,8 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
     onMobileClose?.()
   }
 
+  const subStatus = user?.user_metadata?.subscription_status
+
   const menuItems = [
     { name: 'Início', href: '/dashboard', icon: '🏠' },
     { name: 'Meu desempenho', href: '/analytics', icon: '📊' },
@@ -34,6 +36,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
     { name: 'Financeiro', href: '/financeiro', icon: '💰' },
     { name: 'Imposto de Renda', href: '/ir', icon: '📄' },
     { name: 'Meus Documentos', href: '/documentos', icon: '🛡️' },
+    { name: 'Minha Assinatura', href: '/assinatura/minha', icon: '💳', badge: subStatus === 'active' ? 'Ativo' : undefined },
   ]
 
   const sidebarContent = (
@@ -70,6 +73,11 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
                     {item.icon}
                   </span>
                   <span className="truncate text-left">{item.name}</span>
+                  {'badge' in item && item.badge && (
+                    <span className="ml-auto text-[10px] font-bold uppercase px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                      {item.badge}
+                    </span>
+                  )}
                 </button>
               </li>
             )
