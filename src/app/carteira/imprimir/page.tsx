@@ -42,7 +42,6 @@ export default function CarteiraImprimirPage() {
   const router = useRouter()
   const [documentos, setDocumentos] = useState<Documento[]>([])
   const [fetching, setFetching] = useState(true)
-  const [iframeErrors, setIframeErrors] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (user) fetchDocs(user.id)
@@ -97,17 +96,6 @@ export default function CarteiraImprimirPage() {
           .doc-card {
             break-inside: avoid;
           }
-          iframe {
-            border: 1px solid #e5e7eb !important;
-          }
-          /* Hide browser-injected iframe toolbar */
-          iframe::-webkit-scrollbar {
-            display: none;
-          }
-        }
-        /* Hide PDF viewer toolbar inside iframe for Chromium */
-        iframe[src*=".pdf"] {
-          clip-path: inset(0 0 0 0);
         }
       `}</style>
 
@@ -207,49 +195,19 @@ export default function CarteiraImprimirPage() {
                             />
                           </div>
                         ) : (
-                          <div className="space-y-3">
-                            <div className="flex items-center gap-3 px-4 py-3 bg-orange-50 rounded-lg border border-orange-100">
-                              <svg className="h-5 w-5 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                              </svg>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-[#0F172A] truncate">{fixFileName(doc.arquivo_nome)}</p>
-                                <a href={doc.arquivo_url} target="_blank" rel="noopener noreferrer"
-                                  className="text-xs text-orange-600 hover:underline no-print">
-                                  Abrir documento em nova aba
-                                </a>
-                              </div>
+                          <a href={doc.arquivo_url!} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-4 px-5 py-4 bg-orange-50 rounded-lg border border-orange-100 hover:bg-orange-100/60 transition-colors">
+                            <svg className="h-8 w-8 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-[#0F172A] truncate">{fixFileName(doc.arquivo_nome)}</p>
+                              <p className="text-xs text-orange-600 mt-0.5">Clique para abrir o documento</p>
                             </div>
-                            {!iframeErrors.has(doc.id) ? (
-                              <iframe
-                                src={doc.arquivo_url! + '#toolbar=0&navpanes=0'}
-                                title={doc.nome}
-                                className="w-full rounded-lg border border-gray-200 bg-white"
-                                style={{ height: '500px' }}
-                                onError={() => setIframeErrors(prev => new Set(prev).add(doc.id))}
-                                onLoad={(e) => {
-                                  try {
-                                    const iframe = e.target as HTMLIFrameElement
-                                    // If CORS blocks access, contentDocument will throw
-                                    void iframe.contentDocument
-                                  } catch {
-                                    setIframeErrors(prev => new Set(prev).add(doc.id))
-                                  }
-                                }}
-                              />
-                            ) : (
-                              <a href={doc.arquivo_url!} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-3 px-4 py-4 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition-colors">
-                                <svg className="h-8 w-8 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                                </svg>
-                                <div>
-                                  <p className="text-sm font-medium text-gray-800">{fixFileName(doc.arquivo_nome)}</p>
-                                  <p className="text-xs text-gray-500">Clique para abrir o documento</p>
-                                </div>
-                              </a>
-                            )}
-                          </div>
+                            <svg className="h-4 w-4 text-orange-400 flex-shrink-0 no-print" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
                         )}
                       </div>
                     )}
