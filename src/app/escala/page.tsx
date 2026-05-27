@@ -231,8 +231,8 @@ export default function EscalaPage() {
 
     // Validation depends on block type
     if (isRevenueBlock) {
-      if (!formData.hospital || !formData.data || !formData.valor) {
-        alert('Preencha hospital, data e valor.'); return
+      if (!formData.hospital || !formData.data || !formData.valor || !formData.horas) {
+        alert('Preencha hospital, data, valor e duração.'); return
       }
     } else {
       if (!formData.data) {
@@ -924,8 +924,8 @@ export default function EscalaPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Duração (h)</label>
-                    <input type="number" name="horas" value={formData.horas} onChange={handleInputChange} step="0.5" min="0"
-                      className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="12" />
+                    <input type="number" name="horas" value={formData.horas} onChange={handleInputChange} step="0.5" min="0" required
+                      className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="Ex: 12" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1.5">Especialidade</label>
