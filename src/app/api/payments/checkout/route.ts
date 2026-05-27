@@ -8,12 +8,12 @@ export const dynamic = 'force-dynamic'
  * POST /api/payments/checkout
  *
  * Body esperado:
- *   { cpfCnpj: string }
+ *   { cpfCnpj: string, plan?: 'monthly' | 'annual' }
  *
  * Fluxo:
  *   1. Autentica via Supabase JWT (cookie de sessão)
  *   2. Cria (ou reutiliza) cliente no Asaas
- *   3. Cria assinatura recorrente mensal R$29,90 via cartão de crédito
+ *   3. Cria assinatura recorrente (mensal R$29,90 ou anual R$299,00)
  *   4. Salva asaas_customer_id + subscription_status='pending' no user_metadata
  *   5. Retorna invoiceUrl do Asaas para o médico inserir dados do cartão
  */
@@ -43,7 +43,9 @@ export async function POST(request: NextRequest) {
     }
 
     const user = session.user
-    const { cpfCnpj } = await request.json()
+    const { cpfCnpj, plan = 'monthly' } = await request.json()
+
+    const isAnnual = plan === 'annual'
 
     if (!cpfCnpj || typeof cpfCnpj !== 'string' || cpfCnpj.replace(/\D/g, '').length < 11) {
       return NextResponse.json({ error: 'CPF/CNPJ inválido' }, { status: 400 })
@@ -83,7 +85,7 @@ export async function POST(request: NextRequest) {
       customerId = customerData.id
     }
 
-    // ── 3. Criar assinatura recorrente mensal ──
+    // ── 3. Criar assinatura recorrente ──
     const nextDueDate = new Date()
     nextDueDate.setDate(nextDueDate.getDate() + 1) // cobrar a partir de amanhã
     const dueDateStr = nextDueDate.toISOString().split('T')[0]
@@ -97,10 +99,12 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         customer: customerId,
         billingType: 'CREDIT_CARD',
-        value: 29.90,
+        value: isAnnual ? 299.00 : 29.90,
         nextDueDate: dueDateStr,
-        cycle: 'MONTHLY',
-        description: 'BEM Plantonista — Assinatura Mensal',
+        cycle: isAnnual ? 'YEARLY' : 'MONTHLY',
+        description: isAnnual
+          ? 'BEM Plantonista — Assinatura Anual'
+          : 'BEM Plantonista — Assinatura Mensal',
         externalReference: user.id,
       }),
     })
@@ -122,6 +126,7 @@ export async function POST(request: NextRequest) {
         asaas_customer_id: customerId,
         asaas_subscription_id: subscriptionData.id,
         subscription_status: 'pending',
+        subscription_plan: isAnnual ? 'anual' : 'mensal',
       },
     })
 
