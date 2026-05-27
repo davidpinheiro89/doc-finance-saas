@@ -17,10 +17,27 @@ export const dynamic = 'force-dynamic'
  *   4. Salva asaas_customer_id + subscription_status='pending' no user_metadata
  *   5. Retorna invoiceUrl do Asaas para o médico inserir dados do cartão
  */
+async function safeJson(res: Response, label: string) {
+  const text = await res.text()
+  if (!text) {
+    console.error(`${label}: empty response (status ${res.status})`)
+    return { _empty: true }
+  }
+  try {
+    return JSON.parse(text)
+  } catch {
+    console.error(`${label}: invalid JSON (status ${res.status}):`, text.slice(0, 500))
+    return { _parseError: true, _raw: text.slice(0, 500) }
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
     const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
+
+    console.log('[checkout] ASAAS_BASE_URL:', ASAAS_BASE_URL)
+    console.log('[checkout] ASAAS_API_KEY exists:', !!ASAAS_API_KEY, 'length:', ASAAS_API_KEY.length)
 
     // ── 1. Autenticação via Bearer token ──
     const authHeader = request.headers.get('authorization') || ''
@@ -55,6 +72,7 @@ export async function POST(request: NextRequest) {
     let customerId = user.user_metadata?.asaas_customer_id as string | undefined
 
     if (!customerId) {
+      console.log('[checkout] Creating Asaas customer for:', user.email)
       const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
         method: 'POST',
         headers: {
@@ -69,7 +87,14 @@ export async function POST(request: NextRequest) {
         }),
       })
 
-      const customerData = await customerRes.json()
+      const customerData = await safeJson(customerRes, 'Asaas customer')
+
+      if (customerData._empty || customerData._parseError) {
+        return NextResponse.json(
+          { error: 'Gateway de pagamento sem resposta válida' },
+          { status: 502 }
+        )
+      }
 
       if (!customerRes.ok) {
         console.error('Asaas customer error:', customerData)
@@ -80,6 +105,7 @@ export async function POST(request: NextRequest) {
       }
 
       customerId = customerData.id
+      console.log('[checkout] Asaas customer created:', customerId)
     }
 
     // ── 3. Criar assinatura recorrente ──
@@ -87,6 +113,7 @@ export async function POST(request: NextRequest) {
     nextDueDate.setDate(nextDueDate.getDate() + 1) // cobrar a partir de amanhã
     const dueDateStr = nextDueDate.toISOString().split('T')[0]
 
+    console.log('[checkout] Creating subscription:', { plan, customerId, dueDateStr })
     const subscriptionRes = await fetch(`${ASAAS_BASE_URL}/subscriptions`, {
       method: 'POST',
       headers: {
@@ -106,7 +133,14 @@ export async function POST(request: NextRequest) {
       }),
     })
 
-    const subscriptionData = await subscriptionRes.json()
+    const subscriptionData = await safeJson(subscriptionRes, 'Asaas subscription')
+
+    if (subscriptionData._empty || subscriptionData._parseError) {
+      return NextResponse.json(
+        { error: 'Gateway de pagamento sem resposta válida ao criar assinatura' },
+        { status: 502 }
+      )
+    }
 
     if (!subscriptionRes.ok) {
       console.error('Asaas subscription error:', subscriptionData)
@@ -115,6 +149,8 @@ export async function POST(request: NextRequest) {
         { status: 502 }
       )
     }
+
+    console.log('[checkout] Subscription created:', subscriptionData.id)
 
     // ── 4. Salvar dados no user_metadata do Supabase ──
     const { error: updateError } = await getSupabaseAdmin().auth.admin.updateUserById(user.id, {
@@ -141,9 +177,11 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    const paymentsData = await paymentsRes.json()
+    const paymentsData = await safeJson(paymentsRes, 'Asaas payments')
     const firstPayment = paymentsData?.data?.[0]
     const invoiceUrl = firstPayment?.invoiceUrl || firstPayment?.bankSlipUrl || null
+
+    console.log('[checkout] invoiceUrl:', invoiceUrl ? 'found' : 'NOT found')
 
     return NextResponse.json({
       success: true,
