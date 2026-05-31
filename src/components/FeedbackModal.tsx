@@ -25,10 +25,14 @@ export default function FeedbackModal({ user }: FeedbackModalProps) {
   }, [user])
 
   async function checkShouldShow() {
-    // 1. Check if account is 7+ days old
-    const createdAt = new Date(user.created_at)
-    const daysSinceCreation = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
-    if (daysSinceCreation < DAYS_BEFORE_SHOW) return
+    const isTestUser = user.email === 'davidpinheiro89@gmail.com'
+
+    // 1. Check if account is 7+ days old (skip for test user)
+    if (!isTestUser) {
+      const createdAt = new Date(user.created_at)
+      const daysSinceCreation = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60 * 24)
+      if (daysSinceCreation < DAYS_BEFORE_SHOW) return
+    }
 
     // 2. Check localStorage dismiss cooldown
     const dismissedAt = localStorage.getItem(DISMISS_KEY)
