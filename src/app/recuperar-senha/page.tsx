@@ -16,7 +16,7 @@ export default function RecuperarSenhaPage() {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: 'https://bemplantonista.com.br/reset-password',
       })
 
       if (error) {
