@@ -2,6 +2,7 @@
 
 import { useRouter, usePathname } from 'next/navigation'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
+import FeedbackModal from './FeedbackModal'
 
 interface SidebarProps {
   user?: any
@@ -138,6 +139,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
           </aside>
         </>
       )}
+      {user && <FeedbackModal user={user} />}
     </>
   )
 }
