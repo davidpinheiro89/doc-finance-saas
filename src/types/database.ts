@@ -56,6 +56,7 @@ export interface Plantao {
   data_prevista_pagamento: string | null
   classificacao: string | null
   especialidade: string | null
+  turno: string | null
   tipo_evento: TipoEvento | null
   local_favorito_id: string | null
   created_at: string

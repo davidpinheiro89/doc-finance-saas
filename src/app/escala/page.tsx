@@ -58,7 +58,7 @@ export default function EscalaPage() {
     hospital: '', data: '', valor: '', status: 'pendente',
     horas: '', endereco: '', cep: '',
     data_prevista_pagamento: '', prazo_pagamento_dias: '',
-    classificacao: '', especialidade: '',
+    classificacao: '', especialidade: '', turno: '',
   })
   const [hospitalSuggestions, setHospitalSuggestions] = useState<any[]>([])
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -283,7 +283,8 @@ export default function EscalaPage() {
         data_prevista_pagamento: isRevenueBlock ? dataPrevPgto : null,
         prazo_pagamento_dias: isRevenueBlock ? prazoDias : null,
         classificacao,
-        especialidade
+        especialidade,
+        turno: isRevenueBlock ? (formData.turno || null) : null,
       }
     })
 
@@ -300,7 +301,7 @@ export default function EscalaPage() {
       }
       setShowPlantaoForm(false)
       setEditingId(null)
-      setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '' })
+      setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '', turno: '' })
       setBlockType('plantao')
       setBlockColor('emerald')
       setCustomBlockName('')
@@ -327,6 +328,7 @@ export default function EscalaPage() {
       prazo_pagamento_dias: p.prazo_pagamento_dias ? String(p.prazo_pagamento_dias) : '',
       classificacao: isCustom ? '' : (p.classificacao || ''),
       especialidade: isCustom ? '' : (p.especialidade || ''),
+      turno: p.turno || '',
     })
     // Determine block type
     const matchedBlock = BLOCK_TYPES.find(b => b.key === p.classificacao)
@@ -361,6 +363,7 @@ export default function EscalaPage() {
     lines.push(`Hospital: *${p.hospital}*`)
     if (p.especialidade) lines.push(`Especialidade: ${p.especialidade}`)
     if (p.classificacao && p.classificacao !== 'plantao') lines.push(`Setor: ${p.classificacao}`)
+    if (p.turno) lines.push(`Turno: ${p.turno === 'Diurno' ? 'Diurno ☀️' : 'Noturno 🌙'}`)
     lines.push(`Data: ${dateBR}`)
     if (p.horas) lines.push(`Duracao: ${formatHoras(p.horas)}`)
     if (p.endereco) lines.push(`Local: ${p.endereco}`)
@@ -1005,6 +1008,25 @@ export default function EscalaPage() {
                     <option value="Sala Vermelha">Sala Vermelha</option>
                     <option value="Outro">Outro</option>
                   </select>
+                </div>
+
+                {/* Turno */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1.5">Turno</label>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'Diurno' ? '' : 'Diurno' }))}
+                      className={`flex-1 py-2.5 px-3 text-sm font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                        formData.turno === 'Diurno' ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-amber-300'
+                      }`}>
+                      <span>☀️</span> Diurno
+                    </button>
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'Noturno' ? '' : 'Noturno' }))}
+                      className={`flex-1 py-2.5 px-3 text-sm font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
+                        formData.turno === 'Noturno' ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                      }`}>
+                      <span>🌙</span> Noturno
+                    </button>
+                  </div>
                 </div>
                 </>
                 )}
