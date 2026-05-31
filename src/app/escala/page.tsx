@@ -363,7 +363,7 @@ export default function EscalaPage() {
     lines.push(`Hospital: *${p.hospital}*`)
     if (p.especialidade) lines.push(`Especialidade: ${p.especialidade}`)
     if (p.classificacao && p.classificacao !== 'plantao') lines.push(`Setor: ${p.classificacao}`)
-    if (p.turno) lines.push(`Turno: ${p.turno === 'diurno' ? 'Diurno ☀️' : 'Noturno 🌙'}`)
+    if (p.turno) lines.push(`Turno: ${p.turno === 'dia' ? 'Diurno ☀️' : 'Noturno 🌙'}`)
     lines.push(`Data: ${dateBR}`)
     if (p.horas) lines.push(`Duracao: ${formatHoras(p.horas)}`)
     if (p.endereco) lines.push(`Local: ${p.endereco}`)
@@ -1014,15 +1014,15 @@ export default function EscalaPage() {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1.5">Turno</label>
                   <div className="flex gap-2">
-                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'diurno' ? '' : 'diurno' }))}
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'dia' ? '' : 'dia' }))}
                       className={`flex-1 py-2.5 px-3 text-sm font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                        formData.turno === 'diurno' ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-amber-300'
+                        formData.turno === 'dia' ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-amber-300'
                       }`}>
                       <span>☀️</span> Diurno
                     </button>
-                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'noturno' ? '' : 'noturno' }))}
+                    <button type="button" onClick={() => setFormData(prev => ({ ...prev, turno: prev.turno === 'noite' ? '' : 'noite' }))}
                       className={`flex-1 py-2.5 px-3 text-sm font-medium rounded-xl border transition-all flex items-center justify-center gap-1.5 ${
-                        formData.turno === 'noturno' ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-indigo-300'
+                        formData.turno === 'noite' ? 'bg-indigo-50 border-indigo-300 text-indigo-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-indigo-300'
                       }`}>
                       <span>🌙</span> Noturno
                     </button>
