@@ -39,6 +39,23 @@ export async function POST(request: NextRequest) {
     console.log('[checkout] ASAAS_BASE_URL:', ASAAS_BASE_URL)
     console.log('[checkout] ASAAS_API_KEY exists:', !!ASAAS_API_KEY, 'length:', ASAAS_API_KEY.length)
 
+    // ── 0. Parse request body first (before anything consumes the stream) ──
+    let body: { cpfCnpj?: string; plan?: string }
+    try {
+      body = await request.json()
+      console.log('[checkout] Request body parsed:', { cpfCnpj: body.cpfCnpj ? '***' : 'missing', plan: body.plan })
+    } catch (parseErr) {
+      console.error('[checkout] Failed to parse request body:', parseErr)
+      return NextResponse.json({ error: 'Corpo da requisição inválido' }, { status: 400 })
+    }
+
+    const { cpfCnpj, plan = 'monthly' } = body
+    const isAnnual = plan === 'annual'
+
+    if (!cpfCnpj || typeof cpfCnpj !== 'string' || cpfCnpj.replace(/\D/g, '').length < 11) {
+      return NextResponse.json({ error: 'CPF/CNPJ inválido' }, { status: 400 })
+    }
+
     // ── 1. Autenticação via Bearer token ──
     const authHeader = request.headers.get('authorization') || ''
     const token = authHeader.replace('Bearer ', '')
@@ -55,15 +72,11 @@ export async function POST(request: NextRequest) {
 
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      console.error('[checkout] Auth failed:', authError?.message)
       return NextResponse.json({ error: 'Não autenticado' }, { status: 401 })
     }
-    const { cpfCnpj, plan = 'monthly' } = await request.json()
 
-    const isAnnual = plan === 'annual'
-
-    if (!cpfCnpj || typeof cpfCnpj !== 'string' || cpfCnpj.replace(/\D/g, '').length < 11) {
-      return NextResponse.json({ error: 'CPF/CNPJ inválido' }, { status: 400 })
-    }
+    console.log('[checkout] User authenticated:', user.email)
 
     const cleanCpfCnpj = cpfCnpj.replace(/\D/g, '')
     const fullName = user.user_metadata?.full_name || 'Médico BEM Plantonista'
@@ -189,8 +202,9 @@ export async function POST(request: NextRequest) {
       customerId,
       invoiceUrl,
     })
-  } catch (err) {
-    console.error('Checkout error:', err)
-    return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[checkout] Unhandled error:', message, err)
+    return NextResponse.json({ error: `Erro interno: ${message}` }, { status: 500 })
   }
 }
