@@ -1073,7 +1073,13 @@ export default function DashboardPage() {
                 <div className="lg:col-span-3 bg-gradient-to-br from-white to-violet-50/20 rounded-2xl border border-gray-200/60 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
                   <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Top Hospitais por R$/Hora</h3>
                   {metrics.hospitalRanking.length === 0 ? (
-                    <p className="text-sm text-gray-400 py-4 text-center">Registre plantões com horas para ver o ranking</p>
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center mx-auto mb-3">
+                        <svg className="h-6 w-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Sem dados para ranking</p>
+                      <p className="text-xs text-gray-400">Registre plantões com valor e horas para ver qual hospital paga melhor</p>
+                    </div>
                   ) : (
                     <div className="space-y-3">
                       {metrics.hospitalRanking.map((h, i) => {
@@ -1171,12 +1177,16 @@ export default function DashboardPage() {
             {isPlantoesPending ? (
               <div className="p-6"><SkeletonTableRows rows={4} cols={6} /></div>
             ) : upcomingPlantoes.length === 0 ? (
-              <div className="text-center py-12 px-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
-                  <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <div className="text-center py-14 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 mb-4">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
                 </div>
-                <p className="text-gray-500 font-medium">Nenhum plantão agendado</p>
-                <p className="text-xs text-gray-400 mt-1">Clique em &quot;+ Novo Plantão&quot; para começar</p>
+                <h3 className="text-base font-semibold text-gray-800 mb-1">Nenhum plantão agendado</h3>
+                <p className="text-sm text-gray-500 max-w-xs mx-auto mb-5">Cadastre seus próximos plantões na escala para acompanhar sua agenda.</p>
+                <button onClick={() => router.push('/escala')} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Cadastrar Primeiro Plantão
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1297,16 +1307,26 @@ export default function DashboardPage() {
             {isPlantoesPending ? (
               <div className="p-6"><SkeletonTableRows rows={5} cols={5} /></div>
             ) : filteredHistoricalPlantoes.length === 0 ? (
-              <div className="text-center py-12 px-6">
-                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gray-100 mb-4">
-                  <svg className="h-8 w-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className="text-center py-14 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 mb-4">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
-                <p className="text-gray-500 font-medium">
-                  {historicalPlantoes.length === 0 ? 'Nenhum plantão realizado ainda' : 'Nenhum plantão encontrado com esses filtros'}
+                <h3 className="text-base font-semibold text-gray-800 mb-1">
+                  {historicalPlantoes.length === 0 ? 'Nenhum plantão realizado ainda' : 'Nenhum plantão encontrado'}
+                </h3>
+                <p className="text-sm text-gray-500 max-w-xs mx-auto mb-5">
+                  {historicalPlantoes.length === 0
+                    ? 'Seus plantões realizados aparecerão aqui conforme as datas passam.'
+                    : 'Tente ajustar os filtros para encontrar seus plantões.'}
                 </p>
-                {historicalPlantoes.length > 0 && (
+                {historicalPlantoes.length === 0 ? (
+                  <button onClick={() => router.push('/escala')} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Cadastrar Plantão
+                  </button>
+                ) : (
                   <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
-                    className="text-xs text-orange-600 hover:text-orange-700 font-medium mt-2 transition-colors">Limpar filtros</button>
+                    className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">Limpar filtros</button>
                 )}
               </div>
             ) : (
