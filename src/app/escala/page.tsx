@@ -80,6 +80,8 @@ export default function EscalaPage() {
   const [recurrenceLimitType, setRecurrenceLimitType] = useState<'date' | 'count'>('count')
   const [recurrenceLimitDate, setRecurrenceLimitDate] = useState('')
   const [recurrenceLimitCount, setRecurrenceLimitCount] = useState(4)
+  // Series modal
+  const [seriesModal, setSeriesModal] = useState<{ action: 'edit' | 'delete'; plantao: PlantaoListItem; siblings: PlantaoListItem[] } | null>(null)
   const router = useRouter()
 
   const isRevenueBlock = BLOCK_TYPES.find(b => b.key === blockType)?.revenue ?? true
@@ -127,6 +129,66 @@ export default function EscalaPage() {
       return label || p.hospital || p.classificacao || 'Evento'
     }
     return p.hospital
+  }
+
+  // ── Series detection ──
+  const findSeriesSiblings = (p: PlantaoListItem): PlantaoListItem[] => {
+    if (!p.data || !p.hospital) return []
+    const pDate = new Date(p.data.split('T')[0] + 'T12:00:00')
+    const pDay = pDate.getDay()
+    return plantoes.filter(other => {
+      if (other.id === p.id) return false
+      if (other.hospital !== p.hospital) return false
+      if (other.valor !== p.valor) return false
+      if ((other.horas || 0) !== (p.horas || 0)) return false
+      if (!other.data) return false
+      const oDate = new Date(other.data.split('T')[0] + 'T12:00:00')
+      if (oDate.getDay() !== pDay) return false
+      // Check if interval is multiple of 7 days
+      const diffDays = Math.abs(Math.round((oDate.getTime() - pDate.getTime()) / 86400000))
+      return diffDays > 0 && diffDays % 7 === 0
+    })
+  }
+
+  const handleSeriesEdit = (p: PlantaoListItem) => {
+    const siblings = findSeriesSiblings(p)
+    if (siblings.length > 0) {
+      setSeriesModal({ action: 'edit', plantao: p, siblings })
+    } else {
+      handleEditShift(p)
+    }
+  }
+
+  const handleSeriesDelete = (p: PlantaoListItem) => {
+    const siblings = findSeriesSiblings(p)
+    if (siblings.length > 0) {
+      setSeriesModal({ action: 'delete', plantao: p, siblings })
+    } else {
+      handleDeleteSingle(p)
+    }
+  }
+
+  const handleDeleteSingle = async (p: PlantaoListItem) => {
+    if (!user) return
+    try {
+      const { error } = await supabase.from('plantoes').delete().eq('id', p.id).eq('user_id', user.id)
+      if (error) { alert('Erro: ' + error.message); return }
+      setSeriesModal(null)
+      setShowActionModal(false)
+      invalidatePlantoes()
+    } catch { alert('Erro ao apagar.') }
+  }
+
+  const handleDeleteSeries = async (p: PlantaoListItem, siblings: PlantaoListItem[]) => {
+    if (!user) return
+    const allIds = [p.id, ...siblings.map(s => s.id)]
+    try {
+      const { error } = await supabase.from('plantoes').delete().in('id', allIds).eq('user_id', user.id)
+      if (error) { alert('Erro: ' + error.message); return }
+      setSeriesModal(null)
+      setShowActionModal(false)
+      invalidatePlantoes()
+    } catch { alert('Erro ao apagar série.') }
   }
 
   // ── Actions ──
@@ -709,7 +771,7 @@ export default function EscalaPage() {
                         </div>
                         {/* Action buttons */}
                         <div className="mt-2 flex gap-2">
-                          <button onClick={() => handleEditShift(p)}
+                          <button onClick={() => handleSeriesEdit(p)}
                             className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-sky-700 bg-white/80 hover:bg-sky-50 border border-sky-200/60 rounded-lg transition-all active:scale-[0.98]">
                             <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             Editar
@@ -721,6 +783,10 @@ export default function EscalaPage() {
                               Passar
                             </button>
                           )}
+                          <button onClick={() => handleSeriesDelete(p)}
+                            className="flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 bg-white/80 hover:bg-red-50 border border-red-200/60 rounded-lg transition-all active:scale-[0.98]">
+                            <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -846,6 +912,80 @@ export default function EscalaPage() {
                 <button onClick={confirmDeleteDay}
                   className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-red-500/20 hover:shadow-lg transition-all">
                   Sim, Apagar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Series Action Modal ── */}
+        {seriesModal && (
+          <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-end md:items-center justify-center z-50 md:px-4" onClick={() => setSeriesModal(null)}>
+            <div className="bg-white rounded-t-2xl md:rounded-2xl shadow-2xl max-w-sm w-full p-6 pb-8 md:pb-6 border border-gray-200/60 animate-[slideUp_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+              <div className="md:hidden flex justify-center mb-3">
+                <div className="w-10 h-1 rounded-full bg-gray-300" />
+              </div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${seriesModal.action === 'delete' ? 'bg-red-100' : 'bg-sky-100'}`}>
+                  {seriesModal.action === 'delete' ? (
+                    <svg className="h-5 w-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  ) : (
+                    <svg className="h-5 w-5 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  )}
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Plantão em série</h3>
+                  <p className="text-xs text-gray-500">Este plantão faz parte de uma série de {seriesModal.siblings.length + 1} repetições</p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 border border-gray-200/60 rounded-xl p-4 mb-5">
+                <p className="text-sm text-gray-700 leading-relaxed">
+                  Deseja {seriesModal.action === 'delete' ? 'apagar' : 'editar'} apenas este plantão ou todos os plantões desta série?
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => {
+                    if (seriesModal.action === 'edit') {
+                      handleEditShift(seriesModal.plantao)
+                      setSeriesModal(null)
+                    } else {
+                      handleDeleteSingle(seriesModal.plantao)
+                    }
+                  }}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white hover:bg-gray-50 border border-gray-200 text-sm font-medium text-gray-700 transition-colors"
+                >
+                  <span className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-gray-500 text-xs">1</span>
+                  Apenas este plantão
+                </button>
+                <button
+                  onClick={() => {
+                    if (seriesModal.action === 'edit') {
+                      setRecurrenceEnabled(true)
+                      handleEditShift(seriesModal.plantao)
+                      setSeriesModal(null)
+                    } else {
+                      handleDeleteSeries(seriesModal.plantao, seriesModal.siblings)
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${
+                    seriesModal.action === 'delete'
+                      ? 'bg-red-50 hover:bg-red-100 border-red-200 text-red-700'
+                      : 'bg-sky-50 hover:bg-sky-100 border-sky-200 text-sky-700'
+                  }`}
+                >
+                  <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${
+                    seriesModal.action === 'delete' ? 'bg-red-100 text-red-600' : 'bg-sky-100 text-sky-600'
+                  }`}>{seriesModal.siblings.length + 1}</span>
+                  Todos da série ({seriesModal.siblings.length + 1} plantões)
+                </button>
+                <button
+                  onClick={() => setSeriesModal(null)}
+                  className="w-full py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>
