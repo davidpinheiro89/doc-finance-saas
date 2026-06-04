@@ -1,52 +1,27 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import supabase from '@/lib/supabase-client'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'realizado' | 'Aguardando'
-  horas?: number
-  endereco?: string
-  prazo_pagamento_dias?: number
-}
+import type { Plantao } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesRealizadosPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
   const [confirmingPayment, setConfirmingPayment] = useState<string | null>(null)
-  const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (user) fetchPlantoes(user.id)
+  }, [user])
 
   const fetchPlantoes = async (userId: string) => {
     try {
@@ -122,9 +97,12 @@ export default function PlantoesRealizadosPage() {
     return pastPlantoes
   }
 
-  const filteredPlantoes = getPastPlantoes()
+  // Folgas são filtradas via isFolga() — seção separada abaixo da tabela
+  const allPastPlantoes = getPastPlantoes()
+  const filteredPlantoes = allPastPlantoes.filter(p => !isFolga(p))
+  const folgasNoPeriodo = allPastPlantoes.filter(p => isFolga(p))
 
-  // Calculate metrics
+  // Calculate metrics (only remunerados)
   const metrics = {
     quantidade: filteredPlantoes.length,
     valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
@@ -144,68 +122,78 @@ export default function PlantoesRealizadosPage() {
     return `${day}/${month}/${year}`
   }
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pago':
-        return 'bg-green-100 text-green-800'
-      case 'confirmado':
-        return 'bg-blue-100 text-blue-800'
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'realizado':
-        return 'bg-purple-100 text-purple-800'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
-
-  const getStatusText = (plantao: Plantao) => {
-    // Unique status logic - show only one status per plantão
-    if (plantao.status === 'pago') {
-      return 'Pago'
-    }
-    
-    // If payment hasn't been received or is within deadline
-    if (plantao.prazo_pagamento_dias) {
-      return 'Aguardando'
-    }
-    
-    // If plantão was done but no payment info
-    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
-      return 'Realizado'
-    }
-    
-    // Default to actual status
-    return plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)
+  const getPaymentDeadline = (plantao: Plantao) => {
+    if (!plantao.prazo_pagamento_dias) return null
+    const plantaoDate = new Date(plantao.data + 'T00:00:00')
+    const deadline = new Date(plantaoDate)
+    deadline.setDate(deadline.getDate() + plantao.prazo_pagamento_dias)
+    return deadline
   }
 
   const isOverdue = (plantao: Plantao) => {
-    if (plantao.status === 'pago' || !plantao.prazo_pagamento_dias) {
-      return false
+    if (plantao.status === 'pago') return false
+    const deadline = getPaymentDeadline(plantao)
+    if (!deadline) return false
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return today > deadline
+  }
+
+  const getDaysUntilPayment = (plantao: Plantao) => {
+    const deadline = getPaymentDeadline(plantao)
+    if (!deadline) return null
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return Math.round((deadline.getTime() - today.getTime()) / 86400000)
+  }
+
+  type SmartStatus = { label: string; color: string; tooltip: string }
+
+  const getSmartStatus = (plantao: Plantao): SmartStatus => {
+    if (plantao.status === 'pago') {
+      return { label: 'Pago', color: 'bg-emerald-50 text-emerald-700 border-emerald-200/60', tooltip: 'Pagamento recebido' }
     }
-    
-    const plantaoDate = new Date(plantao.data)
-    const paymentDeadline = new Date(plantaoDate)
-    paymentDeadline.setDate(paymentDeadline.getDate() + plantao.prazo_pagamento_dias)
-    
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    
-    return today > paymentDeadline
+
+    if (isOverdue(plantao)) {
+      const deadline = getPaymentDeadline(plantao)!
+      const daysLate = Math.abs(getDaysUntilPayment(plantao) || 0)
+      return {
+        label: 'Atrasado',
+        color: 'bg-red-50 text-red-700 border-red-200/60',
+        tooltip: `Venceu em ${formatDate(deadline.toISOString().split('T')[0])} — ${daysLate} dia(s) de atraso`
+      }
+    }
+
+    if (plantao.prazo_pagamento_dias) {
+      const daysLeft = getDaysUntilPayment(plantao)
+      if (daysLeft !== null && daysLeft <= 5 && daysLeft >= 0) {
+        return {
+          label: 'Vence em breve',
+          color: 'bg-amber-50 text-amber-700 border-amber-200/60',
+          tooltip: `Pagamento previsto em ${daysLeft} dia(s)`
+        }
+      }
+      const deadline = getPaymentDeadline(plantao)!
+      return {
+        label: 'Aguardando',
+        color: 'bg-sky-50 text-sky-700 border-sky-200/60',
+        tooltip: `Pagamento previsto para ${formatDate(deadline.toISOString().split('T')[0])}`
+      }
+    }
+
+    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
+      return { label: 'Realizado', color: 'bg-green-50 text-green-700 border-green-200/60', tooltip: 'Plantão realizado — sem prazo de pagamento definido' }
+    }
+
+    return { label: 'Pendente', color: 'bg-gray-50 text-gray-600 border-gray-200/60', tooltip: 'Status pendente' }
   }
 
   const handleMarkAsPaid = async (plantaoId: string) => {
-    if (!confirm('Confirmar recebimento deste plantão?')) {
-      return
-    }
-
     setConfirmingPayment(plantaoId)
-    
     try {
       const { error } = await supabase
         .from('plantoes')
         .update({ status: 'pago' })
         .eq('id', plantaoId)
+        .eq('user_id', user!.id)
 
       if (error) {
         console.error('Error marking plantão as paid:', error)
@@ -213,12 +201,8 @@ export default function PlantoesRealizadosPage() {
         return
       }
 
-      // Refresh plantões list
-      await fetchPlantoes(user.id)
-      
-      alert('Pagamento confirmado com sucesso!')
-    } catch (error) {
-      console.error('Error marking plantão as paid:', error)
+      if (user) await fetchPlantoes(user.id)
+    } catch {
       alert('Erro ao confirmar pagamento. Tente novamente.')
     } finally {
       setConfirmingPayment(null)
@@ -238,12 +222,20 @@ export default function PlantoesRealizadosPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center gap-3 p-4 bg-white border-b sticky top-0 z-50">
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg hover:bg-gray-100">
+            <span className="h-6 w-6">☰</span>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Plantões Realizados</h1>
+        </header>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-8 hidden md:block">
             <h1 className="text-3xl font-bold text-gray-800">
               Plantões <span className="text-orange-500">Realizados</span>
             </h1>
@@ -403,12 +395,25 @@ export default function PlantoesRealizadosPage() {
             </div>
             
             {filteredPlantoes.length === 0 ? (
-              <div className="p-8 text-center">
-                <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500">Nenhum plantão realizado encontrado</p>
-                <p className="text-sm text-gray-400 mt-2">Plantões realizados aparecerão aqui</p>
+              <div className="py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-5">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Nenhum plantão realizado</h3>
+                <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+                  Seus plantões realizados aparecerão aqui conforme as datas passam. Cadastre plantões na escala para começar.
+                </p>
+                <button
+                  onClick={() => router.push('/escala')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Cadastrar Primeiro Plantão
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -430,35 +435,102 @@ export default function PlantoesRealizadosPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Ação
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredPlantoes.map((plantao) => (
-                      <tr key={plantao.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatDate(plantao.data)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.hospital}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {formatCurrency(plantao.valor)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.horas || 0}h
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                            {getStatusText(plantao)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredPlantoes.map((plantao) => {
+                      const status = getSmartStatus(plantao)
+                      const canMarkPaid = plantao.status !== 'pago' && (status.label === 'Aguardando' || status.label === 'Vence em breve')
+                      return (
+                        <tr key={plantao.id} className={`hover:bg-gray-50/80 transition-colors ${isOverdue(plantao) ? 'bg-red-50/30' : ''}`}>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {formatDate(plantao.data)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {plantao.hospital}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
+                            {formatCurrency(plantao.valor)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {formatHoras(plantao.horas)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="group relative inline-block">
+                              <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg border ${status.color}`}>
+                                {status.label === 'Pago' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                )}
+                                {status.label === 'Atrasado' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01" /></svg>
+                                )}
+                                {status.label === 'Vence em breve' && (
+                                  <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3" /></svg>
+                                )}
+                                {status.label}
+                              </span>
+                              {/* Tooltip */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 bg-gray-900 text-white text-[10px] rounded-lg whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 pointer-events-none z-10 shadow-lg">
+                                {status.tooltip}
+                                <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-1 w-2 h-2 bg-gray-900 rotate-45" />
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-right">
+                            {canMarkPaid ? (
+                              <button
+                                onClick={() => handleMarkAsPaid(plantao.id)}
+                                disabled={confirmingPayment === plantao.id}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/60 rounded-lg transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Confirmar recebimento"
+                              >
+                                {confirmingPayment === plantao.id ? (
+                                  <div className="animate-spin rounded-full h-3 w-3 border-2 border-emerald-500 border-t-transparent" />
+                                ) : (
+                                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                                )}
+                                <span className="hidden sm:inline">Dar Baixa</span>
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-400">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
           </div>
+
+          {/* ── Folgas no Período ── */}
+          {folgasNoPeriodo.length > 0 && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-1">Folgas no Período</h3>
+              <p className="text-sm text-gray-500 mb-4">Dias de folga e disponibilidade registrados — não contabilizados nos totais financeiros.</p>
+              <div className="flex items-center gap-4">
+                <div className="bg-gray-50 rounded-lg px-4 py-3 border border-gray-100 text-center">
+                  <p className="text-2xl font-bold text-gray-700">{folgasNoPeriodo.length}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">folga(s)</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {folgasNoPeriodo.map(f => (
+                    <span key={f.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 border border-gray-200/60 rounded-lg text-xs text-gray-600">
+                      <span>☽</span>
+                      {formatDate((f.data || '').split('T')[0])}
+                      {f.hospital && f.hospital.toLowerCase() !== 'folga' && (
+                        <span className="text-gray-400">— {f.hospital}</span>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
