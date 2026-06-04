@@ -292,9 +292,14 @@ export default function EscalaPage() {
     try {
       if (editingId) {
         // Update existing record
-        const row = rows[0]
-        const { error } = await supabase.from('plantoes').update(row).eq('id', editingId).eq('user_id', user.id)
+        const { error } = await supabase.from('plantoes').update(rows[0]).eq('id', editingId).eq('user_id', user.id)
         if (error) { alert('Erro: ' + error.message); return }
+        // If recurrence is enabled, insert the additional weeks
+        if (recurrenceEnabled && rows.length > 1) {
+          const extraRows = rows.slice(1)
+          const { error: recError } = await supabase.from('plantoes').insert(extraRows).select()
+          if (recError) { alert('Plantão atualizado, mas erro ao replicar semanas: ' + recError.message); return }
+        }
       } else {
         const { error } = await supabase.from('plantoes').insert(rows).select()
         if (error) { alert('Erro: ' + error.message); return }
