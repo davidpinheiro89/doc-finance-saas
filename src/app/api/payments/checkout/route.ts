@@ -48,6 +48,15 @@ export async function POST(request: NextRequest) {
     console.log('[checkout] ASAAS_BASE_URL:', ASAAS_BASE_URL)
     console.log('[checkout] ASAAS_API_KEY exists:', !!ASAAS_API_KEY, 'length:', ASAAS_API_KEY.length)
 
+    // ── Log do IP de saída da Vercel (para diagnóstico do suporte Asaas) ──
+    try {
+      const ipRes = await fetch('https://api.ipify.org?format=json')
+      const ipData = await ipRes.json()
+      console.log('[checkout] Vercel outbound IP:', ipData.ip)
+    } catch {
+      console.log('[checkout] Could not fetch outbound IP')
+    }
+
     // ── 0. Parse request body first (before anything consumes the stream) ──
     let body: { cpfCnpj?: string; plan?: string }
     try {
@@ -97,7 +106,7 @@ export async function POST(request: NextRequest) {
       console.log('[checkout] Creating Asaas customer for:', user.email)
       const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
         method: 'POST',
-        headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
+        headers: asaasHeaders(ASAAS_API_KEY),
         body: JSON.stringify({
           name: fullName,
           email: user.email,
@@ -129,13 +138,13 @@ export async function POST(request: NextRequest) {
 
     // ── 3. Criar assinatura recorrente ──
     const nextDueDate = new Date()
-    nextDueDate.setDate(nextDueDate.getDate() + 1) // cobrar a partir de amanhã
+    nextDueDate.setDate(nextDueDate.getDate() + 1)
     const dueDateStr = nextDueDate.toISOString().split('T')[0]
 
     console.log('[checkout] Creating subscription:', { plan, customerId, dueDateStr })
     const subscriptionRes = await fetch(`${ASAAS_BASE_URL}/subscriptions`, {
       method: 'POST',
-      headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
+      headers: asaasHeaders(ASAAS_API_KEY),
       body: JSON.stringify({
         customer: customerId,
         billingType: 'CREDIT_CARD',
@@ -184,12 +193,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 5. Buscar link de checkout (primeira cobrança) ──
-    // A primeira cobrança é criada automaticamente pelo Asaas ao criar a subscription.
-    // Buscamos ela para obter o invoiceUrl.
     const paymentsRes = await fetch(
       `${ASAAS_BASE_URL}/subscriptions/${subscriptionData.id}/payments`,
       {
-        headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
+        headers: asaasHeaders(ASAAS_API_KEY),
       }
     )
 
