@@ -69,9 +69,12 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
       {/* Header */}
       <div className="px-6 py-5 border-b border-gray-200">
         <div className="flex items-center justify-center gap-3">
-          <div className="bg-orange-500 rounded-lg w-10 h-10 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-lg leading-none">🏠</span>
-          </div>
+          <svg viewBox="0 0 48 48" className="h-9 w-9 flex-shrink-0" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="48" height="48" rx="12" fill="#F97316"/>
+            <circle cx="42" cy="6" r="10" fill="#FB923C" opacity="0.5"/>
+            <circle cx="6" cy="42" r="10" fill="#FB923C" opacity="0.5"/>
+            <text x="24" y="32" fontFamily="Arial Black, Impact, sans-serif" fontSize="18" fontWeight="900" fill="white" textAnchor="middle" letterSpacing="1">BEM</text>
+          </svg>
           <h1 className="text-lg font-bold whitespace-nowrap">
             <span className="text-orange-500">BEM</span>
             <span className="text-gray-800"> plantonista</span>
