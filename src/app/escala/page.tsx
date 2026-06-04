@@ -2,7 +2,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase-client'
+import supabase from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
 import Sidebar from '../../components/Sidebar'
 
