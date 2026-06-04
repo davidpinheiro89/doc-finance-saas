@@ -10,7 +10,7 @@ interface Plantao {
   hospital: string
   data: string
   valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'realizado'
+  status: 'pendente' | 'pago' | 'confirmado' | 'realizado' | 'Aguardando'
   horas?: number
   endereco?: string
   prazo_pagamento_dias?: number
@@ -53,7 +53,7 @@ export default function PlantoesRealizadosPage() {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: false })
 
       if (error) {
@@ -160,24 +160,23 @@ export default function PlantoesRealizadosPage() {
   }
 
   const getStatusText = (plantao: Plantao) => {
-    // Check if there's a payment deadline and status is not paid
+    // Unique status logic - show only one status per plantão
+    if (plantao.status === 'pago') {
+      return 'Pago'
+    }
+    
+    // If payment hasn't been received or is within deadline
     if (plantao.prazo_pagamento_dias && plantao.status !== 'pago') {
       return 'Aguardando'
     }
     
-    // Return the actual status text
-    switch (plantao.status) {
-      case 'pago':
-        return 'Pago'
-      case 'confirmado':
-        return 'Confirmado'
-      case 'pendente':
-        return 'Pendente'
-      case 'realizado':
-        return 'Realizado'
-      default:
-        return plantao.status
+    // If plantão was done but no payment info
+    if (plantao.status === 'realizado' || plantao.status === 'confirmado') {
+      return 'Realizado'
     }
+    
+    // Default to actual status
+    return plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)
   }
 
   const isOverdue = (plantao: Plantao) => {
@@ -449,32 +448,9 @@ export default function PlantoesRealizadosPage() {
                           {plantao.horas || 0}h
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          <div className="flex items-center space-x-2">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                              {getStatusText(plantao)}
-                            </span>
-                            {plantao.status !== 'pago' && (
-                              <button
-                                onClick={() => handleMarkAsPaid(plantao.id)}
-                                disabled={confirmingPayment === plantao.id}
-                                className="bg-green-500 hover:bg-green-600 text-white text-xs font-medium py-1 px-2 rounded transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {confirmingPayment === plantao.id ? (
-                                  <div className="flex items-center">
-                                    <div className="animate-spin rounded-full h-3 w-3 border-b border-white mr-1"></div>
-                                    Confirmando...
-                                  </div>
-                                ) : (
-                                  <div className="flex items-center">
-                                    <svg className="h-3 w-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                    Pago
-                                  </div>
-                                )}
-                              </button>
-                            )}
-                          </div>
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
+                            {getStatusText(plantao)}
+                          </span>
                         </td>
                       </tr>
                     ))}
