@@ -31,6 +31,15 @@ async function safeJson(res: Response, label: string) {
   }
 }
 
+// Header compartilhado para todas as chamadas ao Asaas
+function asaasHeaders(apiKey: string): Record<string, string> {
+  return {
+    'Content-Type': 'application/json',
+    'access_token': apiKey,
+    'User-Agent': 'BEM-Plantonista/1.0',
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
@@ -88,10 +97,7 @@ export async function POST(request: NextRequest) {
       console.log('[checkout] Creating Asaas customer for:', user.email)
       const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          access_token: ASAAS_API_KEY,
-        },
+        headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
         body: JSON.stringify({
           name: fullName,
           email: user.email,
@@ -129,10 +135,7 @@ export async function POST(request: NextRequest) {
     console.log('[checkout] Creating subscription:', { plan, customerId, dueDateStr })
     const subscriptionRes = await fetch(`${ASAAS_BASE_URL}/subscriptions`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        access_token: ASAAS_API_KEY,
-      },
+      headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
       body: JSON.stringify({
         customer: customerId,
         billingType: 'CREDIT_CARD',
@@ -140,8 +143,8 @@ export async function POST(request: NextRequest) {
         nextDueDate: dueDateStr,
         cycle: isAnnual ? 'YEARLY' : 'MONTHLY',
         description: isAnnual
-          ? 'BEM Plantonista — Assinatura Anual'
-          : 'BEM Plantonista — Assinatura Mensal',
+          ? 'BEM Plantonista – Assinatura Anual'
+          : 'BEM Plantonista – Assinatura Mensal',
         externalReference: user.id,
       }),
     })
@@ -186,7 +189,7 @@ export async function POST(request: NextRequest) {
     const paymentsRes = await fetch(
       `${ASAAS_BASE_URL}/subscriptions/${subscriptionData.id}/payments`,
       {
-        headers: { access_token: ASAAS_API_KEY },
+        headers: asaasHeaders(ASAAS_API_KEY),  // ✅ User-Agent incluído
       }
     )
 
