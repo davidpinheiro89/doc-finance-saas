@@ -298,3 +298,23 @@ export default function LandingPage() {
     </div>
   )
 }
+[33mf6615306[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fix: correct Sidebar props on escala page
+[33ma5e4ae12[m fix: correct supabase import to default export
+[33mf3c92f91[m fix: correct supabase import path on escala page
+[33mc331c2c2[m feat: add confirmation logic for day actions on escala
+[33m2875aee5[m fix: add outbound IP log for Asaas support diagnosis
+[33m20cbdb2b[m fix: add User-Agent header to all Asaas API calls
+[33m4aeccc32[m feat(escala): series modal for edit/delete - ask 'just this one' or 'all in series'
+[33mc811a8ea[m feat(admin/feedback): click truncated comment to open full-text modal
+[33mc71b7cb7[m feat: add /admin/feedback page with restricted access, stats, filters, and sidebar badge
+[33mb77a7f1f[m fix: replicate plantão to subsequent weeks when editing with recurrence enabled
+[33mb5dd42a7[m feat: improve empty states across all data pages with icons, descriptions, and CTA buttons
+[33mc9f2bbe0[m feat(feedback): skip 7-day gate for test user davidpinheiro89@gmail.com
+[33m012d84d8[m feat: add user_feedback table + auto-trigger modal after 7 days with star rating
+[33m74139e4f[m feat: add financial_audit_logs table with triggers on financial_entries and despesas
+[33m1a0f9f25[m fix(escala): use 'dia'/'noite' for turno values to match DB constraint
+[33m662fa9af[m fix(escala): use lowercase turno values ('diurno'/'noturno') to match DB check constraint
+[33mec1fb88b[m feat(escala): add turno field (Diurno/Noturno) to plantao form, DB, and WhatsApp message
+[33m40fbb057[m fix(checkout): parse body before auth to prevent stream issues, wrap request.json in try-catch, return real error messages
+[33m3dc43ccb[m feat: add reset-password page + show/hide password toggle on login, register, reset
+[33m302f8d4e[m fix(checkout): safe JSON parsing for Asaas responses + diagnostic logging
