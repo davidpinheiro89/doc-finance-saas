@@ -164,6 +164,7 @@ export default function EscalaPage() {
         await supabase.from('plantoes').delete().eq('data', dateStr)
 
         const statusData = {
+          user_id: user.id,
           data: dateStr,
           tipo_evento: status,
           status: 'confirmado',
@@ -253,7 +254,7 @@ export default function EscalaPage() {
       const autoStatus = selectedDateObj < today ? 'realizado' : 'pendente'
 
       const plantaoData = {
-        usuario_id: user.id,
+        user_id: user.id,
         tipo_evento: 'plantao',
         hospital: formData.hospital.trim(),
         data: formData.data,
@@ -366,7 +367,7 @@ export default function EscalaPage() {
 
         <Sidebar user={user} isSidebarOpen={isSidebarOpen} />
 
-        <main className="flex-1 p-4 md:p-8 w-full max-w-full overflow-x-hidden">
+        <main className="flex-1 p-4 md:p-8 min-w-0 overflow-x-hidden">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Escala de Plantões</h1>
           </div>
