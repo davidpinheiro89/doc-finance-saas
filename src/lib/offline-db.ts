@@ -5,11 +5,11 @@ interface PlantaoData {
   endereco?: string
   data: string
   valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'atrasado'
+  status: 'pendente' | 'pago' | 'confirmado' | 'realizado'
   data_prevista_pagamento?: string
   horas?: number
   prazo_pagamento_dias?: number
-  usuario_id: string
+  user_id: string
   _created?: number
   _updated?: number
   _synced?: boolean
@@ -27,7 +27,10 @@ interface SyncQueueItem {
 class OfflineDB {
   private db: IDBDatabase | null = null
   private readonly dbName = 'BEMPlantonistaDB'
-  private readonly version = 1
+  // Version 2: rename index `usuario_id` -> `user_id` to align with the
+  // normalized Supabase schema (migration 003). Older clients with v1 are
+  // upgraded transparently via onupgradeneeded.
+  private readonly version = 2
 
   async init(): Promise<void> {
     return new Promise((resolve, reject) => {
@@ -41,16 +44,42 @@ class OfflineDB {
 
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBOpenDBRequest).result
+        const tx = (event.target as IDBOpenDBRequest).transaction!
 
-        // Create plantões store
+        // ----- plantoes store -----
+        let plantoesStore: IDBObjectStore
         if (!db.objectStoreNames.contains('plantoes')) {
-          const plantoesStore = db.createObjectStore('plantoes', { keyPath: 'id' })
-          plantoesStore.createIndex('usuario_id', 'usuario_id', { unique: false })
+          plantoesStore = db.createObjectStore('plantoes', { keyPath: 'id' })
+          plantoesStore.createIndex('user_id', 'user_id', { unique: false })
           plantoesStore.createIndex('data', 'data', { unique: false })
           plantoesStore.createIndex('_synced', '_synced', { unique: false })
+        } else {
+          plantoesStore = tx.objectStore('plantoes')
+
+          // Upgrade v1 -> v2: rename usuario_id index to user_id and migrate
+          // existing rows so they carry the new field name.
+          if (plantoesStore.indexNames.contains('usuario_id')) {
+            plantoesStore.deleteIndex('usuario_id')
+          }
+          if (!plantoesStore.indexNames.contains('user_id')) {
+            plantoesStore.createIndex('user_id', 'user_id', { unique: false })
+          }
+
+          const cursorReq = plantoesStore.openCursor()
+          cursorReq.onsuccess = () => {
+            const cursor = cursorReq.result
+            if (!cursor) return
+            const row = cursor.value as Record<string, any>
+            if (row.user_id == null && row.usuario_id != null) {
+              row.user_id = row.usuario_id
+              delete row.usuario_id
+              cursor.update(row)
+            }
+            cursor.continue()
+          }
         }
 
-        // Create sync queue store
+        // ----- sync queue store -----
         if (!db.objectStoreNames.contains('syncQueue')) {
           const syncStore = db.createObjectStore('syncQueue', { keyPath: 'id' })
           syncStore.createIndex('timestamp', 'timestamp', { unique: false })
@@ -59,14 +88,14 @@ class OfflineDB {
     })
   }
 
-  async getPlantoes(usuarioId: string): Promise<PlantaoData[]> {
+  async getPlantoes(userId: string): Promise<PlantaoData[]> {
     if (!this.db) await this.init()
-    
+
     return new Promise((resolve, reject) => {
       const transaction = this.db!.transaction(['plantoes'], 'readonly')
       const store = transaction.objectStore('plantoes')
-      const index = store.index('usuario_id')
-      const request = index.getAll(usuarioId)
+      const index = store.index('user_id')
+      const request = index.getAll(userId)
 
       request.onerror = () => reject(request.error)
       request.onsuccess = () => resolve(request.result || [])
@@ -99,7 +128,7 @@ class OfflineDB {
     })
   }
 
-  async deletePlantao(id: string, usuarioId: string): Promise<void> {
+  async deletePlantao(id: string, userId: string): Promise<void> {
     if (!this.db) await this.init()
     
     // First get the plantao to add to sync queue

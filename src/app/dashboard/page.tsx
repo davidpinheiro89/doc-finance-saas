@@ -1,10 +1,32 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import { useRouter } from 'next/navigation'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
 import Sidebar from '@/components/Sidebar'
+import { SkeletonMetricCard, SkeletonTableRows } from '@/components/Skeleton'
+import DashboardAlerts from '@/components/DashboardAlerts'
+import NotificationPermission from '@/components/NotificationPermission'
+import OnboardingModal from '@/components/OnboardingModal'
+import { useOnboarding } from '@/hooks/useOnboarding'
+import type { Plantao, LocalFavorito } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  fetchPlantoesByUser,
+  fetchPlantoesByUserRange,
+  applyAutoRealizadoStatus,
+  plantoesKeys,
+  type PlantaoListItem,
+} from '@/lib/queries/plantoes'
+import {
+  formatDateBR,
+  todayLocalISO,
+  toLocalISO,
+  getCurrentMonthRangeLocal,
+  getPreviousMonthRangeLocal,
+} from '@/lib/date-utils'
 
 // Shared delete function for both pages
 const deletePlantaoEvent = async (id: string, userId: string) => {
@@ -36,52 +58,80 @@ const deletePlantaoEvent = async (id: string, userId: string) => {
   }
 }
 
-interface Plantao {
-  id: string
-  user_id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'realizado'
-  horas?: number
-  endereco?: string
-  cep: string
-  data_prevista_pagamento: string
-  prazo_pagamento_dias: string
-  classificacao: string
-  especialidade: string
-  tipo_evento?: 'plantao' | 'folga' | 'disponivel'
-  local_favorito_id?: string | null
-}
-
-interface LocalFavorito {
-  id: string
-  user_id: string
-  nome: string
-  endereco: string
-  valor_hora: number
-  created_at: string
-  updated_at: string
-}
-
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [plantoes, setPlantoes] = useState<any[]>([])
+  const { user, loading } = useAuthGuard()
+  const queryClient = useQueryClient()
   const [showModal, setShowModal] = useState(false)
-  const [editingPlantao, setEditingPlantao] = useState<Plantao | null>(null)
+  const [editingPlantao, setEditingPlantao] = useState<PlantaoListItem | null>(null)
   const [saving, setSaving] = useState(false)
+  const [saveAsFavorite, setSaveAsFavorite] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [markingPaidId, setMarkingPaidId] = useState<string | null>(null)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
-  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([]) // Add favorite locations state
-  const [efficiencyData, setEfficiencyData] = useState<any[]>([])
-  const [chartReady, setChartReady] = useState(false)
-  const [monthlyFilter, setMonthlyFilter] = useState<'current' | 'previous'>('current')
-  const [previousMonthData, setPreviousMonthData] = useState<any[]>([])
-  const [isComparing, setIsComparing] = useState(false)
+  const [locaisFavoritos, setLocaisFavoritos] = useState<any[]>([])
+  const [dashboardFilter, setDashboardFilter] = useState<'current' | '3months' | 'hospital'>('current')
+  const [hospitalFilter, setHospitalFilter] = useState<string>('')
+  const [metaMensal, setMetaMensal] = useState<number>(30000)
+  const [metaEditing, setMetaEditing] = useState(false)
+  const [metaSaving, setMetaSaving] = useState(false)
+  const [metaSaved, setMetaSaved] = useState(false)
+  // History filters
+  const [historyHospitalFilter, setHistoryHospitalFilter] = useState('')
+  const [historyStatusFilter, setHistoryStatusFilter] = useState<'all' | 'pago' | 'aguardando' | 'atrasado'>('all')
+  const [historyShowAll, setHistoryShowAll] = useState(false)
+  const metaSavedTimeout = useRef<NodeJS.Timeout | null>(null)
+
+  // --- Onboarding (primeiro acesso) ---
+  const onboarding = useOnboarding(user)
+
+  // --- TanStack Query: lista principal de plantões do usuário ---
+  const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
+    queryKey: user ? plantoesKeys.byUser(user.id) : ['plantoes', 'anon'],
+    queryFn: () => fetchPlantoesByUser(user!.id),
+    enabled: !!user,
+    // Aplica regra de negócio (data passada + pendente → realizado) sem
+    // alterar o cache subjacente.
+    select: applyAutoRealizadoStatus,
+  })
+
+  // Log erros do useQuery (TanStack Query v5 não suporta onError nas opções)
+  if (plantoesError) {
+    console.error('Erro ao buscar plantões:', plantoesError)
+  }
+
+  // Mostra skeletons enquanto: (a) auth não terminou OU (b) primeira busca
+  // de plantões está em andamento. Após carga inicial, refetches em
+  // background não disparam skeleton (fica responsivo).
+  const isInitialLoading = loading || (!!user && isPlantoesPending)
+
+  // --- TanStack Query: plantões do mês anterior (para comparação) ---
+  const previousMonthRange = useMemo(() => {
+    const now = new Date()
+    const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const lastDay = new Date(now.getFullYear(), now.getMonth(), 0)
+    return {
+      start: toLocalISO(firstDay),
+      end: toLocalISO(lastDay),
+    }
+  }, [])
+
+  const { data: previousMonthData = [], isFetching: isComparing } = useQuery({
+    queryKey: user
+      ? plantoesKeys.byUserRange(user.id, previousMonthRange.start, previousMonthRange.end)
+      : ['plantoes', 'anon-range'],
+    queryFn: () => fetchPlantoesByUserRange(user!.id, previousMonthRange.start, previousMonthRange.end),
+    enabled: !!user,
+  })
+
+  const invalidatePlantoes = () => {
+    if (user) {
+      queryClient.invalidateQueries({ queryKey: plantoesKeys.byUser(user.id) })
+    }
+  }
   const [formData, setFormData] = useState({
     hospital: '',
     data: '',
@@ -98,69 +148,41 @@ export default function DashboardPage() {
   })
   const router = useRouter()
 
+  // Carrega lugares favoritos sempre que o user mudar (não-cacheado por
+  // ora; pode ser migrado para useQuery quando necessário).
   useEffect(() => {
-    checkAuth()
-  }, [])
+    if (user) fetchLocaisFavoritos(user.id)
+  }, [user])
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-      await fetchPreviousMonthData(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
+  // ── Fetch meta mensal do Supabase ──
+  useEffect(() => {
+    if (!user) return
+    const fetchMeta = async () => {
+      const { data } = await supabase
+        .from('user_settings')
+        .select('meta_mensal')
+        .eq('user_id', user.id)
+        .single()
+      if (data?.meta_mensal != null) setMetaMensal(data.meta_mensal)
     }
-  }
+    fetchMeta()
+  }, [user])
 
-  const fetchPlantoes = async (userId: string) => {
+  // ── Salvar meta mensal no Supabase (onBlur / Enter) ──
+  const saveMetaMensal = useCallback(async (valor: number) => {
+    if (!user) return
+    setMetaSaving(true)
     try {
-      const { data, error } = await supabase
-        .from('plantoes')
-        .select('*')
-        .eq('user_id', userId)
-        .order('data', { ascending: false })
-
-      if (error) {
-        console.error('Supabase error fetching plantões:', error)
-        alert('Erro ao buscar plantões: ' + error.message)
-        setPlantoes([])
-        return
+      const { error } = await supabase
+        .from('user_settings')
+        .upsert({ user_id: user.id, meta_mensal: valor }, { onConflict: 'user_id' })
+      if (!error) {
+        setMetaSaved(true)
+        if (metaSavedTimeout.current) clearTimeout(metaSavedTimeout.current)
+        metaSavedTimeout.current = setTimeout(() => setMetaSaved(false), 2000)
       }
-
-      // Filter out 'Folga' entries and apply automatic status logic for past plantões
-      const processedData = (data || []).map((plantao: Plantao) => {
-        // Keep data as pure string, no Date object conversion
-        const plantaoDate = new Date(plantao.data + 'T00:00:00')
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        
-        // If plantão date is in the past and status is still 'pendente', change to 'realizado'
-        if (plantaoDate < today && plantao.status === 'pendente') {
-          return { ...plantao, status: 'realizado' }
-        }
-        
-        return plantao
-      })
-      
-      setPlantoes(processedData)
-      
-      // Fetch favorite locations
-      await fetchLocaisFavoritos(userId)
-    } catch (error) {
-      console.error('Error fetching plantões:', error)
-      alert('Erro ao buscar plantões. Tente novamente.')
-      setPlantoes([])
-    }
-  }
+    } finally { setMetaSaving(false) }
+  }, [user])
 
   const fetchLocaisFavoritos = async (userId: string) => {
     try {
@@ -229,10 +251,10 @@ export default function DashboardPage() {
     const now = new Date()
     const previousMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastDayOfPreviousMonth = new Date(now.getFullYear(), now.getMonth(), 0)
-    
+
     return {
-      start: previousMonth.toISOString().split('T')[0],
-      end: lastDayOfPreviousMonth.toISOString().split('T')[0]
+      start: toLocalISO(previousMonth),
+      end: toLocalISO(lastDayOfPreviousMonth)
     }
   }
 
@@ -241,41 +263,13 @@ export default function DashboardPage() {
     const now = new Date()
     const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    
+
     return {
-      start: firstDayOfMonth.toISOString().split('T')[0],
-      end: lastDayOfMonth.toISOString().split('T')[0]
+      start: toLocalISO(firstDayOfMonth),
+      end: toLocalISO(lastDayOfMonth)
     }
   }
 
-  // Fetch previous month data
-  const fetchPreviousMonthData = async (userId: string) => {
-    setIsComparing(true)
-    try {
-      const { start, end } = getPreviousMonthRange()
-      const { data, error } = await supabase
-        .from('plantoes')
-        .select('*')
-        .eq('user_id', userId)
-        .gte('data', start)
-        .lte('data', end)
-        .order('data', { ascending: false })
-
-      if (error) {
-        console.error('Error fetching previous month data:', error)
-        setPreviousMonthData([])
-        return
-      }
-
-      setPreviousMonthData(data || [])
-      console.log('Dados do mês anterior carregados:', data?.length || 0, 'itens')
-    } catch (error) {
-      console.error('Error fetching previous month data:', error)
-      setPreviousMonthData([])
-    } finally {
-      setIsComparing(false)
-    }
-  }
 
   const handleSaveAsFavorite = async () => {
     if (!formData.hospital || !formData.endereco) {
@@ -287,7 +281,7 @@ export default function DashboardPage() {
       const { data, error } = await supabase
         .from('locais_favoritos')
         .insert({
-          usuario_id: user.id,
+          user_id: user!.id,
           nome: `${formData.hospital} - ${formData.endereco}`,
           endereco: formData.endereco,
           valor_hora: parseFloat(formData.valor) || 0
@@ -317,165 +311,90 @@ export default function DashboardPage() {
       }
       
       // Refresh favorites list
-      await fetchLocaisFavoritos(user.id)
+      await fetchLocaisFavoritos(user!.id)
     } catch (error) {
       console.error('Error saving favorite location:', error)
       alert('Erro ao salvar local favorito. Tente novamente.')
     }
   }
 
-  // Filter plantões based on date range and monthly filter
-  const getListagemPlantoes = () => {
-    let dataToFilter = plantoes
+  // ── Smart filter: filtra plantões conforme o modo selecionado ──
+  const getFilteredPlantoes = useMemo(() => {
+    const dk = (p: PlantaoListItem) => (p.data || '').split('T')[0]
+    let result: PlantaoListItem[] = plantoes
 
-    // Apply monthly filter
-    if (monthlyFilter === 'current') {
-      const { start, end } = getCurrentMonthRange()
-      dataToFilter = plantoes.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
-      })
-    } else if (monthlyFilter === 'previous') {
-      const { start, end } = getPreviousMonthRange()
-      dataToFilter = previousMonthData.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        return plantaoDate >= new Date(start) && plantaoDate <= new Date(end)
-      })
+    if (dashboardFilter === 'current') {
+      const { start, end } = getCurrentMonthRangeLocal()
+      result = plantoes.filter((p) => { const d = dk(p); return d >= start && d <= end })
+    } else if (dashboardFilter === '3months') {
+      const now = new Date()
+      const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+      const start = toLocalISO(threeMonthsAgo)
+      const end = todayLocalISO()
+      result = plantoes.filter((p) => { const d = dk(p); return d >= start && d <= end })
     }
 
-    // Apply custom date range filter if set
-    if (dateRange.start || dateRange.end) {
-      return dataToFilter.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        const startDate = dateRange.start ? new Date(dateRange.start) : null
-        const endDate = dateRange.end ? new Date(dateRange.end) : null
-        
-        if (startDate && plantaoDate < startDate) return false
-        if (endDate && plantaoDate > endDate) return false
-        
-        return true
-      })
+    if (dashboardFilter === 'hospital' && hospitalFilter) {
+      result = plantoes.filter((p) => p.hospital === hospitalFilter)
     }
 
-    return dataToFilter
-  }
+    // Custom date range overlay
+    if (dateRange.start) result = result.filter((p) => dk(p) >= dateRange.start)
+    if (dateRange.end) result = result.filter((p) => dk(p) <= dateRange.end)
 
-  // Calculate filtered metrics
-  const listagemPlantoes = getListagemPlantoes()
-  
-  const filteredMetrics = {
-    quantidade: listagemPlantoes.length,
-    valorTotal: listagemPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: listagemPlantoes.reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
-  }
+    return result
+  }, [plantoes, dashboardFilter, hospitalFilter, dateRange])
 
-  // Function to calculate efficiency for comparison
-  const calculateEfficiency = (data: any[]) => {
-    return data
-      .filter((p: any) => (p.status === 'pago' || p.status === 'realizado') && (p.horas || p.carga_horaria || p.duration))
-      .reduce((acc: any, plantao: any) => {
-        const hospital = plantao.hospital || plantao.local || 'Desconhecido'
-        const h = Number(plantao.horas || plantao.carga_horaria || plantao.duration || 0)
-        
-        if (h <= 0) return acc
-        
-        if (!acc[hospital]) {
-          acc[hospital] = {
-            totalValue: 0,
-            totalHours: 0,
-            hourlyRate: 0,
-            count: 0
-          }
-        }
-        
-        acc[hospital].totalValue += Number(plantao.valor || 0)
-        acc[hospital].totalHours += h
-        acc[hospital].count += 1
-        acc[hospital].hourlyRate = acc[hospital].totalValue / acc[hospital].totalHours
-        
-        return acc
-      }, {} as Record<string, { totalValue: number; totalHours: number; hourlyRate: number; count: number }>)
-  }
+  // ── Hospital list for filter dropdown ──
+  const uniqueHospitals = useMemo(() => {
+    const set = new Set(plantoes.map((p) => p.hospital).filter(Boolean))
+    return Array.from(set).sort()
+  }, [plantoes])
 
-  // Memoized efficiency calculations to prevent unnecessary re-renders
-  const currentMonthEfficiency = useMemo(() => {
-    return calculateEfficiency(listagemPlantoes)
-  }, [listagemPlantoes])
+  // ── Business Intelligence Metrics ──
+  const metrics = useMemo(() => {
+    const filtered = getFilteredPlantoes.filter(p => !isFolga(p))
+    const quantidade = filtered.length
+    const valorBruto = filtered.reduce((s, p) => s + (p.valor || 0), 0)
+    const horasTotal = filtered.reduce((s, p) => s + (p.horas || 0), 0)
 
-  const previousMonthEfficiency = useMemo(() => {
-    return calculateEfficiency(previousMonthData)
-  }, [previousMonthData])
+    // Valor Líquido Estimado (PJ médico: ~25% impostos/retenções)
+    const TAX_RATE = 0.25
+    const valorLiquido = valorBruto * (1 - TAX_RATE)
 
-  const efficiencyWithComparison = useMemo(() => {
-    if (!isComparing || monthlyFilter !== 'current') {
-      return Object.entries(currentMonthEfficiency)
-        .map(([hospital, data]: any) => ({
-          hospital,
-          data,
-          delta: 0
-        }))
-        .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
-        .slice(0, 3)
-    }
+    // Valor médio por hora trabalhada (período filtrado)
+    const valorHora = horasTotal > 0 ? valorBruto / horasTotal : 0
 
-    return Object.entries(currentMonthEfficiency)
-      .map(([hospital, data]: any) => {
-        const previousData = previousMonthEfficiency[hospital]
-        const delta = previousData ? ((data.hourlyRate / previousData.hourlyRate) - 1) * 100 : 0
-        
-        return {
-          hospital,
-          data,
-          delta: Number(delta.toFixed(1))
-        }
-      })
-      .sort((a, b) => b.data.hourlyRate - a.data.hourlyRate)
-      .slice(0, 3)
-  }, [currentMonthEfficiency, previousMonthEfficiency, isComparing, monthlyFilter])
+    // Média histórica geral (todos os plantões do médico, para comparação)
+    const allNonFolga = plantoes.filter(p => !isFolga(p))
+    const allValor = allNonFolga.reduce((s, p) => s + (p.valor || 0), 0)
+    const allHoras = allNonFolga.reduce((s, p) => s + (p.horas || 0), 0)
+    const valorHoraHistorico = allHoras > 0 ? allValor / allHoras : 0
 
-  // useEffect to update efficiency data when memoized calculations change
-  useEffect(() => {
-    if (efficiencyWithComparison.length > 0) {
-      // console.log('Atualizando gráfico com dados memoizados:', efficiencyWithComparison) - REMOVED TO PREVENT LOOP
-      setEfficiencyData(efficiencyWithComparison)
-      setChartReady(true)
-    } else {
-      setEfficiencyData([])
-      setChartReady(false)
-    }
-  }, []) // Empty dependency array to prevent infinite loop
+    // Progresso da meta mensal (usa apenas mês atual)
+    const { start: mesStart, end: mesEnd } = getCurrentMonthRangeLocal()
+    const faturamentoMes = plantoes
+      .filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd && !isFolga(p) })
+      .reduce((s, p) => s + (p.valor || 0), 0)
+    const progressoMeta = metaMensal > 0 ? Math.min((faturamentoMes / metaMensal) * 100, 100) : 0
 
-  // Prepare data for bar chart (plantões by unit)
-  const plantoesByUnit = listagemPlantoes.reduce((acc, plantao) => {
-    const unit = plantao.hospital
-    if (!acc[unit]) {
-      acc[unit] = 0
-    }
-    acc[unit] += 1
-    return acc
-  }, {} as Record<string, number>)
+    // Ranking de hospitais por valor/hora (exclui folgas e registros sem valor)
+    const hospitalMap: Record<string, { valor: number; horas: number; count: number }> = {}
+    filtered.forEach((p) => {
+      if (!p.hospital || isFolga(p)) return
+      if (!hospitalMap[p.hospital]) hospitalMap[p.hospital] = { valor: 0, horas: 0, count: 0 }
+      hospitalMap[p.hospital].valor += p.valor || 0
+      hospitalMap[p.hospital].horas += p.horas || 0
+      hospitalMap[p.hospital].count += 1
+    })
+    const hospitalRanking = Object.entries(hospitalMap)
+      .map(([name, d]) => ({ name, valorHora: d.horas > 0 ? d.valor / d.horas : 0, total: d.valor, count: d.count }))
+      .filter(h => h.valorHora > 0)
+      .sort((a, b) => b.valorHora - a.valorHora)
+      .slice(0, 5)
 
-  const chartData = Object.entries(plantoesByUnit).map(([unit, count]) => ({
-    unidade: unit,
-    quantidade: (count as number) || 0
-  })).sort((a, b) => b.quantidade - a.quantidade)
-
-  // Prepare data for hours distribution chart
-  const hoursByUnit = listagemPlantoes.reduce((acc, plantao) => {
-    const unit = plantao.hospital
-    if (!acc[unit]) {
-      acc[unit] = 0
-    }
-    acc[unit] += (plantao.horas || plantao.carga_horaria || plantao.duration || 0) as number
-    return acc
-  }, {} as Record<string, number>)
-
-  const hoursChartData = Object.entries(hoursByUnit).map(([unit, hours]) => ({
-    unidade: unit,
-    horas: (hours as number) || 0
-  })).sort((a, b) => b.horas - a.horas)
-
-  const COLORS = ['#f97316', '#ea580c', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16', '#22c55e']
+    return { quantidade, valorBruto, horasTotal, valorLiquido, valorHora, valorHoraHistorico, faturamentoMes, progressoMeta, hospitalRanking }
+  }, [getFilteredPlantoes, plantoes, metaMensal])
 
   const handleCepLookup = async () => {
     const cep = formData.cep.replace(/\D/g, '') // Remove non-digits
@@ -530,7 +449,7 @@ export default function DashboardPage() {
     setDeletingId(id)
 
     try {
-      const { success, error } = await deletePlantaoEvent(id, user.id)
+      const { success, error } = await deletePlantaoEvent(id, user!.id)
 
       if (error) {
         console.error('Supabase delete error:', error)
@@ -538,25 +457,26 @@ export default function DashboardPage() {
         return
       }
 
-      // Update local state immediately for visual feedback - NO AUTO FETCH
-      setPlantoes(prev => {
-        const updated = prev.filter(p => p.id !== id)
-        return updated
-      })
+      // Optimistic delete diretamente no cache do TanStack Query
+      if (user) {
+        queryClient.setQueryData<PlantaoListItem[]>(plantoesKeys.byUser(user.id), (old) =>
+          (old ?? []).filter((p) => p.id !== id),
+        )
+      }
       
       // Force router refresh to clear any cache
       router.refresh()
       
       alert('Plantão apagado com sucesso!')
-    } catch (error: any) {
-      console.error('Erro ao apagar:', error.message || error)
+    } catch (error) {
+      console.error('Erro ao apagar:', error instanceof Error ? error.message : error)
       alert('Erro ao apagar plantão. Tente novamente.')
     } finally {
       setDeletingId(null)
     }
   }
 
-  const handleEditPlantao = (plantao: Plantao) => {
+  const handleEditPlantao = (plantao: PlantaoListItem) => {
     setEditingPlantao(plantao)
     setFormData({
       hospital: plantao.hospital,
@@ -570,7 +490,7 @@ export default function DashboardPage() {
       prazo_pagamento_dias: plantao.prazo_pagamento_dias?.toString() || '',
       classificacao: plantao.classificacao || '',
       especialidade: plantao.especialidade || '',
-      local_favorito_id: plantao.local_favorito_id || null
+      local_favorito_id: null // coluna não existe no schema atual
     })
     setShowModal(true)
   }
@@ -581,8 +501,8 @@ export default function DashboardPage() {
 
     try {
       // Validate required fields
-      if (!formData.hospital || !formData.data || !formData.valor || !user.id) {
-        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user.id })
+      if (!formData.hospital || !formData.data || !formData.valor || !user!.id) {
+        console.error('Missing required fields:', { hospital: formData.hospital, data: formData.data, valor: formData.valor, userId: user!.id })
         alert('Preencha todos os campos obrigatórios.')
         return
       }
@@ -607,8 +527,17 @@ export default function DashboardPage() {
         autoStatus = 'pendente'
       }
 
-      let plantaoData: any = {
-        usuario_id: user.id,
+      // Auto-calculate prazo_pagamento_dias from date difference
+      let prazoDias: number | null = formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null
+      if (formData.data_prevista_pagamento && formData.data && !prazoDias) {
+        const diff = Math.round(
+          (new Date(formData.data_prevista_pagamento + 'T00:00:00').getTime() - new Date(formData.data + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24)
+        )
+        prazoDias = diff > 0 ? diff : null
+      }
+
+      const plantaoData: Record<string, string | number | null> = {
+        user_id: user!.id,
         hospital: formData.hospital.trim(),
         data: formData.data,
         valor: parseFloat(formData.valor),
@@ -616,7 +545,7 @@ export default function DashboardPage() {
         horas: formData.horas ? parseFloat(formData.horas) : 0,
         endereco: formData.endereco?.trim() || null,
         data_prevista_pagamento: formData.data_prevista_pagamento || null,
-        prazo_pagamento_dias: formData.prazo_pagamento_dias ? parseInt(formData.prazo_pagamento_dias) : null,
+        prazo_pagamento_dias: prazoDias,
         classificacao: formData.classificacao || null,
         especialidade: formData.especialidade || null
       }
@@ -630,12 +559,12 @@ export default function DashboardPage() {
           .from('plantoes')
           .update(plantaoData)
           .eq('id', editingPlantao.id)
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .select()
       } else {
         // Create new plantão
-        plantaoData.created_at = new Date().toISOString()
-        plantaoData.user_id = user.id
+        // created_at handled by Supabase DEFAULT now()
+        plantaoData.user_id = user!.id
         console.log('Saving plantão to table "plantoes":', plantaoData)
         result = await supabase
           .from('plantoes')
@@ -657,10 +586,26 @@ export default function DashboardPage() {
 
       console.log('Plantão saved successfully:', data)
 
+      // Salvar como favorito se o checkbox estiver marcado
+      if (saveAsFavorite && formData.hospital && !formData.local_favorito_id) {
+        try {
+          await supabase.from('locais_favoritos').insert({
+            user_id: user!.id,
+            nome: formData.hospital,
+            endereco: formData.endereco || '',
+            valor_hora: parseFloat(formData.valor) || 0,
+          })
+          await fetchLocaisFavoritos(user!.id)
+        } catch (favErr) {
+          console.error('Erro ao salvar favorito:', favErr)
+        }
+      }
+
       // Refresh plantões list
-      await fetchPlantoes(user.id)
-      
+      invalidatePlantoes()
+
       // Close modal and reset form
+      setSaveAsFavorite(false)
       setShowModal(false)
       setEditingPlantao(null)
       setFormData({
@@ -705,80 +650,156 @@ export default function DashboardPage() {
   }
 
   const formatDate = (dateString: string) => {
-    // Consistent date formatting - no timezone issues
-    const date = new Date(dateString + 'T00:00:00')
-    const day = String(date.getDate()).padStart(2, '0')
-    const month = String(date.getMonth() + 1).padStart(2, '0')
-    const year = date.getFullYear()
-    
-    return `${day}/${month}/${year}`
+    // Split puro da string YYYY-MM-DD — zero conversão de fuso.
+    return formatDateBR(dateString)
+  }
+
+  const getSmartStatus = (plantao: PlantaoListItem): string => {
+    const st = plantao.status as string
+    if (st === 'pago') return 'pago'
+    // Check if overdue: past payment deadline and not paid
+    if (plantao.data_prevista_pagamento) {
+      const deadlineStr = plantao.data_prevista_pagamento.split('T')[0]
+      if (deadlineStr < todayStr) return 'atrasado'
+    } else if (plantao.prazo_pagamento_dias && plantao.data) {
+      const base = new Date(plantao.data.split('T')[0] + 'T00:00:00')
+      base.setDate(base.getDate() + plantao.prazo_pagamento_dias)
+      const deadlineStr = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+      if (deadlineStr < todayStr) return 'atrasado'
+    }
+    return st
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pago':
-        return 'bg-green-100 text-green-800'
-      case 'pendente':
-        return 'bg-yellow-100 text-yellow-800'
-      case 'confirmado':
-        return 'bg-blue-100 text-blue-800'
+        return 'bg-emerald-100 text-emerald-700'
       case 'realizado':
-        return 'bg-purple-100 text-purple-800'
+        return 'bg-emerald-50 text-emerald-600'
+      case 'atrasado':
+        return 'bg-red-100 text-red-700'
+      case 'pendente':
+      case 'confirmado':
+        return 'bg-amber-100 text-amber-700'
       default:
-        return 'bg-gray-100 text-gray-800'
+        return 'bg-gray-100 text-gray-600'
     }
   }
 
-  // Filter plantões by date
-  const today = new Date()
-  today.setHours(0, 0, 0, 0) // Set to start of day for accurate comparison
+  const getStatusLabel = (status: string) => {
+    switch (status) {
+      case 'pago': return 'Pago'
+      case 'realizado': return 'Realizado'
+      case 'atrasado': return 'Atrasado'
+      case 'pendente': return 'Aguardando'
+      case 'confirmado': return 'Confirmado'
+      default: return status
+    }
+  }
 
-  const upcomingPlantoes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
-    plantaoDate.setHours(0, 0, 0, 0)
-    return plantaoDate >= today
-  }).sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+  const handleMarkAsPaid = async (plantao: PlantaoListItem) => {
+    setMarkingPaidId(plantao.id)
+    try {
+      const { error } = await supabase
+        .from('plantoes')
+        .update({ status: 'pago' })
+        .eq('id', plantao.id)
+        .eq('user_id', user!.id)
+      if (error) { alert('Erro: ' + error.message); return }
+      // Optimistic update in TanStack cache
+      if (user) {
+        queryClient.setQueryData<PlantaoListItem[]>(plantoesKeys.byUser(user.id), (old) =>
+          (old ?? []).map((p) => p.id === plantao.id ? { ...p, status: 'pago' as const } : p),
+        )
+      }
+    } catch { alert('Erro ao confirmar pagamento.') }
+    finally { setMarkingPaidId(null) }
+  }
 
-  const historicalPlantoes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
-    plantaoDate.setHours(0, 0, 0, 0)
-    return plantaoDate < today
-  }).sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+  // Filter plantões by date — comparação por string YYYY-MM-DD evita 100% dos
+  // problemas de fuso horário. Normaliza com `.split('T')[0]` para ser robusto
+  // caso o Supabase devolva timestamp completo em vez de date puro.
+  const todayStr = todayLocalISO()
+  const dataKey = (p: PlantaoListItem) => (p.data || '').split('T')[0]
 
-  // Calculate management metrics
-  const currentMonth = new Date().getMonth()
-  const currentYear = new Date().getFullYear()
-  
-  const plantoesEsteMes = plantoes.filter(plantao => {
-    const plantaoDate = new Date(plantao.data)
-    return plantaoDate.getMonth() === currentMonth && plantaoDate.getFullYear() === currentYear
-  }).length
+  const todayPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d === todayStr && !isFolga(p)
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => (a.hospital || '').localeCompare(b.hospital || ''))
 
-  const pendentesPagamento = plantoes.filter(plantao => 
-    plantao.status === 'pendente' || plantao.status === 'confirmado'
+  const upcomingPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d > todayStr && !isFolga(p)
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(a).localeCompare(dataKey(b)))
+
+  const historicalPlantoes = plantoes.filter((p: PlantaoListItem) => {
+    const d = dataKey(p)
+    return d && d < todayStr && !isFolga(p)
+  }).sort((a: PlantaoListItem, b: PlantaoListItem) => dataKey(b).localeCompare(dataKey(a)))
+
+  const pendentesPagamento = plantoes.filter((p: PlantaoListItem) =>
+    (p.status === 'pendente' || p.status === 'confirmado') && !isFolga(p)
   ).length
 
-  // Calculate net profit (placeholder tax rate - will be configurable later)
-  const TAX_RATE = 0.25 // 25% for taxes and costs (configurable later)
-  const totalRealizado = plantoes
-    .filter(p => p.status === 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
-  const estimatedTaxCosts = totalRealizado * TAX_RATE
-  const lucroLiquidoEstimado = totalRealizado - estimatedTaxCosts
+  // Folgas no mês atual (para exibição separada)
+  const folgasNoMes = useMemo(() => {
+    const { start, end } = getCurrentMonthRangeLocal()
+    return plantoes.filter(p => {
+      const d = (p.data || '').split('T')[0]
+      return d >= start && d <= end && isFolga(p)
+    }).length
+  }, [plantoes])
 
-  // Calculate metrics from real data
-  const totalGanho = plantoes
-    .filter(p => p.status === 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
+  // ── History filter logic ──
+  const historyUniqueHospitals = useMemo(() => {
+    const set = new Set(historicalPlantoes.map(p => p.hospital).filter(Boolean))
+    return Array.from(set).sort()
+  }, [historicalPlantoes])
 
-  const horasTotais = plantoes
-    .filter(p => p.horas || p.carga_horaria || p.duration)
-    .reduce((sum, p) => sum + (p.horas || p.carga_horaria || p.duration || 0), 0)
+  const filteredHistoricalPlantoes = useMemo(() => {
+    return historicalPlantoes.filter(p => {
+      if (historyHospitalFilter && p.hospital !== historyHospitalFilter) return false
+      if (historyStatusFilter !== 'all') {
+        const smart = getSmartStatus(p)
+        if (historyStatusFilter === 'pago' && smart !== 'pago') return false
+        if (historyStatusFilter === 'aguardando' && smart !== 'realizado' && smart !== 'pendente' && smart !== 'confirmado') return false
+        if (historyStatusFilter === 'atrasado' && smart !== 'atrasado') return false
+      }
+      return true
+    })
+  }, [historicalPlantoes, historyHospitalFilter, historyStatusFilter])
 
-  const plantoesRealizados = plantoes.filter(p => p.status === 'pago').length
-
-  // Debug: Log filtered data - REMOVED TO PREVENT INFINITE LOOP
-  // console.log('Dados do gráfico:', listagemPlantoes)
+  // ── Export CSV ──
+  const handleExportCSV = () => {
+    const rows = filteredHistoricalPlantoes.map(p => {
+      const bruto = p.valor || 0
+      const retencao = bruto * 0.25
+      const liquido = bruto - retencao
+      return {
+        'Data': (p.data || '').split('T')[0].split('-').reverse().join('/'),
+        'Hospital': p.hospital || '',
+        'Carga Horária (h)': p.horas || 0,
+        'Valor Bruto (R$)': bruto.toFixed(2).replace('.', ','),
+        'Retenção Estimada (R$)': retencao.toFixed(2).replace('.', ','),
+        'Valor Líquido (R$)': liquido.toFixed(2).replace('.', ','),
+        'Status': getStatusLabel(getSmartStatus(p)),
+      }
+    })
+    if (rows.length === 0) { alert('Nenhum plantão para exportar com os filtros atuais.'); return }
+    const headers = Object.keys(rows[0])
+    const csvContent = [
+      headers.join(';'),
+      ...rows.map(r => headers.map(h => `"${r[h as keyof typeof r]}"`).join(';'))
+    ].join('\n')
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `plantoes_relatorio_${todayStr}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
 
   if (loading) {
     return (
@@ -791,487 +812,600 @@ export default function DashboardPage() {
     )
   }
 
-  return (
-    <div className="flex h-screen bg-gray-50 w-full overflow-x-hidden">
-      <Sidebar user={user} />
-      
-      <div className="flex-1 overflow-auto w-full relative z-10">
-        {/* Header */}
-        <header className="bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center">
-              {/* Mobile Menu Button */}
-              <button
-                onClick={() => {
-                  const sidebar = document.querySelector('[data-sidebar-mobile]')
-                  if (sidebar) {
-                    sidebar.classList.toggle('-translate-x-full')
-                  }
-                }}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-              >
-                <span className="h-6 w-6">☰</span>
-              </button>
-              <h1 className="text-3xl font-bold text-gray-800 ml-2">
-                Início
-              </h1>
+  const subscriptionStatus = user?.user_metadata?.subscription_status
+  if (subscriptionStatus !== 'active') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-gray-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full">
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-xl p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-6 rounded-2xl bg-gradient-to-br from-orange-100 to-orange-50 flex items-center justify-center border border-orange-200/60">
+              <span className="text-4xl">🔒</span>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-sm text-gray-600">
-                <span className="font-medium">{user?.user_metadata?.full_name || 'Médico'}</span>
-                <span className="ml-2 text-xs text-gray-500">{user?.user_metadata?.crm || 'CRM'}</span>
-              </div>
-              <button
-                onClick={handleLogout}
-                className="text-gray-600 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200"
-              >
-                Sair
-              </button>
-            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Acesso Restrito</h1>
+            <p className="text-gray-600 leading-relaxed mb-8">
+              Identificamos que você ainda não possui uma assinatura ativa no BEM Plantonista. Ative seu plano piloto para liberar o acesso completo à sua escala e controle financeiro.
+            </p>
+            <a
+              href="https://wa.me/5511985904388?text=Olá, gostaria de ativar minha conta do BEM Plantonista."
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2.5 px-6 py-3.5 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all active:scale-[0.98]"
+            >
+              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" /></svg>
+              Falar com o Suporte / Ativar Conta
+            </a>
           </div>
         </div>
-      </header>
+      </div>
+    )
+  }
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8">
-        {/* Intelligent Insights Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          {/* Workload Monitoring Card */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-800">Monitor de Carga Horária</h3>
-              <div className="bg-blue-100 rounded-full p-2">
-                <svg className="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+  return (
+    <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
+      {onboarding.showOnboarding && (
+        <OnboardingModal
+          step={onboarding.step}
+          setStep={onboarding.setStep}
+          completeOnboarding={onboarding.completeOnboarding}
+          skipOnboarding={onboarding.skipOnboarding}
+        />
+      )}
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
+
+      <div className="flex-1 overflow-auto w-full relative z-10">
+        {/* ── Header Premium ── */}
+        <header className="bg-white/80 backdrop-blur-md border-b border-gray-200/60 sticky top-0 z-40">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <button onClick={() => setMobileMenuOpen(true)} className="md:hidden p-2 rounded-xl hover:bg-gray-100 transition-colors">
+                  <span className="text-lg">☰</span>
+                </button>
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">Painel de Controle</h1>
+                  <p className="text-xs text-gray-500 hidden sm:block">Visão geral dos seus plantões</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {pendentesPagamento > 0 && (
+                  <span className="hidden sm:inline-flex items-center gap-1.5 bg-amber-50 text-amber-700 text-xs font-medium px-3 py-1.5 rounded-full border border-amber-200">
+                    <span className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse" />
+                    {pendentesPagamento} pagamento(s) pendente(s)
+                  </span>
+                )}
+                <div className="text-right hidden sm:block">
+                  <p className="text-sm font-semibold text-gray-800">{user?.user_metadata?.full_name || 'Médico'}</p>
+                  <p className="text-xs text-gray-400">{user?.user_metadata?.crm || 'CRM'}</p>
+                </div>
+                <button onClick={handleLogout} className="text-gray-400 hover:text-gray-600 p-2 rounded-xl hover:bg-gray-100 transition-all" title="Sair">
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                </button>
               </div>
             </div>
-            <div className="space-y-3">
-              {(() => {
-                const today = new Date()
-                const currentMonth = today.getMonth()
-                const currentYear = today.getFullYear()
-                
-                // Calculate monthly hours
-                const monthlyHours = plantoes
-                  .filter((p: any) => {
-                    const plantaoDate = new Date(p.data)
-                    return plantaoDate.getMonth() === currentMonth && 
-                           plantaoDate.getFullYear() === currentYear &&
-                           p.horas && p.horas > 0
-                  })
-                  .reduce((sum: number, p: any) => sum + (p.horas || 0), 0)
+          </div>
+        </header>
 
-                // Calculate weekly hours (last 7 days)
-                const sevenDaysAgo = new Date(today)
-                sevenDaysAgo.setDate(today.getDate() - 7)
-                sevenDaysAgo.setHours(0, 0, 0, 0)
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6">
 
-                const weeklyHours = plantoes
-                  .filter((p: any) => {
-                    const plantaoDate = new Date(p.data)
-                    return plantaoDate >= sevenDaysAgo && 
-                           plantaoDate <= today &&
-                           p.horas && p.horas > 0
-                  })
-                  .reduce((sum: number, p: any) => sum + (p.horas || 0), 0)
+          {/* ── Filtros Fluidos ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex bg-gray-100 rounded-xl p-1">
+                {([
+                  { key: 'current', label: 'Mês Atual' },
+                  { key: '3months', label: 'Últimos 3 Meses' },
+                  { key: 'hospital', label: 'Por Hospital' },
+                ] as const).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    onClick={() => { setDashboardFilter(key); if (key !== 'hospital') setHospitalFilter('') }}
+                    className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      dashboardFilter === key
+                        ? 'bg-white text-orange-600 shadow-sm'
+                        : 'text-gray-500 hover:text-gray-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
 
-                const healthWarning = weeklyHours > 60
+              {dashboardFilter === 'hospital' && (
+                <select
+                  value={hospitalFilter}
+                  onChange={(e) => setHospitalFilter(e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40 bg-white"
+                >
+                  <option value="">Todos os hospitais</option>
+                  {uniqueHospitals.map((h) => <option key={h} value={h}>{h}</option>)}
+                </select>
+              )}
 
-                return (
-                  <>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-white rounded-lg p-3">
-                        <p className="text-sm text-gray-600">Horas Mensais</p>
-                        <p className={`text-xl font-bold ${monthlyHours > 160 ? 'text-red-600' : 'text-gray-800'}`}>
-                          {monthlyHours.toFixed(1)}h
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {monthlyHours > 160 ? '⚠️ Acima da média' : 'Dentro do esperado'}
-                        </p>
+              <div className="flex items-center gap-2 ml-auto">
+                <input type="date" value={dateRange.start} onChange={(e) => handleDateRangeChange('start', e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                <span className="text-gray-400 text-xs">até</span>
+                <input type="date" value={dateRange.end} onChange={(e) => handleDateRangeChange('end', e.target.value)}
+                  className="px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+                {(dateRange.start || dateRange.end) && (
+                  <button onClick={() => setDateRange({ start: '', end: '' })} className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar datas">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* ── Cards de Métricas Premium ── */}
+          {isPlantoesPending ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <SkeletonMetricCard /><SkeletonMetricCard /><SkeletonMetricCard /><SkeletonMetricCard />
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {/* Faturamento Bruto */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-orange-100">Faturamento Bruto</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorBruto)}</p>
+                  <p className="text-xs text-orange-200 mt-2">{metrics.quantidade} plantões no período</p>
+                </div>
+
+                {/* Líquido Estimado */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-emerald-100">Líquido Estimado</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorLiquido)}</p>
+                  <p className="text-xs text-emerald-200 mt-2">Após ~25% de retenções PJ</p>
+                </div>
+
+                {/* Valor Médio/Hora */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 p-5 text-white shadow-lg shadow-orange-500/20 hover:shadow-xl hover:shadow-orange-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-orange-100">Valor Médio / Hora</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatCurrency(metrics.valorHora)}</p>
+                  <p className="text-xs text-orange-200 mt-2">
+                    {metrics.valorHoraHistorico > 0 && metrics.valorHora > 0 ? (
+                      <>
+                        Sua média histórica: {formatCurrency(metrics.valorHoraHistorico)}/h
+                        {metrics.valorHora > metrics.valorHoraHistorico
+                          ? <span className="ml-1 text-green-200">▲ acima</span>
+                          : metrics.valorHora < metrics.valorHoraHistorico
+                          ? <span className="ml-1 text-red-200">▼ abaixo</span>
+                          : null}
+                      </>
+                    ) : (
+                      <>{formatHoras(metrics.horasTotal)} trabalhadas no período</>
+                    )}
+                  </p>
+                </div>
+
+                {/* Carga Horária */}
+                <div className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-600 p-5 text-white shadow-lg shadow-emerald-500/20 hover:shadow-xl hover:shadow-emerald-500/30 transition-all duration-300">
+                  <div className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+                  <p className="text-sm font-medium text-emerald-100">Carga Horária</p>
+                  <p className="text-3xl font-bold mt-1 tracking-tight">{formatHoras(metrics.horasTotal)}</p>
+                  <p className="text-xs text-emerald-200 mt-2">{metrics.quantidade} plantões</p>
+                </div>
+              </div>
+
+              {/* Folgas no mês (exibição separada, sem somar nos KPIs) */}
+              {folgasNoMes > 0 && (
+                <p className="text-xs text-gray-400 text-right">Folgas no mês: {folgasNoMes}</p>
+              )}
+
+              {/* ── Meta Mensal + Ranking por Hospital ── */}
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+                {/* Meta Mensal */}
+                <div className="lg:col-span-2 bg-gradient-to-br from-white to-orange-50/30 rounded-2xl border border-gray-200/60 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider">Meta Mensal</h3>
+                    <div className="flex items-center gap-1.5">
+                      {metaSaved && (
+                        <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full animate-pulse">✓ Salvo</span>
+                      )}
+                      {metaSaving && (
+                        <span className="text-[10px] text-gray-400">Salvando...</span>
+                      )}
+                      {metaEditing ? (
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-gray-400">R$</span>
+                          <input
+                            autoFocus
+                            type="number"
+                            value={metaMensal}
+                            onChange={(e) => setMetaMensal(Number(e.target.value) || 0)}
+                            onBlur={() => { saveMetaMensal(metaMensal); setMetaEditing(false) }}
+                            onKeyDown={(e) => { if (e.key === 'Enter') { (e.target as HTMLInputElement).blur() } if (e.key === 'Escape') setMetaEditing(false) }}
+                            className="w-28 text-right text-xs font-medium text-gray-700 border border-orange-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-orange-500/40"
+                          />
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setMetaEditing(true)}
+                          title="Clique para editar sua meta mensal"
+                          className="group flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-orange-50 transition-colors"
+                        >
+                          <span className="text-xs font-medium text-gray-600">{formatCurrency(metaMensal)}</span>
+                          <svg className="h-3.5 w-3.5 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Ring Progress */}
+                  <div className="flex items-center gap-6">
+                    <div className="relative w-28 h-28 flex-shrink-0">
+                      <svg className="w-28 h-28 -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="50" fill="none" stroke="#f1f5f9" strokeWidth="10" />
+                        <circle
+                          cx="60" cy="60" r="50" fill="none"
+                          stroke={metrics.progressoMeta >= 100 ? '#10b981' : '#f97316'}
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          strokeDasharray={`${(metrics.progressoMeta / 100) * 314.16} 314.16`}
+                          className="transition-all duration-700 ease-out"
+                        />
+                      </svg>
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <span className="text-2xl font-bold text-gray-800">{metrics.progressoMeta.toFixed(0)}%</span>
                       </div>
-                      <div className="bg-white rounded-lg p-3">
-                        <p className="text-sm text-gray-600">Horas Semanais</p>
-                        <p className={`text-xl font-bold ${healthWarning ? 'text-red-600' : 'text-gray-800'}`}>
-                          {weeklyHours.toFixed(1)}h / 60h
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {healthWarning ? '⚠️ Cuidado com a Saúde' : 'Carga segura'}
+                    </div>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-xs text-gray-400">Faturado este mês</p>
+                        <p className="text-lg font-bold text-gray-800">{formatCurrency(metrics.faturamentoMes)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Falta para a meta</p>
+                        <p className="text-lg font-bold text-gray-800">
+                          {formatCurrency(Math.max(metaMensal - metrics.faturamentoMes, 0))}
                         </p>
                       </div>
                     </div>
-                    
-                    {healthWarning && (
-                      <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                        <p className="text-red-700 font-medium text-sm">
-                          ⚠️ Cuidado com a Saúde
-                        </p>
-                        <p className="text-red-600 text-xs mt-1">
-                          Sua carga horária semanal de {weeklyHours.toFixed(1)}h excede o recomendado de 60h. 
-                          Considere descansar para manter sua saúde e bem-estar.
-                        </p>
-                      </div>
-                    )}
-                    
-                    {!healthWarning && weeklyHours > 0 && (
-                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                        <p className="text-green-700 font-medium text-sm">
-                          ✅ Carga Horária Saudável
-                        </p>
-                        <p className="text-green-600 text-xs mt-1">
-                          Sua carga horária semanal está dentro dos limites recomendados para uma boa saúde.
-                        </p>
-                      </div>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-          </div>
-        </div>
+                  </div>
+                </div>
 
-        {/* Filtro de Período */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Filtrar por Período</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Data Inicial
-              </label>
-              <input
-                type="date"
-                id="startDate"
-                value={dateRange.start}
-                onChange={(e) => handleDateRangeChange('start', e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              />
+                {/* Ranking de Hospitais */}
+                <div className="lg:col-span-3 bg-gradient-to-br from-white to-violet-50/20 rounded-2xl border border-gray-200/60 shadow-sm p-6 hover:shadow-md transition-shadow duration-300">
+                  <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wider mb-4">Top Hospitais por R$/Hora</h3>
+                  {metrics.hospitalRanking.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 rounded-xl bg-violet-50 flex items-center justify-center mx-auto mb-3">
+                        <svg className="h-6 w-6 text-violet-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-600 mb-1">Sem dados para ranking</p>
+                      <p className="text-xs text-gray-400">Registre plantões com valor e horas para ver qual hospital paga melhor</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {metrics.hospitalRanking.map((h, i) => {
+                        const maxValorHora = metrics.hospitalRanking[0]?.valorHora || 1
+                        const pct = (h.valorHora / maxValorHora) * 100
+                        return (
+                          <div key={h.name} className="group cursor-default">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shadow-sm ${
+                                  i === 0 ? 'bg-gradient-to-br from-orange-400 to-orange-500 text-white' : 'bg-gray-100 text-gray-500'
+                                }`}>{i + 1}</span>
+                                <span className="text-sm font-medium text-gray-800 truncate">{h.name}</span>
+                              </div>
+                              <div className="text-right flex-shrink-0 ml-3">
+                                <span className="text-sm font-bold text-gray-900">{formatCurrency(h.valorHora)}/h</span>
+                                <span className="text-[10px] text-gray-400 ml-1.5 bg-gray-100 px-1.5 py-0.5 rounded-md">{h.count} plantões</span>
+                              </div>
+                            </div>
+                            <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-700 ease-out ${i === 0 ? 'bg-gradient-to-r from-orange-400 to-orange-500' : 'bg-gradient-to-r from-orange-200 to-orange-300'}`}
+                                style={{ width: `${pct}%` }}
+                              />
+                            </div>
+                            {/* Tooltip on hover */}
+                            <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 mt-1">
+                              <p className="text-[10px] text-gray-400">Total: {formatCurrency(h.total)} em {h.count} plantão(ões)</p>
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+
+          {/* ── Central de Alertas ── */}
+          {!isPlantoesPending && (
+            <div className="space-y-3">
+              <DashboardAlerts plantoes={plantoes} getSmartStatus={getSmartStatus} isLoading={isPlantoesPending} />
+              <NotificationPermission />
             </div>
-            <div>
-              <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-2">
-                Data Final
-              </label>
-              <input
-                type="date"
-                id="endDate"
-                value={dateRange.end}
-                onChange={(e) => handleDateRangeChange('end', e.target.value)}
-                className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-              />
+          )}
+
+          {/* ── Plantões de Hoje ── */}
+          {!isPlantoesPending && todayPlantoes.length > 0 && (
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200/60 p-6">
+              <div className="absolute top-0 right-0 w-40 h-40 bg-orange-200/20 rounded-full -translate-y-1/2 translate-x-1/2" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-orange-500 rounded-xl p-2.5 shadow-lg shadow-orange-500/30">
+                  <svg className="h-5 w-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-gray-900">Plantões de Hoje</h2>
+                  <p className="text-xs text-gray-500">{todayPlantoes.length} plantão(ões) agendado(s)</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {todayPlantoes.map((plantao) => (
+                  <div key={plantao.id} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 flex items-center justify-between border border-orange-100/60 hover:bg-white transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-gray-900 truncate">{plantao.hospital}</p>
+                      <p className="text-xs text-gray-500">{plantao.horas ? formatHoras(plantao.horas) : ''}{plantao.especialidade ? ` · ${plantao.especialidade}` : ''}</p>
+                    </div>
+                    <div className="text-right ml-4">
+                      <p className="font-bold text-emerald-600">{formatCurrency(plantao.valor || 0)}</p>
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold mt-1 ${getStatusColor(getSmartStatus(plantao))}`}>{getStatusLabel(getSmartStatus(plantao))}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
-            <div className="flex items-end">
+          )}
+
+          {/* ── Próximos Plantões ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
+            <div className="flex justify-between items-center p-6 pb-0">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Próximos Plantões</h2>
+                <p className="text-xs text-gray-500 mt-0.5">{upcomingPlantoes.length} agendado(s)</p>
+              </div>
               <button
-                onClick={() => setDateRange({ start: '', end: '' })}
-                className="w-full bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                onClick={() => setShowModal(true)}
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-semibold text-sm py-2.5 px-5 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg hover:shadow-orange-500/30 transition-all duration-200"
               >
-                Limpar Filtro
+                + Novo Plantão
               </button>
             </div>
-          </div>
-        </div>
 
-        {/* Cards de Resumo */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* Plantões no Período */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Plantões no Período</p>
-                <p className="text-3xl font-bold text-orange-500 mt-2">
-                  {filteredMetrics.quantidade}
-                </p>
+            {isPlantoesPending ? (
+              <div className="p-6"><SkeletonTableRows rows={4} cols={6} /></div>
+            ) : upcomingPlantoes.length === 0 ? (
+              <div className="text-center py-14 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 mb-4">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-800 mb-1">Nenhum plantão agendado</h3>
+                <p className="text-sm text-gray-500 max-w-xs mx-auto mb-5">Cadastre seus próximos plantões na escala para acompanhar sua agenda.</p>
+                <button onClick={() => router.push('/escala')} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors">
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Cadastrar Primeiro Plantão
+                </button>
               </div>
-              <div className="bg-orange-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Valor Total (R$) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Valor Total (R$)</p>
-                <p className="text-3xl font-bold text-green-600 mt-2">
-                  {formatCurrency(filteredMetrics.valorTotal)}
-                </p>
-              </div>
-              <div className="bg-green-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-
-          {/* Carga Horária Total (Hrs) */}
-          <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">Carga Horária Total (Hrs)</p>
-                <p className="text-3xl font-bold text-blue-600 mt-2">
-                  {horasTotais.toFixed(1)}
-                </p>
-              </div>
-              <div className="bg-blue-100 rounded-full p-3">
-                <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Próximos Plantões (A Realizar) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Próximos Plantões</h2>
-              <p className="text-sm text-gray-600 mt-1">Plantões agendados para datas futuras</p>
-            </div>
-            <button 
-              onClick={() => setShowModal(true)}
-              className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-            >
-              + Novo Plantão
-            </button>
-          </div>
-
-          {upcomingPlantoes.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 mb-2">
-                <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <p className="text-gray-500">Nenhum plantão agendado</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Hospital
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Horas
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {upcomingPlantoes.map((plantao) => (
-                    <tr key={plantao.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="font-semibold text-orange-600">
-                          {formatDate(plantao.data)}
-                        </div>
-                        {(plantao.horas || plantao.carga_horaria || plantao.duration) && (
-                          <div className="text-xs text-gray-500">{plantao.horas || plantao.carga_horaria || plantao.duration}h</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div>
-                          <button
-                            onClick={() => {
-                              const query = plantao.endereco || plantao.hospital
-                              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-                              window.open(mapsUrl, '_blank')
-                            }}
-                            className="text-gray-900 hover:text-orange-500 font-medium underline underline-offset-2 hover:underline-offset-4 transition-all duration-200"
-                          >
-                            {plantao.hospital}
-                          </button>
-                        </div>
-                        {plantao.endereco && (
-                          <div className="text-xs text-gray-500 mt-1 max-w-xs truncate">
-                            {plantao.endereco}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
-                        {formatCurrency(plantao.valor)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(plantao.horas || plantao.carga_horaria || plantao.duration || 0)}h
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                          {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleEditPlantao(plantao)}
-                            className="text-orange-500 hover:text-orange-600 p-1 rounded hover:bg-orange-50 transition-colors duration-200"
-                            title="Editar plantão"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          <button
-                            onClick={() => handleDeletePlantao(plantao.id)}
-                            disabled={deletingId === plantao.id}
-                            className="text-red-500 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Excluir plantão"
-                          >
-                            {deletingId === plantao.id ? (
-                              <div className="animate-spin rounded-full h-4 w-4 border-b border-red-500"></div>
-                            ) : (
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
+                      {['Data', 'Hospital', 'Valor', 'Horas', 'Status', 'Ações'].map((h) => (
+                        <th key={h} className="px-6 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                      ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-
-        {/* Histórico (Realizados) */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex justify-between items-center mb-6">
-            <div>
-              <h2 className="text-xl font-semibold text-gray-800">Histórico</h2>
-              <p className="text-sm text-gray-600 mt-1">Plantões já realizados</p>
-            </div>
+                  </thead>
+                  <tbody>
+                    {upcomingPlantoes.map((plantao, idx) => (
+                      <tr key={plantao.id} className={`hover:bg-orange-50/40 transition-colors ${idx !== upcomingPlantoes.length - 1 ? 'border-b border-gray-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm font-semibold text-orange-600">{formatDate(plantao.data)}</span>
+                          {Number(plantao.horas) > 0 && <span className="block text-[10px] text-gray-400">{formatHoras(plantao.horas)}</span>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
+                            className="text-sm text-gray-900 hover:text-orange-600 font-medium transition-colors">{plantao.hospital}</button>
+                          {plantao.endereco && <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{plantao.endereco}</p>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(plantao.valor)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{formatHoras(plantao.horas)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(getSmartStatus(plantao))}`}>{getStatusLabel(getSmartStatus(plantao))}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-1">
+                            <button onClick={() => handleEditPlantao(plantao)} className="p-1.5 rounded-lg hover:bg-orange-50 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-1.5 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
+                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-4 w-4 border-2 border-red-500 border-t-transparent" /> : (
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {historicalPlantoes.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="text-gray-400 mb-2">
-                <svg className="h-12 w-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+          {/* ── Histórico ── */}
+          <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden hover:shadow-md transition-shadow duration-300">
+            <div className="p-6 pb-4">
+              {/* Header row */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                    <svg className="h-4 w-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-gray-900">Histórico</h2>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {filteredHistoricalPlantoes.length === historicalPlantoes.length
+                        ? `${historicalPlantoes.length} plantão(ões)`
+                        : `${filteredHistoricalPlantoes.length} de ${historicalPlantoes.length} plantão(ões)`
+                      }
+                    </p>
+                  </div>
+                </div>
+                {/* Export button */}
+                <button onClick={handleExportCSV}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all group">
+                  <svg className="h-4 w-4 text-gray-400 group-hover:text-orange-500 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="hidden sm:inline">Exportar</span>
+                </button>
               </div>
-              <p className="text-gray-500">Nenhum plantão realizado ainda</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead>
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Data
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Hospital/Local
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Valor
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">
-                      Ações
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  {historicalPlantoes.map((plantao) => (
-                    <tr key={plantao.id} className="hover:bg-gray-50 opacity-75">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                        <div>{formatDate(plantao.data)}</div>
-                        {plantao.horas && (
-                          <div className="text-xs text-gray-400">{plantao.horas}h</div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div>
-                          <button
-                            onClick={() => {
-                              const query = plantao.endereco || plantao.hospital
-                              const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
-                              window.open(mapsUrl, '_blank')
-                            }}
-                            className="text-gray-700 hover:text-orange-500 font-medium underline underline-offset-2 hover:underline-offset-4 transition-all duration-200"
-                          >
-                            {plantao.hospital}
-                          </button>
-                        </div>
-                        {plantao.endereco && (
-                          <div className="text-xs text-gray-400 mt-1 max-w-xs truncate">
-                            {plantao.endereco}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
-                        {formatCurrency(plantao.valor)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>
-                          {plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex space-x-2">
-                          {/* Edit Button */}
-                          <button
-                            onClick={() => handleEditPlantao(plantao)}
-                            className="text-orange-500 hover:text-orange-600 p-1 rounded hover:bg-orange-50 transition-colors duration-200"
-                            title="Editar plantão"
-                          >
-                            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                            </svg>
-                          </button>
-                          
-                          {/* Delete Button */}
-                          <button
-                            onClick={() => handleDeletePlantao(plantao.id)}
-                            disabled={deletingId === plantao.id}
-                            className="text-red-500 hover:text-red-600 p-1 rounded hover:bg-red-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                            title="Apagar plantão"
-                          >
-                            {deletingId === plantao.id ? (
-                              <svg className="h-4 w-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                              </svg>
-                            ) : (
-                              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                              </svg>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </main>
 
-      {/* Modal */}
+              {/* Filter bar */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status chips — larger touch targets on mobile */}
+                {([
+                  { key: 'all', label: 'Todos' },
+                  { key: 'pago', label: 'Pagos' },
+                  { key: 'aguardando', label: 'Aguardando' },
+                  { key: 'atrasado', label: 'Atrasados' },
+                ] as const).map(({ key, label }) => (
+                  <button key={key} onClick={() => setHistoryStatusFilter(key)}
+                    className={`px-3.5 py-2 md:px-3 md:py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      historyStatusFilter === key
+                        ? key === 'atrasado'
+                          ? 'bg-red-50 border-red-300 text-red-700 shadow-sm'
+                          : key === 'pago'
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-sm'
+                            : 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm'
+                        : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:text-gray-700 active:bg-gray-100'
+                    }`}>
+                    {label}
+                  </button>
+                ))}
+
+                {/* Hospital select */}
+                <select value={historyHospitalFilter} onChange={(e) => setHistoryHospitalFilter(e.target.value)}
+                  className="ml-auto px-3 py-2 md:py-1.5 text-xs font-medium rounded-lg border border-gray-200 text-gray-600 bg-white focus:outline-none focus:ring-2 focus:ring-orange-500/40 max-w-[180px] sm:max-w-[200px] truncate">
+                  <option value="">Todos os hospitais</option>
+                  {historyUniqueHospitals.map(h => <option key={h} value={h}>{h}</option>)}
+                </select>
+
+                {/* Clear filters */}
+                {(historyHospitalFilter || historyStatusFilter !== 'all') && (
+                  <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
+                    className="p-2 rounded-lg hover:bg-gray-100 active:bg-gray-200 text-gray-400 hover:text-gray-600 transition-colors" title="Limpar filtros">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {isPlantoesPending ? (
+              <div className="p-6"><SkeletonTableRows rows={5} cols={5} /></div>
+            ) : filteredHistoricalPlantoes.length === 0 ? (
+              <div className="text-center py-14 px-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-orange-50 mb-4">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <h3 className="text-base font-semibold text-gray-800 mb-1">
+                  {historicalPlantoes.length === 0 ? 'Nenhum plantão realizado ainda' : 'Nenhum plantão encontrado'}
+                </h3>
+                <p className="text-sm text-gray-500 max-w-xs mx-auto mb-5">
+                  {historicalPlantoes.length === 0
+                    ? 'Seus plantões realizados aparecerão aqui conforme as datas passam.'
+                    : 'Tente ajustar os filtros para encontrar seus plantões.'}
+                </p>
+                {historicalPlantoes.length === 0 ? (
+                  <button onClick={() => router.push('/escala')} className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors">
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Cadastrar Plantão
+                  </button>
+                ) : (
+                  <button onClick={() => { setHistoryHospitalFilter(''); setHistoryStatusFilter('all') }}
+                    className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">Limpar filtros</button>
+                )}
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full">
+                  <thead>
+                    <tr className="bg-gradient-to-r from-gray-50/80 to-gray-100/50 border-b border-gray-100">
+                      {['Data', 'Hospital', 'Valor', 'Status', 'Ações'].map((h) => (
+                        <th key={h} className="px-6 py-3.5 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wider">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(historyShowAll ? filteredHistoricalPlantoes : filteredHistoricalPlantoes.slice(0, 10)).map((plantao, idx) => {
+                      const visibleCount = historyShowAll ? filteredHistoricalPlantoes.length : Math.min(filteredHistoricalPlantoes.length, 10)
+                      return (
+                      <tr key={plantao.id} className={`hover:bg-gray-50/60 transition-colors ${idx !== visibleCount - 1 ? 'border-b border-gray-50' : ''}`}>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="text-sm text-gray-600">{formatDate(plantao.data)}</span>
+                          {Number(plantao.horas) > 0 && <span className="block text-[10px] text-gray-400">{formatHoras(plantao.horas)}</span>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <button onClick={() => { window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(plantao.endereco || plantao.hospital)}`, '_blank') }}
+                            className="text-sm text-gray-700 hover:text-orange-600 font-medium transition-colors">{plantao.hospital}</button>
+                          {plantao.endereco && <p className="text-[10px] text-gray-400 truncate max-w-[200px]">{plantao.endereco}</p>}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700">{formatCurrency(plantao.valor)}</td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {(() => { const smart = getSmartStatus(plantao); return (
+                            <span className={`inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold rounded-lg uppercase tracking-wide ${getStatusColor(smart)}`}>
+                              {smart === 'atrasado' && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 9v2m0 4h.01" /></svg>}
+                              {smart === 'pago' && <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>}
+                              {getStatusLabel(smart)}
+                            </span>
+                          )})()}
+                        </td>
+                        <td className="px-4 md:px-6 py-4 whitespace-nowrap">
+                          <div className="flex gap-0.5">
+                            {getSmartStatus(plantao) !== 'pago' && (
+                              <button onClick={() => handleMarkAsPaid(plantao)} disabled={markingPaidId === plantao.id}
+                                className="p-2 rounded-lg hover:bg-emerald-50 active:bg-emerald-100 text-gray-400 hover:text-emerald-600 transition-colors disabled:opacity-40" title="Dar Baixa">
+                                {markingPaidId === plantao.id
+                                  ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-emerald-500 border-t-transparent" />
+                                  : <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                }
+                              </button>
+                            )}
+                            <button onClick={() => handleEditPlantao(plantao)} className="p-2 rounded-lg hover:bg-orange-50 active:bg-orange-100 text-gray-400 hover:text-orange-600 transition-colors" title="Editar">
+                              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            <button onClick={() => handleDeletePlantao(plantao.id)} disabled={deletingId === plantao.id} className="p-2 rounded-lg hover:bg-red-50 active:bg-red-100 text-gray-400 hover:text-red-500 transition-colors disabled:opacity-40" title="Excluir">
+                              {deletingId === plantao.id ? <div className="animate-spin rounded-full h-5 w-5 border-2 border-red-500 border-t-transparent" /> : (
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              )}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )})}
+                  </tbody>
+                </table>
+                {filteredHistoricalPlantoes.length > 10 && (
+                  <div className="text-center py-3 border-t border-gray-50">
+                    <button onClick={() => setHistoryShowAll(!historyShowAll)} className="text-sm text-orange-600 hover:text-orange-700 font-medium transition-colors">
+                      {historyShowAll ? 'Mostrar menos' : `Ver todos os ${filteredHistoricalPlantoes.length} plantões →`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </main>
+
+      {/* Modal Premium */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center px-4 z-50">
-          <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto flex flex-col">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center px-4 z-50">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto flex flex-col border border-gray-200/60">
             <div className="flex justify-between items-center mb-6 flex-shrink-0">
-              <h3 className="text-xl font-semibold text-gray-800">
+              <h3 className="text-xl font-bold text-gray-900">
                 {editingPlantao ? 'Editar Plantão' : 'Novo Plantão'}
               </h3>
               <button
@@ -1307,32 +1441,33 @@ export default function DashboardPage() {
                 <label htmlFor="hospital" className="block text-sm font-medium text-gray-700 mb-2">
                   Hospital/Local
                 </label>
-                <div className="flex space-x-2">
-                  <input
-                    type="text"
-                    id="hospital"
-                    name="hospital"
-                    value={formData.hospital}
-                    onChange={handleInputChange}
-                    className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                    placeholder="Nome do hospital"
-                    required
-                  />
+                {/* Seletor de local salvo aparece somente se houver favoritos cadastrados */}
+                {locaisFavoritos.length > 0 && (
                   <select
                     id="local_favorito_id"
                     name="local_favorito_id"
                     value={formData.local_favorito_id || ''}
                     onChange={handleLocationChange}
-                    className="flex-1 block px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                    className="block w-full px-3 py-2 mb-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent text-sm bg-gray-50"
                   >
-                    <option value="">Selecionar Local Salvo</option>
+                    <option value="">Selecionar local salvo (opcional)</option>
                     {locaisFavoritos.map((local) => (
                       <option key={local.id} value={local.id}>
                         {local.nome}
                       </option>
                     ))}
                   </select>
-                </div>
+                )}
+                <input
+                  type="text"
+                  id="hospital"
+                  name="hospital"
+                  value={formData.hospital}
+                  onChange={handleInputChange}
+                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                  placeholder="Nome do hospital"
+                  required
+                />
               </div>
 
               {/* Data */}
@@ -1454,23 +1589,79 @@ export default function DashboardPage() {
                 </select>
               </div>
 
-              {/* Prazo de Pagamento */}
+              {/* Data Prevista de Pagamento */}
               <div>
-                <label htmlFor="prazo_pagamento_dias" className="block text-sm font-medium text-gray-700 mb-2">
-                  Prazo de Pagamento (dias)
+                <label htmlFor="data_prevista_pagamento" className="block text-sm font-medium text-gray-700 mb-2">
+                  Data Prevista de Pagamento
                 </label>
                 <input
-                  type="number"
-                  id="prazo_pagamento_dias"
-                  name="prazo_pagamento_dias"
-                  value={formData.prazo_pagamento_dias}
+                  type="date"
+                  id="data_prevista_pagamento"
+                  name="data_prevista_pagamento"
+                  value={formData.data_prevista_pagamento}
                   onChange={handleInputChange}
-                  min="1"
-                  max="365"
-                  className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-                  placeholder="30"
+                  className="block w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-transparent text-sm"
                 />
-                <p className="text-xs text-gray-500 mt-1">Dias após a data do plantão para pagamento</p>
+                {/* Atalhos rápidos */}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.data) { alert('Preencha a data do plantão primeiro.'); return }
+                      const base = new Date(formData.data + 'T00:00:00')
+                      base.setDate(base.getDate() + 30)
+                      const iso = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}-${String(base.getDate()).padStart(2, '0')}`
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: iso, prazo_pagamento_dias: '30' }))
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.prazo_pagamento_dias === '30'
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    30 dias
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!formData.data) { alert('Preencha a data do plantão primeiro.'); return }
+                      const base = new Date(formData.data + 'T00:00:00')
+                      const nextMonth = new Date(base.getFullYear(), base.getMonth() + 1, 15)
+                      const iso = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-15`
+                      const diffDays = Math.round((nextMonth.getTime() - base.getTime()) / (1000 * 60 * 60 * 24))
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: iso, prazo_pagamento_dias: String(diffDays) }))
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.data_prevista_pagamento && formData.data_prevista_pagamento.endsWith('-15') && formData.prazo_pagamento_dias !== '30'
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    Próximo Mês (dia 15)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFormData(prev => ({ ...prev, data_prevista_pagamento: '', prazo_pagamento_dias: '' }))
+                      document.getElementById('data_prevista_pagamento')?.focus()
+                    }}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-all ${
+                      formData.data_prevista_pagamento && formData.prazo_pagamento_dias !== '30' && !formData.data_prevista_pagamento.endsWith('-15')
+                        ? 'bg-orange-50 border-orange-300 text-orange-700'
+                        : 'bg-white border-gray-200 text-gray-600 hover:border-orange-300 hover:text-orange-600'
+                    }`}
+                  >
+                    Customizado
+                  </button>
+                </div>
+                {formData.data_prevista_pagamento && formData.data && (
+                  <p className="text-[11px] text-gray-400 mt-1.5">
+                    {(() => {
+                      const diff = Math.round((new Date(formData.data_prevista_pagamento + 'T00:00:00').getTime() - new Date(formData.data + 'T00:00:00').getTime()) / (1000 * 60 * 60 * 24))
+                      return diff > 0 ? `≈ ${diff} dias após o plantão` : 'Data anterior ao plantão'
+                    })()}
+                  </p>
+                )}
               </div>
 
               {/* Endereço */}
@@ -1489,39 +1680,34 @@ export default function DashboardPage() {
                 />
               </div>
 
-              {/* Actions */}
-              <div className="flex space-x-2 mt-4">
-                <button
-                  type="submit"
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                >
-                  {editingPlantao ? 'Atualizar Plantão' : 'Cadastrar Plantão'}
-                </button>
-                {formData.hospital && !formData.local_favorito_id && (
-                  <button
-                    type="button"
-                    onClick={handleSaveAsFavorite}
-                    className="flex-1 bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
-                  >
-                    Salvar como Favorito
-                  </button>
-                )}
-              </div>
+              {/* Checkbox discreto: salvar local como favorito */}
+              {formData.hospital && !formData.local_favorito_id && !editingPlantao && (
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none pt-2">
+                  <input
+                    type="checkbox"
+                    checked={saveAsFavorite}
+                    onChange={(e) => setSaveAsFavorite(e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300 text-orange-500 focus:ring-orange-500"
+                  />
+                  Salvar este local como favorito
+                </label>
+              )}
 
-              <div className="flex space-x-3 pt-4">
+              {/* Ações: Cancelar + Salvar Plantão */}
+              <div className="flex gap-3 pt-4">
                 <button
                   type="button"
                   onClick={() => setShowModal(false)}
-                  className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2.5 px-4 rounded-xl transition-colors duration-200"
                 >
                   Cancelar
                 </button>
                 <button
                   type="submit"
                   disabled={saving}
-                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-semibold py-2.5 px-4 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {saving ? 'Salvando...' : (editingPlantao ? 'Atualizar Plantão' : 'Salvar Plantão')}
+                  {saving ? 'Salvando...' : 'Salvar Plantão'}
                 </button>
               </div>
             </form>

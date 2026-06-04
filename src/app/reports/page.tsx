@@ -1,34 +1,20 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import jsPDF from 'jspdf'
-
-interface Plantao {
-  id: string
-  hospital: string
-  endereco?: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado' | 'atrasado'
-  data_prevista_pagamento?: string
-  horas?: number
-  prazo_pagamento_dias?: number
-}
+import type { Plantao } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { formatHoras } from '@/lib/folga-utils'
 
 export default function ReportsPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth())
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear())
-  const router = useRouter()
-
-  useEffect(() => {
-    checkAuth()
-  }, [])
 
   useEffect(() => {
     if (user) {
@@ -36,30 +22,12 @@ export default function ReportsPage() {
     }
   }, [user, selectedMonth, selectedYear])
 
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-    } catch (error) {
-      console.error('Error checking auth:', error)
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const fetchPlantoes = async () => {
     try {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', user.id)
+        .eq('user_id', user!.id)
         .order('data', { ascending: false })
 
       if (error) {
@@ -82,7 +50,20 @@ export default function ReportsPage() {
   }
 
   const formatDate = (dateString: string) => {
+    // Split puro da string YYYY-MM-DD para evitar conversão UTC (off-by-one no fuso UTC-3)
+    if (!dateString) return ''
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    if (year && month && day) return `${day}/${month}/${year}`
     return new Date(dateString).toLocaleDateString('pt-BR')
+  }
+
+  // 'atrasado' é um status DERIVADO (não persistido). Um plantão está atrasado
+  // quando não foi pago e a data + prazo_pagamento_dias já passaram.
+  const isOverdue = (p: Plantao) => {
+    if (p.status === 'pago' || !p.prazo_pagamento_dias) return false
+    const deadline = new Date(p.data)
+    deadline.setDate(deadline.getDate() + p.prazo_pagamento_dias)
+    return deadline < new Date()
   }
 
   const generatePDFReport = async () => {
@@ -136,7 +117,7 @@ export default function ReportsPage() {
       const totalHours = monthPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
       const paidAmount = monthPlantoes.filter(p => p.status === 'pago').reduce((sum, p) => sum + p.valor, 0)
       const pendingAmount = monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado').reduce((sum, p) => sum + p.valor, 0)
-      const overdueAmount = monthPlantoes.filter(p => p.status === 'atrasado').reduce((sum, p) => sum + p.valor, 0)
+      const overdueAmount = monthPlantoes.filter(isOverdue).reduce((sum, p) => sum + p.valor, 0)
       
       // Summary boxes
       pdf.setFillColor('#FFF3E0')
@@ -185,7 +166,7 @@ export default function ReportsPage() {
         pdf.text('Plantões Atrasados', 115, 190)
         pdf.setFontSize(14)
         pdf.setTextColor('#EF4444')
-        pdf.text(`${monthPlantoes.filter(p => p.status === 'atrasado').length}`, 115, 200)
+        pdf.text(`${monthPlantoes.filter(isOverdue).length}`, 115, 200)
       }
       
       // Detailed Plantões List
@@ -239,14 +220,14 @@ export default function ReportsPage() {
         const hospitalName = plantao.hospital.length > 20 ? plantao.hospital.substring(0, 20) + '...' : plantao.hospital
         pdf.text(hospitalName, 60, yPosition)
         
-        pdf.text(`${plantao.horas || 0}h`, 120, yPosition)
+        pdf.text(formatHoras(plantao.horas), 120, yPosition)
         pdf.text(formatCurrency(plantao.valor), 150, yPosition)
         
         // Status with color
         const statusText = plantao.status.charAt(0).toUpperCase() + plantao.status.slice(1)
         if (plantao.status === 'pago') {
           pdf.setTextColor('#22C55E')
-        } else if (plantao.status === 'atrasado') {
+        } else if (isOverdue(plantao)) {
           pdf.setTextColor('#EF4444')
         } else if (plantao.status === 'confirmado') {
           pdf.setTextColor('#3B82F6')
@@ -299,7 +280,7 @@ export default function ReportsPage() {
   const totalHours = monthPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   const paidAmount = monthPlantoes.filter(p => p.status === 'pago').reduce((sum, p) => sum + p.valor, 0)
   const pendingAmount = monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado').reduce((sum, p) => sum + p.valor, 0)
-  const overdueAmount = monthPlantoes.filter(p => p.status === 'atrasado').reduce((sum, p) => sum + p.valor, 0)
+  const overdueAmount = monthPlantoes.filter(isOverdue).reduce((sum, p) => sum + p.valor, 0)
 
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)
@@ -501,7 +482,7 @@ export default function ReportsPage() {
                         {plantao.hospital}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {plantao.horas ? `${plantao.horas}h` : '-'}
+                        {plantao.horas ? formatHoras(plantao.horas) : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
                         {formatCurrency(plantao.valor)}
@@ -509,7 +490,7 @@ export default function ReportsPage() {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           plantao.status === 'pago' ? 'bg-green-100 text-green-800' :
-                          plantao.status === 'atrasado' ? 'bg-red-100 text-red-800' :
+                          isOverdue(plantao) ? 'bg-red-100 text-red-800' :
                           plantao.status === 'confirmado' ? 'bg-blue-100 text-blue-800' :
                           'bg-yellow-100 text-yellow-800'
                         }`}>

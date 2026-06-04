@@ -9,15 +9,16 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@sentry/nextjs": "^10.54.0",
+    "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.38.0",
     "@tanstack/react-query": "^5.100.9",
     "@tanstack/react-query-persist-client": "^5.100.9",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
-    "next": "14.0.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.7",
+    "next": "^14.2.35",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "recharts": "^2.8.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@types/node": "^20.8.0",

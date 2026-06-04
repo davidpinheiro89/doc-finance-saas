@@ -1,57 +1,33 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado'
-  horas?: number
-  endereco?: string
-}
+import type { Plantao } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { isFolga, formatHoras } from '@/lib/folga-utils'
 
 export default function PlantoesFuturosPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
+  const router = useRouter()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [dateRange, setDateRange] = useState({
     start: '',
     end: ''
   })
-  const router = useRouter()
 
   useEffect(() => {
-    checkAuth()
-  }, [])
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchPlantoes(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+    if (user) fetchPlantoes(user.id)
+  }, [user])
 
   const fetchPlantoes = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from('plantoes')
         .select('*')
-        .eq('usuario_id', userId)
+        .eq('user_id', userId)
         .order('data', { ascending: true }) // Future plantões in chronological order
 
       if (error) {
@@ -74,22 +50,23 @@ export default function PlantoesFuturosPage() {
     }))
   }
 
-  // Filter future plantões (data de hoje em diante)
+  // Filter future plantões (data de hoje em diante), excluindo folgas
   const getFuturePlantoes = () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0) // Start of today
     
     const futurePlantoes = plantoes.filter(plantao => {
-      const plantaoDate = new Date(plantao.data)
+      if (isFolga(plantao)) return false
+      const plantaoDate = new Date(plantao.data + 'T00:00:00')
       return plantaoDate >= today
     })
 
     // Apply date range filter if set
     if (dateRange.start || dateRange.end) {
       return futurePlantoes.filter(plantao => {
-        const plantaoDate = new Date(plantao.data)
-        const startDate = dateRange.start ? new Date(dateRange.start) : null
-        const endDate = dateRange.end ? new Date(dateRange.end) : null
+        const plantaoDate = new Date(plantao.data + 'T00:00:00')
+        const startDate = dateRange.start ? new Date(dateRange.start + 'T00:00:00') : null
+        const endDate = dateRange.end ? new Date(dateRange.end + 'T00:00:00') : null
 
         if (startDate && endDate) {
           return plantaoDate >= startDate && plantaoDate <= endDate
@@ -123,6 +100,10 @@ export default function PlantoesFuturosPage() {
   }
 
   const formatDate = (dateString: string) => {
+    // Split puro da string YYYY-MM-DD para evitar conversão UTC (off-by-one no fuso UTC-3)
+    if (!dateString) return ''
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    if (year && month && day) return `${day}/${month}/${year}`
     const date = new Date(dateString)
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -132,12 +113,15 @@ export default function PlantoesFuturosPage() {
   }
 
   const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString)
+    // Parseia manualmente para evitar off-by-one UTC
+    const [year, month, day] = (dateString || '').split('T')[0].split('-').map(Number)
+    if (!year || !month || !day) return ''
+    const date = new Date(year, month - 1, day)
     return date.toLocaleDateString('pt-BR', {
+      weekday: 'short',
       day: '2-digit',
       month: '2-digit',
-      year: 'numeric',
-      weekday: 'short'
+      year: 'numeric'
     })
   }
 
@@ -157,7 +141,7 @@ export default function PlantoesFuturosPage() {
   const getDaysUntil = (dateString: string) => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
-    const plantaoDate = new Date(dateString)
+    const plantaoDate = new Date(dateString + 'T00:00:00')
     const diffTime = plantaoDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     
@@ -180,12 +164,20 @@ export default function PlantoesFuturosPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center gap-3 p-4 bg-white border-b sticky top-0 z-50">
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg hover:bg-gray-100">
+            <span className="h-6 w-6">☰</span>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Plantões Futuros</h1>
+        </header>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-8 hidden md:block">
             <h1 className="text-3xl font-bold text-gray-800">
               Plantões <span className="text-orange-500">Futuros</span>
             </h1>
@@ -289,12 +281,25 @@ export default function PlantoesFuturosPage() {
             </div>
             
             {filteredPlantoes.length === 0 ? (
-              <div className="p-8 text-center">
-                <svg className="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-                <p className="text-gray-500">Nenhum plantão futuro agendado</p>
-                <p className="text-sm text-gray-400 mt-2">Adicione plantões futuros para vê-los aqui</p>
+              <div className="py-16 px-6 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-orange-50 flex items-center justify-center mx-auto mb-5">
+                  <svg className="h-8 w-8 text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2">Nenhum plantão agendado ainda</h3>
+                <p className="text-sm text-gray-500 max-w-sm mx-auto mb-6">
+                  Adicione seus próximos plantões para acompanhar sua agenda e projetar seu faturamento
+                </p>
+                <button
+                  onClick={() => router.push('/escala')}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold text-white bg-orange-500 hover:bg-orange-600 rounded-xl shadow-sm shadow-orange-500/20 transition-colors"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Agendar Primeiro Plantão
+                </button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -346,7 +351,7 @@ export default function PlantoesFuturosPage() {
                           {formatCurrency(plantao.valor)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {plantao.horas || 0}h
+                          {formatHoras(plantao.horas)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(plantao.status)}`}>

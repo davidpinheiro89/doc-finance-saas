@@ -1,39 +1,22 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { supabase } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { supabaseClient as supabase } from '@/lib/supabase-client'
 import Sidebar from '@/components/Sidebar'
 // Chart imports removed to prevent loops
-
-interface Plantao {
-  id: string
-  hospital: string
-  data: string
-  valor: number
-  status: 'pendente' | 'pago' | 'confirmado'
-  horas?: number
-}
-
-interface Despesa {
-  id: string
-  descricao: string
-  valor: number
-  data: string
-  categoria: string
-  user_id: string
-  recorrente?: boolean
-}
+import type { Plantao, Despesa, Receita } from '@/types/database'
+import { useAuthGuard } from '@/hooks/useAuthGuard'
+import { toLocalISO } from '@/lib/date-utils'
 
 export default function FinanceiroPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { user, loading } = useAuthGuard()
   const [plantoes, setPlantoes] = useState<Plantao[]>([])
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [despesas, setDespesas] = useState<Despesa[]>([])
   const [showAddExpense, setShowAddExpense] = useState(false)
   const [showEditExpense, setShowEditExpense] = useState(false)
   const [editingExpense, setEditingExpense] = useState<Despesa | null>(null)
-  const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)) // YYYY-MM format
+  const [selectedMonth, setSelectedMonth] = useState<string>(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}` }) // YYYY-MM format
   const [selectedYear, setSelectedYear] = useState<number>(2026)
   const [newExpense, setNewExpense] = useState<{
     descricao: string;
@@ -48,47 +31,55 @@ export default function FinanceiroPage() {
     categoria: 'transporte',
     recorrente: false
   })
-  const router = useRouter()
+  const [customCategories, setCustomCategories] = useState<string[]>([])
+  const [showNewCategoryInput, setShowNewCategoryInput] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [showEditNewCategoryInput, setShowEditNewCategoryInput] = useState(false)
+  const [editNewCategoryName, setEditNewCategoryName] = useState('')
+
+  // ── Receitas state ──
+  const [receitas, setReceitas] = useState<Receita[]>([])
+  const [showAddReceita, setShowAddReceita] = useState(false)
+  const [newReceita, setNewReceita] = useState({ descricao: '', valor: '', data: '', categoria: 'consulta' })
+
+  const receitaCategories = [
+    { value: 'consulta', label: 'Consulta' },
+    { value: 'procedimento', label: 'Procedimento' },
+    { value: 'parecer', label: 'Parecer Médico' },
+    { value: 'aula', label: 'Aula / Palestra' },
+    { value: 'outros', label: 'Outros' },
+  ]
+
+  const defaultCategories = [
+    { value: 'transporte', label: 'Transporte' },
+    { value: 'alimentacao', label: 'Alimentação' },
+    { value: 'material', label: 'Material Médico' },
+    { value: 'outros', label: 'Outros' },
+  ]
+
+  const allCategories = [
+    ...defaultCategories,
+    ...customCategories.map(c => ({ value: c, label: c })),
+  ]
 
   useEffect(() => {
-    checkAuth()
-  }, []) // Empty dependency array to prevent infinite loops
-
-  useEffect(() => {
-    // Trigger recalculation when filters or data change
     if (user) {
       fetchData(user.id)
     }
-  }, [selectedMonth, selectedYear, despesas.length]) // React to filter changes
-
-  const checkAuth = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login')
-        return
-      }
-      
-      setUser(user)
-      await fetchData(user.id)
-    } catch (error) {
-      router.push('/login')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [user, selectedMonth, selectedYear])
 
   const fetchData = async (userId: string) => {
     await Promise.all([
       fetchPlantoes(userId),
-      fetchDespesas(userId)
+      fetchDespesas(userId),
+      fetchReceitas(userId)
     ])
   }
 
   const fetchPlantoes = async (userId: string) => {
     try {
       const { data, error } = await supabase
-        .from('plantões')
+        .from('plantoes')
         .select('*')
         .eq('user_id', userId)
 
@@ -117,10 +108,65 @@ export default function FinanceiroPage() {
       }
 
       setDespesas(data || [])
+      // Auto-detect custom categories from existing data
+      const knownValues = new Set(defaultCategories.map(c => c.value))
+      const extraCats = (data || [])
+        .map(d => d.categoria)
+        .filter(c => c && !knownValues.has(c))
+      const uniqueExtra = Array.from(new Set(extraCats))
+      if (uniqueExtra.length > 0) {
+        setCustomCategories(prev => {
+          const merged = new Set([...prev, ...uniqueExtra])
+          return Array.from(merged)
+        })
+      }
       console.log('Estado despesas atualizado com:', data?.length || 0, 'itens')
     } catch (error) {
       setDespesas([])
     }
+  }
+
+  const fetchReceitas = async (userId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('receitas')
+        .select('*')
+        .eq('user_id', userId)
+        .order('data', { ascending: false })
+
+      if (error) { setReceitas([]); return }
+      setReceitas(data || [])
+    } catch { setReceitas([]) }
+  }
+
+  const handleAddReceita = async () => {
+    if (!newReceita.descricao || !newReceita.valor || !newReceita.data) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+    try {
+      const { error } = await supabase.from('receitas').insert({
+        descricao: newReceita.descricao.trim(),
+        valor: parseFloat(newReceita.valor),
+        data: newReceita.data,
+        categoria: newReceita.categoria,
+        recorrente: false,
+        user_id: user!.id,
+      })
+      if (error) { alert('Erro ao adicionar receita: ' + error.message); return }
+      setNewReceita({ descricao: '', valor: '', data: '', categoria: 'consulta' })
+      setShowAddReceita(false)
+      await fetchReceitas(user!.id)
+    } catch { alert('Erro ao adicionar receita. Tente novamente.') }
+  }
+
+  const handleDeleteReceita = async (receita: Receita) => {
+    if (!confirm('Tem certeza que deseja excluir esta receita?')) return
+    try {
+      const { error } = await supabase.from('receitas').delete().eq('id', receita.id).eq('user_id', user!.id)
+      if (error) { alert('Erro ao excluir receita: ' + error.message); return }
+      await fetchReceitas(user!.id)
+    } catch { alert('Erro ao excluir receita. Tente novamente.') }
   }
 
   const handleAddExpense = async () => {
@@ -142,10 +188,10 @@ export default function FinanceiroPage() {
           expensesToInsert.push({
             descricao: `${newExpense.descricao} - ${expenseDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`,
             valor: parseFloat(newExpense.valor),
-            data: expenseDate.toISOString().split('T')[0],
+            data: toLocalISO(expenseDate),
             categoria: newExpense.categoria,
             recorrente: true,
-            user_id: user.id
+            user_id: user!.id
           })
         }
 
@@ -166,7 +212,7 @@ export default function FinanceiroPage() {
             data: newExpense.data,
             categoria: newExpense.categoria,
             recorrente: false,
-            user_id: user.id
+            user_id: user!.id
           })
 
         if (error) {
@@ -185,36 +231,49 @@ export default function FinanceiroPage() {
       })
       setShowAddExpense(false)
       
-      // Sync with database immediately
-      await fetchDespesas(user.id)
-      console.log('Despesa adicionada com sucesso:', newExpense)
-      
-      // Force immediate refresh to ensure new expense appears in list
-      setTimeout(() => fetchDespesas(user.id), 500)
+      await fetchDespesas(user!.id)
     } catch (error) {
       alert('Erro ao adicionar despesa. Tente novamente.')
     }
   }
 
   const handleEditExpense = (despesa: Despesa) => {
-    setEditingExpense(despesa)
+    setEditingExpense({
+      ...despesa,
+      data: (despesa.data || '').split('T')[0],
+    })
     setShowEditExpense(true)
   }
 
   const handleUpdateExpense = async () => {
     if (!editingExpense) return
 
+    if (!editingExpense.descricao || !editingExpense.valor || !editingExpense.data) {
+      alert('Preencha todos os campos obrigatórios')
+      return
+    }
+
+    const valorNum = typeof editingExpense.valor === 'string'
+      ? parseFloat(editingExpense.valor as unknown as string)
+      : editingExpense.valor
+
+    if (isNaN(valorNum) || valorNum <= 0) {
+      alert('Informe um valor válido')
+      return
+    }
+
     try {
       const { error } = await supabase
         .from('despesas')
         .update({
-          descricao: editingExpense.descricao,
-          valor: editingExpense.valor,
+          descricao: editingExpense.descricao.trim(),
+          valor: valorNum,
           data: editingExpense.data,
           categoria: editingExpense.categoria,
-          recorrente: editingExpense.recorrente
+          recorrente: editingExpense.recorrente ?? false
         })
         .eq('id', editingExpense.id)
+        .eq('user_id', user!.id)
 
       if (error) {
         alert('Erro ao atualizar despesa: ' + error.message)
@@ -223,7 +282,7 @@ export default function FinanceiroPage() {
 
       setShowEditExpense(false)
       setEditingExpense(null)
-      await fetchDespesas(user.id)
+      await fetchDespesas(user!.id)
     } catch (error) {
       alert('Erro ao atualizar despesa. Tente novamente.')
     }
@@ -247,7 +306,7 @@ export default function FinanceiroPage() {
         const { error } = await supabase
           .from('despesas')
           .delete()
-          .eq('user_id', user.id)
+          .eq('user_id', user!.id)
           .like('descricao', `${baseDescription}%`)
           .eq('recorrente', true)
 
@@ -260,6 +319,7 @@ export default function FinanceiroPage() {
           .from('despesas')
           .delete()
           .eq('id', despesa.id)
+          .eq('user_id', user!.id)
 
         if (error) {
           alert('Erro ao excluir despesa: ' + error.message)
@@ -267,7 +327,7 @@ export default function FinanceiroPage() {
         }
       }
 
-      await fetchDespesas(user.id)
+      await fetchDespesas(user!.id)
     } catch (error) {
       alert('Erro ao excluir despesa. Tente novamente.')
     }
@@ -295,7 +355,15 @@ export default function FinanceiroPage() {
     }
     return d.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
   })
-  console.log('Lista atualizada:', filteredDespesas.length, 'itens')
+
+  const filteredReceitas = receitas.filter(r => {
+    if (selectedMonth === 'todos') {
+      return r.data.startsWith(selectedYear + '-')
+    }
+    return r.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
+  })
+
+  const totalReceitas = filteredReceitas.reduce((sum, r) => sum + (r.valor || 0), 0)
 
   // Reactivated calculations for Insight card - using recorrente field correctly
   const totalDespesas = filteredDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
@@ -309,6 +377,9 @@ export default function FinanceiroPage() {
   const totalDespesasVariaveis = despesasVariaveis.reduce((sum, d) => sum + (d.valor || 0), 0)
   
   const totalGeralDespesas = totalDespesasFixas + totalDespesasVariaveis
+  
+  // Saldo final: (Plantões pagos + Receitas extras) - Despesas totais
+  const saldoFinal = (totalRecebido + totalReceitas) - totalGeralDespesas
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -318,6 +389,10 @@ export default function FinanceiroPage() {
   }
 
   const formatDate = (dateString: string) => {
+    // Split puro da string YYYY-MM-DD para evitar conversão UTC (off-by-one no fuso UTC-3)
+    if (!dateString) return ''
+    const [year, month, day] = dateString.split('T')[0].split('-')
+    if (year && month && day) return `${day}/${month}/${year}`
     const date = new Date(dateString)
     return date.toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -331,9 +406,17 @@ export default function FinanceiroPage() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Sidebar user={user} />
+      <Sidebar user={user} mobileOpen={mobileMenuOpen} onMobileClose={() => setMobileMenuOpen(false)} />
       
       <div className="flex-1 overflow-auto">
+        {/* Mobile Header */}
+        <header className="md:hidden flex items-center gap-3 p-4 bg-white border-b sticky top-0 z-50">
+          <button onClick={() => setMobileMenuOpen(true)} className="p-2 rounded-lg hover:bg-gray-100">
+            <span className="h-6 w-6">☰</span>
+          </button>
+          <h1 className="text-xl font-bold text-gray-800">Financeiro</h1>
+        </header>
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
           {/* Header */}
           <div className="mb-6">
@@ -389,18 +472,30 @@ export default function FinanceiroPage() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">Dashboard Financeiro</h3>
                 
                 {/* Summary Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Total Fixo</p>
+                    <p className="text-sm text-gray-600 mb-1">Plantões Pagos</p>
+                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRecebido)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Receitas Extras</p>
+                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(totalReceitas)}</p>
+                  </div>
+                  <div className="bg-white rounded-lg p-4 border border-gray-200">
+                    <p className="text-sm text-gray-600 mb-1">Despesas Fixas</p>
                     <p className="text-xl font-bold text-orange-600">{formatCurrency(totalDespesasFixas)}</p>
                   </div>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Total Variável</p>
+                    <p className="text-sm text-gray-600 mb-1">Despesas Variáveis</p>
                     <p className="text-xl font-bold text-red-600">{formatCurrency(totalDespesasVariaveis)}</p>
                   </div>
                   <div className="bg-white rounded-lg p-4 border border-gray-200">
-                    <p className="text-sm text-gray-600 mb-1">Recebido</p>
-                    <p className="text-xl font-bold text-green-600">{formatCurrency(totalRecebido)}</p>
+                    <p className="text-sm text-gray-600 mb-1">Total Despesas</p>
+                    <p className="text-xl font-bold text-gray-800">{formatCurrency(totalGeralDespesas)}</p>
+                  </div>
+                  <div className={`rounded-lg p-4 border-2 ${saldoFinal >= 0 ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'}`}>
+                    <p className="text-sm text-gray-600 mb-1 font-medium">Saldo Final</p>
+                    <p className={`text-xl font-bold ${saldoFinal >= 0 ? 'text-green-700' : 'text-red-700'}`}>{formatCurrency(saldoFinal)}</p>
                   </div>
                 </div>
 
@@ -481,7 +576,7 @@ export default function FinanceiroPage() {
                       {/* Donut Chart */}
                       <div className="flex justify-center items-center">
                         <div className="relative w-40 h-40">
-                          <svg className="w-40 h-40 transform -rotate-90">
+                          <svg className="w-40 h-40 transform -rotate-90" viewBox="0 0 160 160">
                             {(() => {
                               const categoryTotals = filteredDespesas.reduce((acc, despesa) => {
                                 acc[despesa.categoria] = (acc[despesa.categoria] || 0) + (despesa.valor || 0)
@@ -529,13 +624,9 @@ export default function FinanceiroPage() {
                                 )
                               })
                             })()}
+                            {/* Furo central do donut para look mais limpo */}
+                            <circle cx="80" cy="80" r="40" fill="white" />
                           </svg>
-                          <div className="absolute inset-0 flex items-center justify-center">
-                            <div className="text-center">
-                              <p className="text-2xl font-bold text-gray-800">{formatCurrency(totalDespesas)}</p>
-                              <p className="text-xs text-gray-500">Total</p>
-                            </div>
-                          </div>
                         </div>
                       </div>
                       
@@ -683,6 +774,119 @@ export default function FinanceiroPage() {
             </div>
           </div>
 
+          {/* ── Seção de Receitas ── */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10 pointer-events-auto">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">Receitas Extras</h3>
+              <button
+                onClick={() => setShowAddReceita(true)}
+                className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+              >
+                + Nova Receita
+              </button>
+            </div>
+
+            {/* Form Nova Receita */}
+            {showAddReceita && (
+              <div className="p-6 bg-emerald-50/40 border-b border-gray-200">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Descrição *</label>
+                    <input
+                      type="text"
+                      value={newReceita.descricao}
+                      onChange={(e) => setNewReceita({ ...newReceita, descricao: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="Ex: Consulta particular"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Valor (R$) *</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={newReceita.valor}
+                      onChange={(e) => setNewReceita({ ...newReceita, valor: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                      placeholder="0.00"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Data *</label>
+                    <input
+                      type="date"
+                      value={newReceita.data}
+                      onChange={(e) => setNewReceita({ ...newReceita, data: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                    <select
+                      value={newReceita.categoria}
+                      onChange={(e) => setNewReceita({ ...newReceita, categoria: e.target.value })}
+                      className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                    >
+                      {receitaCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div className="mt-4 flex justify-end space-x-3">
+                  <button onClick={() => setShowAddReceita(false)} className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Cancelar
+                  </button>
+                  <button onClick={handleAddReceita} className="bg-emerald-500 hover:bg-emerald-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                    Adicionar Receita
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Tabela de Receitas */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Descrição</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Categoria</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredReceitas.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-12 text-center">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center mx-auto mb-3">
+                        <svg className="h-6 w-6 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Nenhuma receita extra</p>
+                      <p className="text-xs text-gray-400">Registre consultas, aulas ou outras receitas além dos plantões</p>
+                    </td></tr>
+                  ) : filteredReceitas.map((receita) => (
+                    <tr key={receita.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{formatDate(receita.data)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{receita.descricao}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-emerald-100 text-emerald-800">{receita.categoria}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-emerald-700">{formatCurrency(receita.valor)}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <button onClick={() => handleDeleteReceita(receita)} className="text-red-600 hover:text-red-900">
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           {/* Seção de Despesas */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-8 relative z-10 pointer-events-auto">
             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
@@ -740,15 +944,48 @@ export default function FinanceiroPage() {
                       Categoria
                     </label>
                     <select
-                      value={newExpense.categoria}
-                      onChange={(e) => setNewExpense({...newExpense, categoria: e.target.value})}
+                      value={showNewCategoryInput ? '__new__' : newExpense.categoria}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setShowNewCategoryInput(true)
+                        } else {
+                          setShowNewCategoryInput(false)
+                          setNewExpense({...newExpense, categoria: e.target.value})
+                        }
+                      }}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
-                      <option value="transporte">Transporte</option>
-                      <option value="alimentacao">Alimentação</option>
-                      <option value="material">Material Médico</option>
-                      <option value="outros">Outros</option>
+                      {allCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                      <option value="__new__">+ Nova Categoria...</option>
                     </select>
+                    {showNewCategoryInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          placeholder="Nome da categoria"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = newCategoryName.trim()
+                            if (!name) return
+                            setCustomCategories(prev => [...prev, name])
+                            setNewExpense({...newExpense, categoria: name})
+                            setNewCategoryName('')
+                            setShowNewCategoryInput(false)
+                          }}
+                          className="px-3 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
@@ -805,7 +1042,15 @@ export default function FinanceiroPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredDespesas.map((despesa: Despesa) => (
+                    {filteredDespesas.length === 0 ? (
+                    <tr><td colSpan={5} className="px-6 py-12 text-center">
+                      <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mx-auto mb-3">
+                        <svg className="h-6 w-6 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" /></svg>
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 mb-1">Nenhuma despesa registrada</p>
+                      <p className="text-xs text-gray-400">Controle seus gastos profissionais para calcular o lucro líquido</p>
+                    </td></tr>
+                    ) : filteredDespesas.map((despesa: Despesa) => (
                       <tr key={despesa.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {formatDate(despesa.data)}
@@ -873,7 +1118,7 @@ export default function FinanceiroPage() {
                       type="number"
                       step="0.01"
                       value={editingExpense.valor}
-                      onChange={(e) => setEditingExpense({...editingExpense, valor: parseFloat(e.target.value)})}
+                      onChange={(e) => setEditingExpense({...editingExpense, valor: e.target.value === '' ? 0 : parseFloat(e.target.value) || 0})}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     />
                   </div>
@@ -893,15 +1138,52 @@ export default function FinanceiroPage() {
                       Categoria
                     </label>
                     <select
-                      value={editingExpense.categoria}
-                      onChange={(e) => setEditingExpense({...editingExpense, categoria: e.target.value})}
+                      value={showEditNewCategoryInput ? '__new__' : editingExpense.categoria}
+                      onChange={(e) => {
+                        if (e.target.value === '__new__') {
+                          setShowEditNewCategoryInput(true)
+                        } else {
+                          setShowEditNewCategoryInput(false)
+                          setEditingExpense({...editingExpense, categoria: e.target.value})
+                        }
+                      }}
                       className="block w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent pointer-events-auto"
                     >
-                      <option value="transporte">Transporte</option>
-                      <option value="alimentacao">Alimentação</option>
-                      <option value="material">Material Médico</option>
-                      <option value="outros">Outros</option>
+                      {allCategories.map(cat => (
+                        <option key={cat.value} value={cat.value}>{cat.label}</option>
+                      ))}
+                      {/* Show current category if it's custom and not yet in allCategories */}
+                      {!allCategories.find(c => c.value === editingExpense.categoria) && (
+                        <option value={editingExpense.categoria}>{editingExpense.categoria}</option>
+                      )}
+                      <option value="__new__">+ Nova Categoria...</option>
                     </select>
+                    {showEditNewCategoryInput && (
+                      <div className="flex gap-2 mt-2">
+                        <input
+                          type="text"
+                          value={editNewCategoryName}
+                          onChange={(e) => setEditNewCategoryName(e.target.value)}
+                          placeholder="Nome da categoria"
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const name = editNewCategoryName.trim()
+                            if (!name) return
+                            setCustomCategories(prev => [...prev, name])
+                            setEditingExpense({...editingExpense, categoria: name})
+                            setEditNewCategoryName('')
+                            setShowEditNewCategoryInput(false)
+                          }}
+                          className="px-3 py-2 bg-orange-500 text-white text-sm font-medium rounded-lg hover:bg-orange-600 transition-colors"
+                        >
+                          Adicionar
+                        </button>
+                      </div>
+                    )}
                   </div>
                   
                   {/* Checkbox for recurring expenses */}
@@ -929,7 +1211,7 @@ export default function FinanceiroPage() {
                     Cancelar
                   </button>
                   <button
-                    onClick={handleAddExpense}
+                    onClick={handleUpdateExpense}
                     className="bg-orange-500 hover:bg-orange-600 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
                   >
                     Salvar Despesa
