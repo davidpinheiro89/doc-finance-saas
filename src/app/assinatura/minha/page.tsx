@@ -21,6 +21,17 @@ export default function MinhaAssinaturaPage() {
   const subEndDate = user?.user_metadata?.subscription_end_date || null
   const isActive = subStatus === 'active'
 
+  // --- Trial calculation ---
+  const TRIAL_DAYS = 30
+  const createdAt = user?.created_at ? new Date(user.created_at) : null
+  const today = new Date()
+  const diffMs = createdAt ? today.getTime() - createdAt.getTime() : 0
+  const daysUsed = createdAt ? Math.min(Math.floor(diffMs / (1000 * 60 * 60 * 24)), TRIAL_DAYS) : 0
+  const daysLeft = Math.max(TRIAL_DAYS - daysUsed, 0)
+  const trialProgress = Math.min((daysUsed / TRIAL_DAYS) * 100, 100)
+  const trialExpired = daysLeft === 0
+  const isBetaOrFree = subPlan === 'beta' || subPlan === 'free' || !isActive
+
   const planLabel = (() => {
     switch (subPlan) {
       case 'mensal': return 'Mensal'
@@ -36,6 +47,11 @@ export default function MinhaAssinaturaPage() {
       return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })
     } catch { return null }
   }
+
+  const progressColor =
+    trialProgress >= 90 ? 'bg-red-500' :
+    trialProgress >= 70 ? 'bg-amber-500' :
+    'bg-orange-500'
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
@@ -60,6 +76,71 @@ export default function MinhaAssinaturaPage() {
         </header>
 
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+          {/* Card: Trial */}
+          {isBetaOrFree && (
+            <div className={`rounded-2xl border shadow-sm overflow-hidden ${
+              trialExpired
+                ? 'bg-red-50 border-red-200'
+                : 'bg-white border-gray-200/60'
+            }`}>
+              <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+                <h2 className="text-base font-bold text-gray-900">
+                  {trialExpired ? '⚠️ Trial encerrado' : '⏳ Período de trial'}
+                </h2>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full border ${
+                  trialExpired
+                    ? 'bg-red-100 text-red-600 border-red-200'
+                    : daysLeft <= 5
+                    ? 'bg-amber-100 text-amber-700 border-amber-200'
+                    : 'bg-orange-100 text-orange-700 border-orange-100'
+                }`}>
+                  {trialExpired ? 'Expirado' : `${daysLeft} dia${daysLeft !== 1 ? 's' : ''} restante${daysLeft !== 1 ? 's' : ''}`}
+                </span>
+              </div>
+              <div className="px-6 py-5 space-y-4">
+                <div>
+                  <div className="flex justify-between text-xs text-gray-500 mb-2">
+                    <span>{daysUsed} dia{daysUsed !== 1 ? 's' : ''} utilizados</span>
+                    <span>{TRIAL_DAYS} dias no total</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                    <div
+                      className={`h-3 rounded-full transition-all duration-700 ${progressColor}`}
+                      style={{ width: `${trialProgress}%` }}
+                    />
+                  </div>
+                </div>
+
+                {trialExpired ? (
+                  <p className="text-sm text-red-600 font-medium">
+                    Seu trial de 30 dias encerrou. Assine agora para continuar usando o BEM Plantonista.
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-500">
+                    Você tem acesso gratuito a todas as funcionalidades durante o trial.{' '}
+                    {daysLeft <= 7 && (
+                      <span className="font-semibold text-amber-600">
+                        Seu trial termina em breve — garanta seu plano!
+                      </span>
+                    )}
+                  </p>
+                )}
+
+                <button
+                  onClick={() => router.push('/assinatura')}
+                  className={`w-full py-3 text-sm font-bold text-white rounded-xl shadow-md transition-all active:scale-[0.98] ${
+                    trialExpired
+                      ? 'bg-gradient-to-r from-red-500 to-red-600 shadow-red-500/20 hover:shadow-lg'
+                      : 'bg-gradient-to-r from-orange-500 to-orange-600 shadow-orange-500/20 hover:shadow-lg'
+                  }`}
+                >
+                  {trialExpired ? 'Assinar agora' : 'Ver planos e assinar'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Card: Plano Atual */}
           <div className="bg-white rounded-2xl border border-gray-200/60 shadow-sm overflow-hidden">
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
@@ -101,7 +182,7 @@ export default function MinhaAssinaturaPage() {
           </div>
 
           {/* Card: Upgrade */}
-          {(subPlan === 'beta' || subPlan === 'free' || !isActive) && (
+          {isBetaOrFree && isActive && !trialExpired && (
             <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200/60 shadow-sm overflow-hidden">
               <div className="px-6 py-6">
                 <div className="flex items-center gap-3 mb-3">
@@ -154,6 +235,7 @@ export default function MinhaAssinaturaPage() {
               </a>
             </div>
           </div>
+
         </div>
       </div>
     </div>
