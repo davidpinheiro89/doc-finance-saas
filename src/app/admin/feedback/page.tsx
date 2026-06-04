@@ -24,6 +24,7 @@ export default function AdminFeedbackPage() {
   const [fetching, setFetching] = useState(true)
   const [ratingFilter, setRatingFilter] = useState<number | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [selectedComment, setSelectedComment] = useState<FeedbackItem | null>(null)
 
   useEffect(() => {
     if (loading) return
@@ -187,7 +188,13 @@ export default function AdminFeedbackPage() {
                   {filtered.map(f => (
                     <tr key={f.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">{renderStars(f.rating)}</td>
-                      <td className="px-6 py-4 text-sm text-gray-700 max-w-xs truncate">{f.comment || <span className="text-gray-400 italic">Sem comentário</span>}</td>
+                      <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                        {f.comment ? (
+                          <button onClick={() => setSelectedComment(f)} className="text-left truncate block max-w-xs hover:text-orange-600 transition-colors cursor-pointer">{f.comment}</button>
+                        ) : (
+                          <span className="text-gray-400 italic">Sem comentário</span>
+                        )}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{f.email}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(f.created_at)}</td>
                     </tr>
@@ -198,6 +205,26 @@ export default function AdminFeedbackPage() {
           )}
         </div>
       </main>
+
+      {/* Comment Detail Modal */}
+      {selectedComment && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setSelectedComment(null)} />
+          <div className="relative bg-white rounded-2xl shadow-xl border border-gray-100 p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                {renderStars(selectedComment.rating)}
+                <span className="text-xs text-gray-500">{formatDate(selectedComment.created_at)}</span>
+              </div>
+              <button onClick={() => setSelectedComment(null)} className="p-1 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-2">{selectedComment.email}</p>
+            <p className="text-sm text-gray-800 whitespace-pre-wrap leading-relaxed">{selectedComment.comment || 'Sem comentário'}</p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
