@@ -367,7 +367,7 @@ export default function EscalaPage() {
 
         <Sidebar user={user} isSidebarOpen={isSidebarOpen} />
 
-        <main className="flex-1 p-4 md:p-8 min-w-0 overflow-x-hidden">
+        <main className="flex-1 p-4 md:p-8 md:ml-20 min-w-0 overflow-x-hidden">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800">Escala de Plantões</h1>
           </div>
