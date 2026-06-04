@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import FeedbackModal from './FeedbackModal'
+import WhatsNewModal, { useWhatsNew } from './WhatsNewModal'
 
 const ADMIN_EMAIL = 'davidpinheiro89@gmail.com'
 
@@ -33,6 +34,8 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
   const isAdmin = user?.email === ADMIN_EMAIL
 
   const [feedbackCount, setFeedbackCount] = useState(0)
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
+  const hasNew = useWhatsNew()
 
   useEffect(() => {
     if (!isAdmin) return
@@ -128,6 +131,11 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
             </p>
           </div>
         </div>
+        <button onClick={() => setShowWhatsNew(true)} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors mb-1">
+          <span className="flex-shrink-0 w-5 h-5 flex items-center justify-center">🚀</span>
+          <span className="flex-1 text-left">O que há de novo</span>
+          {hasNew && <span className="w-2 h-2 rounded-full bg-orange-500 flex-shrink-0" />}
+        </button>
         <button
           onClick={handleLogout}
           className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors duration-200 cursor-pointer"
@@ -136,6 +144,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
           <span>Sair</span>
         </button>
       </div>
+      {showWhatsNew && <WhatsNewModal onClose={() => setShowWhatsNew(false)} />}
     </>
   )
 
