@@ -8,6 +8,7 @@ import { SkeletonMetricCard, SkeletonTableRows } from '@/components/Skeleton'
 import DashboardAlerts from '@/components/DashboardAlerts'
 import NotificationPermission from '@/components/NotificationPermission'
 import OnboardingModal from '@/components/OnboardingModal'
+import WhatsNewModal, { useWhatsNew } from '@/components/WhatsNewModal'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
@@ -87,6 +88,15 @@ export default function DashboardPage() {
 
   // --- Onboarding (primeiro acesso) ---
   const onboarding = useOnboarding(user)
+
+  // --- What's New (novidades in-app) ---
+  const hasNewUpdates = useWhatsNew()
+  const [showWhatsNew, setShowWhatsNew] = useState(false)
+  useEffect(() => {
+    if (!hasNewUpdates || onboarding.showOnboarding) return
+    const timer = setTimeout(() => setShowWhatsNew(true), 1000)
+    return () => clearTimeout(timer)
+  }, [hasNewUpdates, onboarding.showOnboarding])
 
   // --- TanStack Query: lista principal de plantões do usuário ---
   const { data: plantoes = [], isPending: isPlantoesPending, error: plantoesError } = useQuery<PlantaoListItem[]>({
@@ -842,6 +852,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
+      {showWhatsNew && <WhatsNewModal onClose={() => setShowWhatsNew(false)} />}
       {onboarding.showOnboarding && (
         <OnboardingModal
           step={onboarding.step}
