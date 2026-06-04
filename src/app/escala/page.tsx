@@ -364,7 +364,7 @@ export default function EscalaPage() {
           <button onClick={handleLogout} className="text-gray-600 text-sm">Sair</button>
         </header>
 
-        <Sidebar user={user} isSidebarOpen={isSidebarOpen} />
+        <Sidebar user={user} mobileOpen={isSidebarOpen} onMobileClose={() => setIsSidebarOpen(false)} />
 
         <main className="flex-1 p-4 md:p-8 w-full max-w-full overflow-x-hidden">
           <div className="flex justify-between items-center mb-6">
