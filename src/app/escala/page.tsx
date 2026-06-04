@@ -215,7 +215,7 @@ export default function EscalaPage() {
 
     const abrirFormulario = async (limparDia = false) => {
       if (limparDia) {
-        await supabase.from('plantoes').delete().eq('data', dateStr)
+        await supabase.from('plantoes').delete().eq('data', dateStr).in('tipo_evento', ['disponivel', 'folga'])
         await fetchPlantoes(user.id)
       }
       setShowActionModal(false)
@@ -334,6 +334,14 @@ export default function EscalaPage() {
       setShowActionModal(false)
       await fetchPlantoes(user.id)
     } catch { alert('Erro ao limpar o dia.') }
+  }
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      const { error } = await supabase.from('plantoes').delete().eq('id', itemId)
+      if (error) { alert('Erro ao apagar item.'); return }
+      await fetchPlantoes(user.id)
+    } catch { alert('Erro ao apagar item.') }
   }
 
   if (!user) {
@@ -478,15 +486,30 @@ export default function EscalaPage() {
                   {(() => {
                     const dateStr = formatDateYYYYMMDD(selectedDate)
                     const dayPlantoes = getDayPlantoes(dateStr)
-                    if (dayPlantoes.length > 0) {
-                      return dayPlantoes.map((p, i) => (
-                        <div key={i} className="mt-2 p-2 bg-blue-50 rounded-lg flex justify-between items-center">
-                          <span className="text-sm font-medium text-blue-800">{p.hospital}</span>
-                          <span className="text-sm text-blue-600">R$ {Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                        </div>
-                      ))
-                    }
-                    return null
+                    const disponivel = getDayStatus(dateStr, 'disponivel')
+                    const folga = getDayStatus(dateStr, 'folga')
+                    return (
+                      <>
+                        {dayPlantoes.map((p, i) => (
+                          <div key={i} className="mt-2 p-2 bg-blue-50 rounded-lg flex justify-between items-center">
+                            <span className="text-sm font-medium text-blue-800">{p.hospital}</span>
+                            <span className="text-sm text-blue-600">R$ {Number(p.valor).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                          </div>
+                        ))}
+                        {disponivel && (
+                          <div className="mt-2 p-2 bg-green-50 rounded-lg flex justify-between items-center">
+                            <span className="text-sm font-medium text-green-800">🟢 Disponível</span>
+                            <button onClick={() => handleDeleteItem(disponivel.id)} className="text-red-400 hover:text-red-600 text-sm">🗑️</button>
+                          </div>
+                        )}
+                        {folga && (
+                          <div className="mt-2 p-2 bg-red-50 rounded-lg flex justify-between items-center">
+                            <span className="text-sm font-medium text-red-800">🔴 Folga</span>
+                            <button onClick={() => handleDeleteItem(folga.id)} className="text-red-400 hover:text-red-600 text-sm">🗑️</button>
+                          </div>
+                        )}
+                      </>
+                    )
                   })()}
                 </div>
                 <button onClick={() => setShowActionModal(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
