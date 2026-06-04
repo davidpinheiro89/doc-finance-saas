@@ -1,8 +1,11 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { supabaseClient as supabase } from '@/lib/supabase-client'
 import FeedbackModal from './FeedbackModal'
+
+const ADMIN_EMAIL = 'davidpinheiro89@gmail.com'
 
 interface SidebarProps {
   user?: any
@@ -27,6 +30,26 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
   }
 
   const subStatus = user?.user_metadata?.subscription_status
+  const isAdmin = user?.email === ADMIN_EMAIL
+
+  const [feedbackCount, setFeedbackCount] = useState(0)
+
+  useEffect(() => {
+    if (!isAdmin) return
+    async function fetchCount() {
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        const res = await fetch('/api/admin/feedback', {
+          headers: { Authorization: `Bearer ${session?.access_token}` },
+        })
+        if (res.ok) {
+          const json = await res.json()
+          setFeedbackCount(json.feedbacks?.length || 0)
+        }
+      } catch {}
+    }
+    fetchCount()
+  }, [isAdmin])
 
   const menuItems = [
     { name: 'Início', href: '/dashboard', icon: '🏠' },
@@ -38,6 +61,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
     { name: 'Imposto de Renda', href: '/ir', icon: '📄' },
     { name: 'Meus Documentos', href: '/documentos', icon: '🛡️' },
     { name: 'Minha Assinatura', href: '/assinatura/minha', icon: '💳', badge: subStatus === 'active' ? 'Ativo' : undefined },
+    ...(isAdmin ? [{ name: 'Feedbacks', href: '/admin/feedback', icon: '💬', badge: feedbackCount > 0 ? String(feedbackCount) : undefined }] : []),
   ]
 
   const sidebarContent = (
