@@ -31,15 +31,6 @@ async function safeJson(res: Response, label: string) {
   }
 }
 
-// Header compartilhado para todas as chamadas ao Asaas
-function asaasHeaders(apiKey: string): Record<string, string> {
-  return {
-    'Content-Type': 'application/json',
-    'access_token': apiKey,
-    'User-Agent': 'BEM-Plantonista/1.0',
-  }
-}
-
 export async function POST(request: NextRequest) {
   try {
     const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
@@ -47,15 +38,6 @@ export async function POST(request: NextRequest) {
 
     console.log('[checkout] ASAAS_BASE_URL:', ASAAS_BASE_URL)
     console.log('[checkout] ASAAS_API_KEY exists:', !!ASAAS_API_KEY, 'length:', ASAAS_API_KEY.length)
-
-    // ── Log do IP de saída da Vercel (para diagnóstico do suporte Asaas) ──
-    try {
-      const ipRes = await fetch('https://api.ipify.org?format=json')
-      const ipData = await ipRes.json()
-      console.log('[checkout] Vercel outbound IP:', ipData.ip)
-    } catch {
-      console.log('[checkout] Could not fetch outbound IP')
-    }
 
     // ── 0. Parse request body first (before anything consumes the stream) ──
     let body: { cpfCnpj?: string; plan?: string }
@@ -106,7 +88,10 @@ export async function POST(request: NextRequest) {
       console.log('[checkout] Creating Asaas customer for:', user.email)
       const customerRes = await fetch(`${ASAAS_BASE_URL}/customers`, {
         method: 'POST',
-        headers: asaasHeaders(ASAAS_API_KEY),
+        headers: {
+          'Content-Type': 'application/json',
+          access_token: ASAAS_API_KEY,
+        },
         body: JSON.stringify({
           name: fullName,
           email: user.email,
@@ -138,13 +123,16 @@ export async function POST(request: NextRequest) {
 
     // ── 3. Criar assinatura recorrente ──
     const nextDueDate = new Date()
-    nextDueDate.setDate(nextDueDate.getDate() + 1)
+    nextDueDate.setDate(nextDueDate.getDate() + 1) // cobrar a partir de amanhã
     const dueDateStr = nextDueDate.toISOString().split('T')[0]
 
     console.log('[checkout] Creating subscription:', { plan, customerId, dueDateStr })
     const subscriptionRes = await fetch(`${ASAAS_BASE_URL}/subscriptions`, {
       method: 'POST',
-      headers: asaasHeaders(ASAAS_API_KEY),
+      headers: {
+        'Content-Type': 'application/json',
+        access_token: ASAAS_API_KEY,
+      },
       body: JSON.stringify({
         customer: customerId,
         billingType: 'CREDIT_CARD',
@@ -152,8 +140,8 @@ export async function POST(request: NextRequest) {
         nextDueDate: dueDateStr,
         cycle: isAnnual ? 'YEARLY' : 'MONTHLY',
         description: isAnnual
-          ? 'BEM Plantonista – Assinatura Anual'
-          : 'BEM Plantonista – Assinatura Mensal',
+          ? 'BEM Plantonista — Assinatura Anual'
+          : 'BEM Plantonista — Assinatura Mensal',
         externalReference: user.id,
       }),
     })
@@ -193,10 +181,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── 5. Buscar link de checkout (primeira cobrança) ──
+    // A primeira cobrança é criada automaticamente pelo Asaas ao criar a subscription.
+    // Buscamos ela para obter o invoiceUrl.
     const paymentsRes = await fetch(
       `${ASAAS_BASE_URL}/subscriptions/${subscriptionData.id}/payments`,
       {
-        headers: asaasHeaders(ASAAS_API_KEY),
+        headers: { access_token: ASAAS_API_KEY },
       }
     )
 
