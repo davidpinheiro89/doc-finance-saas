@@ -166,7 +166,7 @@ export default function PlantoesRealizadosPage() {
     }
     
     // If payment hasn't been received or is within deadline
-    if (plantao.prazo_pagamento_dias && plantao.status !== 'pago') {
+    if (plantao.prazo_pagamento_dias) {
       return 'Aguardando'
     }
     
