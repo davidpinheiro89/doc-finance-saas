@@ -13,10 +13,21 @@ export const dynamic = 'force-dynamic'
  *   asaas-signature: HMAC-SHA256 do body com ASAAS_WEBHOOK_SECRET
  *
  * Eventos tratados:
- *   PAYMENT_CONFIRMED, PAYMENT_RECEIVED → active
+ *   PAYMENT_CONFIRMED, PAYMENT_RECEIVED → active + subscription_end_date
  *   PAYMENT_OVERDUE → overdue
  *   SUBSCRIPTION_DELETED → cancelled
  */
+
+function calcEndDate(plan: string): string {
+  const date = new Date()
+  if (plan === 'anual') {
+    date.setFullYear(date.getFullYear() + 1)
+  } else {
+    date.setDate(date.getDate() + 30)
+  }
+  return date.toISOString()
+}
+
 export async function POST(request: NextRequest) {
   try {
     const secret = process.env.ASAAS_WEBHOOK_SECRET ?? ''
@@ -65,11 +76,10 @@ export async function POST(request: NextRequest) {
         newStatus = 'cancelled'
         break
       default:
-        // Evento não tratado — aceitar sem ação
         return NextResponse.json({ ok: true, ignored: true })
     }
 
-    // ── 5. Atualizar user_metadata no Supabase ──
+    // ── 5. Buscar usuário ──
     const supabaseAdmin = getSupabaseAdmin()
 
     const { data: { user }, error: getUserError } = await supabaseAdmin.auth.admin.getUserById(externalReference)
@@ -79,11 +89,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
     }
 
+    // ── 6. Montar metadata atualizado ──
+    const currentPlan: string = user.user_metadata?.subscription_plan ?? 'mensal'
+
+    const updatedMetadata: Record<string, unknown> = {
+      ...user.user_metadata,
+      subscription_status: newStatus,
+    }
+
+    // Gravar subscription_end_date apenas em pagamento confirmado
+    if (newStatus === 'active') {
+      updatedMetadata.subscription_end_date = calcEndDate(currentPlan)
+      console.log(`Webhook: end_date set to ${updatedMetadata.subscription_end_date} (plan: ${currentPlan})`)
+    }
+
+    // Limpar end_date se cancelado
+    if (newStatus === 'cancelled') {
+      updatedMetadata.subscription_end_date = null
+    }
+
+    // ── 7. Atualizar Supabase ──
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(externalReference, {
-      user_metadata: {
-        ...user.user_metadata,
-        subscription_status: newStatus,
-      },
+      user_metadata: updatedMetadata,
     })
 
     if (updateError) {
