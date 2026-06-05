@@ -146,7 +146,8 @@ export default function NotasPage() {
     if (file.size > 10 * 1024 * 1024) { alert('Arquivo muito grande (máx 10MB).'); return }
 
     setUploading(true)
-    const path = `${user.id}/${selectedNote.id}/${file.name}`
+    const sanitizedName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
+    const path = `${user.id}/${selectedNote.id}/${sanitizedName}`
     const { error } = await supabase.storage.from('notas-arquivos').upload(path, file, { upsert: true })
     setUploading(false)
     if (error) { alert('Erro ao enviar arquivo: ' + error.message); return }
