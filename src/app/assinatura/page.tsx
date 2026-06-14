@@ -49,7 +49,7 @@ export default function AssinaturaPage() {
       if (data.invoiceUrl) {
         window.location.href = data.invoiceUrl
       } else {
-        setError('Checkout criado mas link de pagamento não disponível. Entre em contato pelo WhatsApp.')
+        setError('Checkout criado mas link de pagamento não disponível. Tente novamente em alguns instantes.')
       }
     } catch {
       setError('Erro de conexão. Tente novamente.')
@@ -113,7 +113,7 @@ export default function AssinaturaPage() {
                 R$29<span className="text-xl">,90</span>
                 <span className="text-sm font-normal text-gray-500">/mês</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Após 3 meses: R$49,90/mês</p>
+              <p className="text-xs text-gray-500 mt-1">Após 3 meses: R$39,90/mês</p>
               <p className="text-[10px] text-orange-600 font-medium mt-1">Garantia de 7 dias · Cancele quando quiser</p>
               <button
                 onClick={() => handleCheckout('monthly')}
@@ -133,7 +133,7 @@ export default function AssinaturaPage() {
               <span className="absolute -top-2.5 right-4 bg-emerald-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full uppercase">Melhor valor</span>
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-emerald-700 uppercase tracking-wide">Anual</span>
-                <span className="text-[10px] text-emerald-600 font-semibold">Economia de ~50%</span>
+                <span className="text-[10px] text-emerald-600 font-semibold">Economia de ~37%</span>
               </div>
               <p className="text-3xl font-extrabold text-gray-900">
                 R$299<span className="text-xl">,00</span>
@@ -152,19 +152,6 @@ export default function AssinaturaPage() {
                 )}
               </button>
             </div>
-          </div>
-
-          {/* Secondary option */}
-          <div className="border-t border-gray-100 pt-4 mt-4">
-            <p className="text-xs text-gray-400 mb-2">Prefere ativar de outra forma?</p>
-            <a
-              href="https://wa.me/5511985904388?text=Ol%C3%A1%2C%20gostaria%20de%20ativar%20minha%20assinatura%20do%20BEM%20Plantonista."
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium hover:underline"
-            >
-              Ativar via WhatsApp
-            </a>
           </div>
 
           <button

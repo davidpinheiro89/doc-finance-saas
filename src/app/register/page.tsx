@@ -37,7 +37,7 @@ export default function RegisterPage() {
       if (error) {
         setError('Erro ao criar conta. Verifique seus dados.')
       } else {
-        setSuccess('Conta criada com sucesso! Verifique seu e-mail para confirmar o cadastro.')
+        setSuccess('Conta criada! Confirme seu e-mail e faça login para escolher seu plano.')
         setTimeout(() => {
           router.push('/login')
         }, 3000)

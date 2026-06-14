@@ -194,7 +194,7 @@ export default function MinhaAssinaturaPage() {
                 <p className="text-sm text-gray-600 mb-5 leading-relaxed">
                   Após o período beta, continue com acesso completo por apenas{' '}
                   <span className="font-bold text-orange-600">R$ 29,90/mês</span> ou{' '}
-                  <span className="font-bold text-emerald-600">R$ 299,00/ano</span> (economia de ~50%).
+                  <span className="font-bold text-emerald-600">R$ 299,00/ano</span> (economia de ~37%).
                 </p>
                 <button
                   onClick={() => router.push('/assinatura')}
