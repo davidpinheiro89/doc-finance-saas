@@ -80,8 +80,8 @@ export default function LandingPage() {
         </div>
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
           <h2 className="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight text-white">
-            Gerencie seus plantões{' '}
-            <span className="text-orange-400">com inteligência</span>
+            Seu financeiro de plantão,{' '}
+            <span className="text-orange-400">finalmente organizado.</span>
           </h2>
           <p className="mt-5 text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">
             Financeiro, escalas e documentos médicos em uma plataforma feita por quem entende a rotina do plantonista.
@@ -91,7 +91,7 @@ export default function LandingPage() {
               href="/register"
               className="inline-flex items-center justify-center px-7 py-3.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold shadow-lg shadow-orange-500/25 hover:shadow-xl hover:shadow-orange-500/30 transition-all text-base"
             >
-              Começar agora por R$29,90/mês
+              Começar grátis por 7 dias
             </a>
             <a
               href="#modulos"
