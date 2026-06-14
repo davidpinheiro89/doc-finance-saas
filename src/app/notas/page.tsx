@@ -189,7 +189,7 @@ export default function NotasPage() {
     if (!user || !selectedNote || !e.target.files?.length) return
     const file = e.target.files[0]
     if (file.type !== 'application/pdf') { alert('Apenas arquivos PDF são permitidos.'); return }
-    if (file.size > 10 * 1024 * 1024) { alert('Arquivo muito grande (máx 10MB).'); return }
+    if (file.size > 50 * 1024 * 1024) { alert('Arquivo muito grande (máx 50MB).'); return }
 
     setUploading(true)
     const sanitizedName = file.name.replace(/\s+/g, '-').replace(/[^a-zA-Z0-9._-]/g, '')
