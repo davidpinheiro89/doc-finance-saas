@@ -172,11 +172,9 @@ export default function LandingPage() {
             <div className="p-7 text-center">
               <p className="text-xs font-bold text-orange-600 uppercase tracking-wide mb-2">Mensal</p>
               <p className="text-4xl font-extrabold">
-                R$29<span className="text-2xl">,90</span>
+                R$39<span className="text-2xl">,90</span>
                 <span className="text-base font-normal text-gray-500">/mês</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Nos primeiros 3 meses</p>
-              <p className="text-xs text-gray-400">Após: R$39,90/mês</p>
               <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
                 {[
                   'Painel financeiro completo',
@@ -206,12 +204,12 @@ export default function LandingPage() {
           </div>
 
           {/* Plano Anual */}
-          <div className="relative bg-white rounded-2xl border-2 border-emerald-400 shadow-xl shadow-emerald-500/10 overflow-hidden">
-            <span className="absolute -top-0 right-0 left-0 bg-emerald-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
-              Melhor valor
+          <div className="relative bg-white rounded-2xl border-2 border-orange-400 shadow-xl shadow-orange-500/10 overflow-hidden">
+            <span className="absolute -top-0 right-0 left-0 bg-orange-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
+              ⭐ Mais popular
             </span>
             <div className="p-7 pt-12 text-center">
-              <p className="text-xs font-bold text-emerald-700 uppercase tracking-wide mb-2">Anual</p>
+              <p className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-2">Anual</p>
               <p className="text-4xl font-extrabold">
                 R$299<span className="text-2xl">,00</span>
                 <span className="text-base font-normal text-gray-500">/ano</span>
@@ -228,7 +226,7 @@ export default function LandingPage() {
                   'Suporte por e-mail',
                 ].map((item, i) => (
                   <li key={i} className="flex items-center gap-2">
-                    <svg className="h-4 w-4 text-emerald-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="h-4 w-4 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                     {item}
@@ -237,7 +235,7 @@ export default function LandingPage() {
               </ul>
               <a
                 href="/register"
-                className="mt-6 block w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-semibold transition-colors shadow-lg shadow-emerald-500/25 text-sm"
+                className="mt-6 block w-full py-3 rounded-xl bg-orange-500 hover:bg-orange-600 text-white font-semibold transition-colors shadow-lg shadow-orange-500/25 text-sm"
               >
                 Assinar plano anual
               </a>
