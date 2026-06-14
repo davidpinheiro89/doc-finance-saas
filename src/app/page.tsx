@@ -73,13 +73,16 @@ export default function LandingPage() {
 
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-orange-50 to-white" />
+        <div className="absolute inset-0">
+          <img src="/images/hero-doctor.jpg" alt="" className="w-full h-full object-cover" />
+          <div className="absolute inset-0 bg-[rgba(15,23,42,0.7)]" />
+        </div>
         <div className="relative max-w-4xl mx-auto px-4 sm:px-6 py-20 sm:py-28 text-center">
-          <h2 className="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight">
+          <h2 className="text-3xl sm:text-5xl font-extrabold leading-tight tracking-tight text-white">
             Gerencie seus plantões{' '}
-            <span className="text-orange-500">com inteligência</span>
+            <span className="text-orange-400">com inteligência</span>
           </h2>
-          <p className="mt-5 text-lg sm:text-xl text-gray-600 max-w-2xl mx-auto">
+          <p className="mt-5 text-lg sm:text-xl text-gray-200 max-w-2xl mx-auto">
             Financeiro, escalas e documentos médicos em uma plataforma feita por quem entende a rotina do plantonista.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
@@ -91,12 +94,16 @@ export default function LandingPage() {
             </a>
             <a
               href="#modulos"
-              className="inline-flex items-center justify-center px-7 py-3.5 rounded-xl border border-gray-300 hover:border-gray-400 text-gray-700 font-medium transition-colors text-base"
+              className="inline-flex items-center justify-center px-7 py-3.5 rounded-xl border border-white/30 hover:border-white/60 text-white font-medium transition-colors text-base"
             >
               Conhecer recursos
             </a>
           </div>
-          <p className="mt-4 text-xs text-gray-400">Após 3 meses R$49,90/mês · Plano anual R$299,00 (~R$24,92/mês) · 7 dias de garantia</p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3 text-xs text-gray-300">
+            <span>✓ 7 dias de garantia</span>
+            <span>✓ Cancele quando quiser</span>
+            <span>✓ Suporte via WhatsApp</span>
+          </div>
         </div>
       </section>
 
@@ -143,6 +150,15 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── App Preview ── */}
+      <section className="max-w-4xl mx-auto px-4 sm:px-6 py-12">
+        <img
+          src="/images/hero-app.jpg"
+          alt="Prévia do aplicativo BEM Plantonista"
+          className="w-full rounded-2xl border border-gray-200 shadow-lg"
+        />
+      </section>
+
       {/* ── Preços ── */}
       <section className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-20">
         <h3 className="text-2xl sm:text-3xl font-bold text-center mb-3">Escolha seu plano</h3>
@@ -152,9 +168,6 @@ export default function LandingPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 max-w-2xl mx-auto">
           {/* Plano Mensal */}
           <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-            <div className="bg-orange-500 text-white text-center py-2 text-xs font-bold uppercase tracking-wider">
-              Lançamento
-            </div>
             <div className="p-7 text-center">
               <p className="text-xs font-bold text-orange-600 uppercase tracking-wide mb-2">Mensal</p>
               <p className="text-4xl font-extrabold">
@@ -162,7 +175,7 @@ export default function LandingPage() {
                 <span className="text-base font-normal text-gray-500">/mês</span>
               </p>
               <p className="text-xs text-gray-500 mt-1">Nos primeiros 3 meses</p>
-              <p className="text-xs text-gray-400">Após: R$49,90/mês</p>
+              <p className="text-xs text-gray-400">Após: R$39,90/mês</p>
               <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
                 {[
                   'Painel financeiro completo',
@@ -202,8 +215,7 @@ export default function LandingPage() {
                 R$299<span className="text-2xl">,00</span>
                 <span className="text-base font-normal text-gray-500">/ano</span>
               </p>
-              <p className="text-xs text-gray-500 mt-1">Equivale a R$24,92/mês</p>
-              <p className="text-xs text-emerald-600 font-semibold">Economia de ~50% vs mensal</p>
+              <p className="text-xs text-gray-500 mt-1">Equivale a R$24,92/mês · Economia de ~37% vs mensal</p>
               <ul className="mt-5 space-y-2 text-sm text-left text-gray-700">
                 {[
                   'Painel financeiro completo',

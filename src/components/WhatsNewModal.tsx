@@ -4,6 +4,14 @@ import { useState, useEffect } from 'react'
 
 const UPDATES = [
   {
+    id: 'minhas-notas',
+    date: '05 Jun 2026',
+    title: 'Minhas Notas',
+    description: 'Agora você pode criar anotações, organizar informações do plantão e anexar PDFs diretamente no app.',
+    tag: 'Novo',
+    tagColor: 'bg-orange-100 text-orange-700',
+  },
+  {
     id: 'escala-remove-folga',
     date: '04 Jun 2025',
     title: 'Escala inteligente',
