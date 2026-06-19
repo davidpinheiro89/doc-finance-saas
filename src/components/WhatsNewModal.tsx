@@ -4,6 +4,22 @@ import { useState, useEffect } from 'react'
 
 const UPDATES = [
   {
+    id: 'valor-fixo-mensal',
+    date: '19 Jun 2026',
+    title: 'Valor fixo mensal para plantões recorrentes',
+    description: 'Ao repetir um plantão, agora você pode escolher entre receber \'Por plantão\' ou definir um \'Valor fixo mensal\', facilitando o controle financeiro de contratos com remuneração fixa.',
+    tag: 'Novo',
+    tagColor: 'bg-orange-100 text-orange-700',
+  },
+  {
+    id: 'cores-eventos-config',
+    date: '19 Jun 2026',
+    title: 'Personalize as cores dos seus eventos',
+    description: 'Acesse Configurações > Cores dos Eventos e escolha a cor padrão para Plantão, Folga, Pós-Plantão, Férias e Personalizado. Sua escolha é aplicada automaticamente ao criar novos eventos.',
+    tag: 'Novo',
+    tagColor: 'bg-orange-100 text-orange-700',
+  },
+  {
     id: 'minhas-notas',
     date: '05 Jun 2026',
     title: 'Minhas Notas',
