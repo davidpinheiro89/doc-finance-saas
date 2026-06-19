@@ -9,7 +9,8 @@ import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { fetchPlantoesByUser, plantoesKeys, type PlantaoListItem } from '@/lib/queries/plantoes'
 import { formatHoras } from '@/lib/folga-utils'
 import { calcularValorEfetivo } from '@/lib/calcular-valor'
-import { BLOCK_TYPES, BLOCK_COLORS, getColorConfig, type BlockColorKey } from '@/lib/block-config'
+import { BLOCK_TYPES, BLOCK_COLORS, getColorConfig, type BlockColorKey, type BlockTypeKey } from '@/lib/block-config'
+import { useCoresEvento } from '@/hooks/useCoresEvento'
 
 export default function EscalaPage() {
   const { user, loading } = useAuthGuard()
@@ -61,6 +62,7 @@ export default function EscalaPage() {
   const [seriesModal, setSeriesModal] = useState<{ action: 'edit' | 'delete'; plantao: PlantaoListItem; siblings: PlantaoListItem[] } | null>(null)
   const router = useRouter()
 
+  const { coresEvento } = useCoresEvento(user?.id)
   const isRevenueBlock = BLOCK_TYPES.find(b => b.key === blockType)?.revenue ?? true
 
   // ── Helpers ──
@@ -359,7 +361,7 @@ export default function EscalaPage() {
       setEditingId(null)
       setFormData({ hospital: '', data: '', valor: '', status: 'pendente', horas: '', endereco: '', cep: '', data_prevista_pagamento: '', prazo_pagamento_dias: '', classificacao: '', especialidade: '', turno: '' })
       setBlockType('plantao')
-      setBlockColor('emerald')
+      setBlockColor(coresEvento['plantao'])
       setCustomBlockName('')
       setRecurrenceEnabled(false)
       setRecurrenceLimitCount(4)
@@ -392,7 +394,7 @@ export default function EscalaPage() {
     setBlockType(matchedBlock ? matchedBlock.key : (p.valor > 0 ? 'plantao' : 'plantao'))
     // Determine block color
     const matchedColor = BLOCK_COLORS.find(c => c.key === p.especialidade)
-    setBlockColor(matchedColor ? matchedColor.key : 'emerald')
+    setBlockColor(matchedColor ? matchedColor.key : coresEvento[(matchedBlock?.key || 'plantao') as BlockTypeKey])
     setCustomBlockName(isCustom && !matchedBlock ? (p.classificacao || '') : '')
     setRecurrenceEnabled(false)
     setTipoRemuneracao(p.tipo_remuneracao === 'fixo_mensal' ? 'fixo_mensal' : 'por_plantao')
@@ -1042,7 +1044,7 @@ export default function EscalaPage() {
                   <label className="block text-xs font-medium text-gray-500 mb-2">Tipo de Evento</label>
                   <div className="flex flex-wrap gap-2">
                     {BLOCK_TYPES.map(bt => (
-                      <button key={bt.key} type="button" onClick={() => setBlockType(bt.key)}
+                      <button key={bt.key} type="button" onClick={() => { setBlockType(bt.key); if (!editingId) setBlockColor(coresEvento[bt.key as BlockTypeKey]) }}
                         className={`px-3 py-2 text-xs font-medium rounded-lg border transition-all ${
                           blockType === bt.key
                             ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm'
