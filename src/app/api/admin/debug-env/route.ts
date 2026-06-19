@@ -21,10 +21,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
 
+  const resolvedKey = process.env.ASAAS_API_KEY_V2 ?? process.env.ASAAS_API_KEY ?? ''
+
   return NextResponse.json({
+    ASAAS_API_KEY_V2_length: process.env.ASAAS_API_KEY_V2?.length ?? 0,
+    ASAAS_API_KEY_V2_first6: process.env.ASAAS_API_KEY_V2?.slice(0, 6) ?? 'EMPTY',
     ASAAS_API_KEY_length: process.env.ASAAS_API_KEY?.length ?? 0,
     ASAAS_API_KEY_first6: process.env.ASAAS_API_KEY?.slice(0, 6) ?? 'EMPTY',
-    ASAAS_API_KEY_last4: process.env.ASAAS_API_KEY?.slice(-4) ?? 'EMPTY',
+    resolvedKey_length: resolvedKey.length,
+    resolvedKey_first6: resolvedKey.slice(0, 6) || 'EMPTY',
     ASAAS_BASE_URL: process.env.ASAAS_BASE_URL ?? 'EMPTY',
     ASAAS_WEBHOOK_SECRET_length: process.env.ASAAS_WEBHOOK_SECRET?.length ?? 0,
     runtime: process.env.NEXT_RUNTIME ?? 'unknown',

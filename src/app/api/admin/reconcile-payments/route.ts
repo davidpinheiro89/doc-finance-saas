@@ -43,18 +43,14 @@ export async function GET(request: NextRequest) {
 
   // ── Parâmetros ──
   const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
-  const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
+  const ASAAS_API_KEY = process.env.ASAAS_API_KEY_V2 ?? process.env.ASAAS_API_KEY ?? ''
 
   if (!ASAAS_API_KEY) {
-    // Debug temporário — retorna info no body para diagnóstico direto
     return NextResponse.json({
       error: 'ASAAS_API_KEY não configurada',
       debug: {
+        ASAAS_API_KEY_V2_present: !!process.env.ASAAS_API_KEY_V2,
         ASAAS_API_KEY_present: !!process.env.ASAAS_API_KEY,
-        ASAAS_API_KEY_first4: process.env.ASAAS_API_KEY?.slice(0, 4) ?? 'UNDEFINED',
-        ASAAS_BASE_URL: ASAAS_BASE_URL,
-        VERCEL_ENV: process.env.VERCEL_ENV ?? 'UNDEFINED',
-        NODE_ENV: process.env.NODE_ENV ?? 'UNDEFINED',
         allAsaasEnvs: Object.keys(process.env).filter(k => k.includes('ASAAS')),
       },
     }, { status: 500 })
