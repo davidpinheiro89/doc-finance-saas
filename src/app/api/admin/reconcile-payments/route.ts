@@ -28,6 +28,15 @@ export async function GET(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
   )
   const { data: { user: caller }, error: authError } = await supabaseAuth.auth.getUser(token)
+
+  // Log temporário de diagnóstico — remover após confirmar funcionamento
+  console.log('[reconcile] auth check:', {
+    callerEmail: caller?.email ?? 'NULL',
+    adminEmail: ADMIN_EMAIL,
+    match: caller?.email === ADMIN_EMAIL,
+    authError: authError?.message ?? null,
+  })
+
   if (authError || !caller || caller.email !== ADMIN_EMAIL) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
@@ -35,6 +44,12 @@ export async function GET(request: NextRequest) {
   // ── Parâmetros ──
   const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
+
+  // Log temporário de debug — remover após diagnóstico
+  console.log('[DEBUG] ASAAS_API_KEY presente:', !!process.env.ASAAS_API_KEY, 'primeiros chars:', process.env.ASAAS_API_KEY?.slice(0, 4))
+  console.log('[DEBUG] ASAAS_BASE_URL:', ASAAS_BASE_URL)
+  console.log('[DEBUG] VERCEL_ENV:', process.env.VERCEL_ENV)
+  console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV)
 
   if (!ASAAS_API_KEY) {
     return NextResponse.json({ error: 'ASAAS_API_KEY não configurada' }, { status: 500 })
