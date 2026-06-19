@@ -8,6 +8,7 @@ import Sidebar from '../../components/Sidebar'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { fetchPlantoesByUser, plantoesKeys, type PlantaoListItem } from '@/lib/queries/plantoes'
 import { formatHoras } from '@/lib/folga-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 // ── Block Type & Color config ──
 const BLOCK_TYPES = [
@@ -559,7 +560,7 @@ export default function EscalaPage() {
     const cls = (p.classificacao || '').toLowerCase()
     return cls === 'folga'
   })
-  const monthRevenue = monthPlantoes.reduce((s, p) => s + (p.valor || 0), 0)
+  const monthRevenue = calcularValorEfetivo(monthPlantoes)
   const monthHours = monthPlantoes.reduce((s, p) => s + (p.horas || 0), 0)
 
   return (

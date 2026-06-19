@@ -7,6 +7,7 @@ import jsPDF from 'jspdf'
 import type { Plantao, Despesa } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga } from '@/lib/folga-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 type RegimeTributario = 'pessoa_fisica' | 'simples_nacional' | 'lucro_presumido'
 
@@ -128,7 +129,7 @@ export default function ImpostoRendaPage() {
   })
 
   // Calculate yearly metrics
-  const totalReceita = remunerados.reduce((sum, p) => sum + (p.valor || 0), 0)
+  const totalReceita = calcularValorEfetivo(remunerados)
   const totalDespesas = yearlyDespesas.reduce((sum, d) => sum + (d.valor || 0), 0)
 
   // ── Tabela Progressiva Mensal IRPF (vigente desde fev/2024) ──
@@ -160,11 +161,18 @@ export default function ImpostoRendaPage() {
     return { irpj, csll, pis_cofins, total: irpj + csll + pis_cofins }
   }
 
-  // Agrupa receita por mês
+  // Agrupa receita por mês (respeitando fixo_mensal: 1x por grupo/mês)
   const monthlyIncome: Record<string, number> = {}
+  const fixoMensalIR = new Set<string>()
   remunerados.forEach(p => {
     const month = (p.data || '').split('T')[0].slice(0, 7)
-    if (month) monthlyIncome[month] = (monthlyIncome[month] || 0) + (p.valor || 0)
+    if (!month) return
+    if (p.tipo_remuneracao === 'fixo_mensal' && p.grupo_recorrencia_id) {
+      const chave = `${p.grupo_recorrencia_id}|${month}`
+      if (fixoMensalIR.has(chave)) return
+      fixoMensalIR.add(chave)
+    }
+    monthlyIncome[month] = (monthlyIncome[month] || 0) + (p.valor || 0)
   })
 
   // ── Cálculo conforme regime ──
@@ -295,17 +303,21 @@ export default function ImpostoRendaPage() {
     return acc
   }, {} as Record<string, number>)
 
-  // Group plantões by month
-  const receitasByMonth = yearlyPlantoes.reduce((acc, plantao) => {
-    const month = new Date(plantao.data).getMonth()
-    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
-    const monthName = monthNames[month]
-    if (!acc[monthName]) {
-      acc[monthName] = 0
+  // Group plantões by month (respeitando fixo_mensal)
+  const receitasByMonth: Record<string, number> = {}
+  const fixoMensalChart = new Set<string>()
+  const monthNamesChart = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+  yearlyPlantoes.forEach(plantao => {
+    const mes = (plantao.data || '').split('T')[0].slice(0, 7)
+    if (plantao.tipo_remuneracao === 'fixo_mensal' && plantao.grupo_recorrencia_id) {
+      const chave = `${plantao.grupo_recorrencia_id}|${mes}`
+      if (fixoMensalChart.has(chave)) return
+      fixoMensalChart.add(chave)
     }
-    acc[monthName] += plantao.valor
-    return acc
-  }, {} as Record<string, number>)
+    const monthName = monthNamesChart[new Date(plantao.data).getMonth()]
+    if (!receitasByMonth[monthName]) receitasByMonth[monthName] = 0
+    receitasByMonth[monthName] += plantao.valor
+  })
 
   if (loading) {
     return (

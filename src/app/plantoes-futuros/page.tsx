@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga, formatHoras } from '@/lib/folga-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 export default function PlantoesFuturosPage() {
   const { user, loading } = useAuthGuard()
@@ -88,7 +89,7 @@ export default function PlantoesFuturosPage() {
   // Calculate metrics
   const metrics = {
     quantidade: filteredPlantoes.length,
-    valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
+    valorTotal: calcularValorEfetivo(filteredPlantoes),
     cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
   }
 
