@@ -64,6 +64,7 @@ export default function Sidebar({ user, mobileOpen = false, onMobileClose }: Sid
     { name: 'Imposto de Renda', href: '/ir', icon: '📄' },
     { name: 'Minhas Notas', href: '/notas', icon: '📝' },
     { name: 'Meus Documentos', href: '/documentos', icon: '🛡️' },
+    { name: 'Configurações', href: '/configuracoes', icon: '⚙️' },
     { name: 'Minha Assinatura', href: '/assinatura/minha', icon: '💳', badge: subStatus === 'active' ? 'Ativo' : undefined },
     ...(isAdmin ? [{ name: 'Feedbacks', href: '/admin/feedback', icon: '💬', badge: feedbackCount > 0 ? String(feedbackCount) : undefined }] : []),
   ]
