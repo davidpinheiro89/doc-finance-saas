@@ -80,6 +80,7 @@ export default function EscalaPage() {
   const [recurrenceLimitType, setRecurrenceLimitType] = useState<'date' | 'count'>('count')
   const [recurrenceLimitDate, setRecurrenceLimitDate] = useState('')
   const [recurrenceLimitCount, setRecurrenceLimitCount] = useState(4)
+  const [tipoRemuneracao, setTipoRemuneracao] = useState<'por_plantao' | 'fixo_mensal'>('por_plantao')
   // Series modal
   const [seriesModal, setSeriesModal] = useState<{ action: 'edit' | 'delete'; plantao: PlantaoListItem; siblings: PlantaoListItem[] } | null>(null)
   const router = useRouter()
@@ -318,6 +319,7 @@ export default function EscalaPage() {
     }
 
     // Generate dates (single or recurrence batch)
+    const grupoId = recurrenceEnabled ? crypto.randomUUID() : null
     const dates = recurrenceEnabled ? generateRecurrenceDates(formData.data) : [formData.data]
 
     const rows = dates.map(dateStr => {
@@ -356,6 +358,8 @@ export default function EscalaPage() {
         classificacao,
         especialidade,
         turno: isRevenueBlock ? (formData.turno || null) : null,
+        grupo_recorrencia_id: grupoId,
+        tipo_remuneracao: recurrenceEnabled ? tipoRemuneracao : 'por_plantao',
       }
     })
 
@@ -384,6 +388,7 @@ export default function EscalaPage() {
       setRecurrenceEnabled(false)
       setRecurrenceLimitCount(4)
       setRecurrenceLimitDate('')
+      setTipoRemuneracao('por_plantao')
       invalidatePlantoes()
     } catch { alert('Erro ao salvar plantão.') }
     finally { setSavingPlantao(false) }
@@ -414,6 +419,7 @@ export default function EscalaPage() {
     setBlockColor(matchedColor ? matchedColor.key : 'emerald')
     setCustomBlockName(isCustom && !matchedBlock ? (p.classificacao || '') : '')
     setRecurrenceEnabled(false)
+    setTipoRemuneracao(p.tipo_remuneracao === 'fixo_mensal' ? 'fixo_mensal' : 'por_plantao')
     setShowActionModal(false)
     setShowPlantaoForm(true)
   }
@@ -1119,7 +1125,7 @@ export default function EscalaPage() {
                   </div>
                   {isRevenueBlock && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1.5">Valor (R$) *</label>
+                    <label className="block text-xs font-medium text-gray-500 mb-1.5">{recurrenceEnabled && tipoRemuneracao === 'fixo_mensal' ? 'Valor fixo mensal (R$) *' : 'Valor (R$) *'}</label>
                     <input type="number" name="valor" value={formData.valor} onChange={handleInputChange} step="0.01" min="0"
                       className="block w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/40" placeholder="0,00" required />
                   </div>
@@ -1238,6 +1244,30 @@ export default function EscalaPage() {
 
                   {recurrenceEnabled && (
                     <div className="space-y-3 pt-1">
+                      {/* Tipo de remuneração — só para blocos de receita */}
+                      {isRevenueBlock && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1.5">Tipo de remuneração</label>
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => setTipoRemuneracao('por_plantao')}
+                              className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                                tipoRemuneracao === 'por_plantao' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                              }`}>
+                              Por plantão
+                            </button>
+                            <button type="button" onClick={() => setTipoRemuneracao('fixo_mensal')}
+                              className={`flex-1 py-2 px-3 text-xs font-medium rounded-lg border transition-all ${
+                                tipoRemuneracao === 'fixo_mensal' ? 'bg-orange-50 border-orange-300 text-orange-700 shadow-sm' : 'border-gray-200 text-gray-600 hover:border-orange-300'
+                              }`}>
+                              Valor fixo mensal
+                            </button>
+                          </div>
+                          {tipoRemuneracao === 'fixo_mensal' && (
+                            <p className="text-[10px] text-amber-600 mt-1.5">O valor informado é o total do mês — não será multiplicado por ocorrência.</p>
+                          )}
+                        </div>
+                      )}
+
                       {/* Frequency */}
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1.5">Frequência</label>
