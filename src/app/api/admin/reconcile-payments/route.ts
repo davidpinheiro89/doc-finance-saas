@@ -45,14 +45,19 @@ export async function GET(request: NextRequest) {
   const ASAAS_BASE_URL = process.env.ASAAS_BASE_URL ?? 'https://sandbox.asaas.com/api/v3'
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY ?? ''
 
-  // Log temporário de debug — remover após diagnóstico
-  console.log('[DEBUG] ASAAS_API_KEY presente:', !!process.env.ASAAS_API_KEY, 'primeiros chars:', process.env.ASAAS_API_KEY?.slice(0, 4))
-  console.log('[DEBUG] ASAAS_BASE_URL:', ASAAS_BASE_URL)
-  console.log('[DEBUG] VERCEL_ENV:', process.env.VERCEL_ENV)
-  console.log('[DEBUG] NODE_ENV:', process.env.NODE_ENV)
-
   if (!ASAAS_API_KEY) {
-    return NextResponse.json({ error: 'ASAAS_API_KEY não configurada' }, { status: 500 })
+    // Debug temporário — retorna info no body para diagnóstico direto
+    return NextResponse.json({
+      error: 'ASAAS_API_KEY não configurada',
+      debug: {
+        ASAAS_API_KEY_present: !!process.env.ASAAS_API_KEY,
+        ASAAS_API_KEY_first4: process.env.ASAAS_API_KEY?.slice(0, 4) ?? 'UNDEFINED',
+        ASAAS_BASE_URL: ASAAS_BASE_URL,
+        VERCEL_ENV: process.env.VERCEL_ENV ?? 'UNDEFINED',
+        NODE_ENV: process.env.NODE_ENV ?? 'UNDEFINED',
+        allAsaasEnvs: Object.keys(process.env).filter(k => k.includes('ASAAS')),
+      },
+    }, { status: 500 })
   }
 
   const days = parseInt(request.nextUrl.searchParams.get('days') ?? '30', 10)
