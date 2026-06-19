@@ -13,6 +13,7 @@ import { useOnboarding } from '@/hooks/useOnboarding'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga, formatHoras } from '@/lib/folga-utils'
+import { calcularValorEfetivo, calcularValorPorHospital } from '@/lib/calcular-valor'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   fetchPlantoesByUser,
@@ -365,7 +366,7 @@ export default function DashboardPage() {
   const metrics = useMemo(() => {
     const filtered = getFilteredPlantoes.filter(p => !isFolga(p))
     const quantidade = filtered.length
-    const valorBruto = filtered.reduce((s, p) => s + (p.valor || 0), 0)
+    const valorBruto = calcularValorEfetivo(filtered)
     const horasTotal = filtered.reduce((s, p) => s + (p.horas || 0), 0)
 
     // Valor Líquido Estimado (PJ médico: ~25% impostos/retenções)
@@ -377,27 +378,19 @@ export default function DashboardPage() {
 
     // Média histórica geral (todos os plantões do médico, para comparação)
     const allNonFolga = plantoes.filter(p => !isFolga(p))
-    const allValor = allNonFolga.reduce((s, p) => s + (p.valor || 0), 0)
+    const allValor = calcularValorEfetivo(allNonFolga)
     const allHoras = allNonFolga.reduce((s, p) => s + (p.horas || 0), 0)
     const valorHoraHistorico = allHoras > 0 ? allValor / allHoras : 0
 
     // Progresso da meta mensal (usa apenas mês atual)
     const { start: mesStart, end: mesEnd } = getCurrentMonthRangeLocal()
-    const faturamentoMes = plantoes
-      .filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd && !isFolga(p) })
-      .reduce((s, p) => s + (p.valor || 0), 0)
+    const plantoesMes = plantoes.filter((p) => { const d = (p.data || '').split('T')[0]; return d >= mesStart && d <= mesEnd && !isFolga(p) })
+    const faturamentoMes = calcularValorEfetivo(plantoesMes)
     const progressoMeta = metaMensal > 0 ? Math.min((faturamentoMes / metaMensal) * 100, 100) : 0
 
     // Ranking de hospitais por valor/hora (exclui folgas e registros sem valor)
-    const hospitalMap: Record<string, { valor: number; horas: number; count: number }> = {}
-    filtered.forEach((p) => {
-      if (!p.hospital || isFolga(p)) return
-      if (!hospitalMap[p.hospital]) hospitalMap[p.hospital] = { valor: 0, horas: 0, count: 0 }
-      hospitalMap[p.hospital].valor += p.valor || 0
-      hospitalMap[p.hospital].horas += p.horas || 0
-      hospitalMap[p.hospital].count += 1
-    })
-    const hospitalRanking = Object.entries(hospitalMap)
+    const hospitalMapData = calcularValorPorHospital(filtered.filter(p => !!p.hospital))
+    const hospitalRanking = Object.entries(hospitalMapData)
       .map(([name, d]) => ({ name, valorHora: d.horas > 0 ? d.valor / d.horas : 0, total: d.valor, count: d.count }))
       .filter(h => h.valorHora > 0)
       .sort((a, b) => b.valorHora - a.valorHora)
@@ -793,6 +786,8 @@ export default function DashboardPage() {
         'Retenção Estimada (R$)': retencao.toFixed(2).replace('.', ','),
         'Valor Líquido (R$)': liquido.toFixed(2).replace('.', ','),
         'Status': getStatusLabel(getSmartStatus(p)),
+        'Tipo Remuneração': p.tipo_remuneracao === 'fixo_mensal' ? 'Fixo Mensal' : 'Por Plantão',
+        'Grupo Recorrência': p.grupo_recorrencia_id || '',
       }
     })
     if (rows.length === 0) { alert('Nenhum plantão para exportar com os filtros atuais.'); return }
