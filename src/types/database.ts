@@ -59,6 +59,8 @@ export interface Plantao {
   turno: string | null
   tipo_evento: TipoEvento | null
   local_favorito_id: string | null
+  grupo_recorrencia_id: string | null
+  tipo_remuneracao: 'por_plantao' | 'fixo_mensal'
   created_at: string
   updated_at: string
 }

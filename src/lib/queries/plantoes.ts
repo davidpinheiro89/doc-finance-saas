@@ -64,6 +64,8 @@ export type PlantaoListItem = Pick<
   | 'classificacao'
   | 'especialidade'
   | 'turno'
+  | 'grupo_recorrencia_id'
+  | 'tipo_remuneracao'
 >
 
 // =============================================================================
