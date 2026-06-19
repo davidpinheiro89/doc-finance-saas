@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import type { Plantao, Despesa, Receita } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { toLocalISO } from '@/lib/date-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 export default function FinanceiroPage() {
   const { user, loading } = useAuthGuard()
@@ -341,13 +342,9 @@ export default function FinanceiroPage() {
     return p.data.startsWith(selectedYear + '-' + selectedMonth.slice(5))
   })
 
-  const totalRecebido = filteredPlantoes
-    .filter(p => p.status === 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
+  const totalRecebido = calcularValorEfetivo(filteredPlantoes.filter(p => p.status === 'pago'))
 
-  const totalAReceber = filteredPlantoes
-    .filter(p => p.status !== 'pago')
-    .reduce((sum, p) => sum + (p.valor || 0), 0)
+  const totalAReceber = calcularValorEfetivo(filteredPlantoes.filter(p => p.status !== 'pago'))
 
   const filteredDespesas = despesas.filter(d => {
     if (selectedMonth === 'todos') {

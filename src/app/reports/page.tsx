@@ -7,6 +7,7 @@ import jsPDF from 'jspdf'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { formatHoras } from '@/lib/folga-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 export default function ReportsPage() {
   const { user, loading } = useAuthGuard()
@@ -113,11 +114,11 @@ export default function ReportsPage() {
         return plantaoDate.getMonth() === selectedMonth && plantaoDate.getFullYear() === selectedYear
       })
       
-      const totalRevenue = monthPlantoes.reduce((sum, p) => sum + p.valor, 0)
+      const totalRevenue = calcularValorEfetivo(monthPlantoes)
       const totalHours = monthPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
-      const paidAmount = monthPlantoes.filter(p => p.status === 'pago').reduce((sum, p) => sum + p.valor, 0)
-      const pendingAmount = monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado').reduce((sum, p) => sum + p.valor, 0)
-      const overdueAmount = monthPlantoes.filter(isOverdue).reduce((sum, p) => sum + p.valor, 0)
+      const paidAmount = calcularValorEfetivo(monthPlantoes.filter(p => p.status === 'pago'))
+      const pendingAmount = calcularValorEfetivo(monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado'))
+      const overdueAmount = calcularValorEfetivo(monthPlantoes.filter(isOverdue))
       
       // Summary boxes
       pdf.setFillColor('#FFF3E0')
@@ -276,11 +277,11 @@ export default function ReportsPage() {
     return plantaoDate.getMonth() === selectedMonth && plantaoDate.getFullYear() === selectedYear
   })
 
-  const totalRevenue = monthPlantoes.reduce((sum, p) => sum + p.valor, 0)
+  const totalRevenue = calcularValorEfetivo(monthPlantoes)
   const totalHours = monthPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0)
-  const paidAmount = monthPlantoes.filter(p => p.status === 'pago').reduce((sum, p) => sum + p.valor, 0)
-  const pendingAmount = monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado').reduce((sum, p) => sum + p.valor, 0)
-  const overdueAmount = monthPlantoes.filter(isOverdue).reduce((sum, p) => sum + p.valor, 0)
+  const paidAmount = calcularValorEfetivo(monthPlantoes.filter(p => p.status === 'pago'))
+  const pendingAmount = calcularValorEfetivo(monthPlantoes.filter(p => p.status === 'pendente' || p.status === 'confirmado'))
+  const overdueAmount = calcularValorEfetivo(monthPlantoes.filter(isOverdue))
 
   const monthNames = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro']
   const years = Array.from({ length: 5 }, (_, i) => new Date().getFullYear() - i)

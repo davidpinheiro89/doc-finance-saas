@@ -7,6 +7,7 @@ import Sidebar from '@/components/Sidebar'
 import type { Plantao } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
 import { isFolga } from '@/lib/folga-utils'
+import { calcularValorEfetivo } from '@/lib/calcular-valor'
 
 export default function AnalyticsPage() {
   const { user, loading } = useAuthGuard()
@@ -54,14 +55,15 @@ export default function AnalyticsPage() {
     })
   }, [plantoes, dateRange])
 
-  const filteredMetrics = useMemo(() => ({
-    quantidade: filteredPlantoes.length,
-    valorTotal: filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0),
-    cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0),
-    mediaPorPlantao: filteredPlantoes.length > 0
-      ? filteredPlantoes.reduce((sum, p) => sum + (p.valor || 0), 0) / filteredPlantoes.length
-      : 0
-  }), [filteredPlantoes])
+  const filteredMetrics = useMemo(() => {
+    const valorTotal = calcularValorEfetivo(filteredPlantoes)
+    return {
+      quantidade: filteredPlantoes.length,
+      valorTotal,
+      cargaHoraria: filteredPlantoes.reduce((sum, p) => sum + (p.horas || 0), 0),
+      mediaPorPlantao: filteredPlantoes.length > 0 ? valorTotal / filteredPlantoes.length : 0
+    }
+  }, [filteredPlantoes])
 
   // Volume by unit
   const volumeChartData = useMemo(() => {
