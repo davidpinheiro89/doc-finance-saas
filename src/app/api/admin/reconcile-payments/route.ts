@@ -29,14 +29,6 @@ export async function GET(request: NextRequest) {
   )
   const { data: { user: caller }, error: authError } = await supabaseAuth.auth.getUser(token)
 
-  // Log temporário de diagnóstico — remover após confirmar funcionamento
-  console.log('[reconcile] auth check:', {
-    callerEmail: caller?.email ?? 'NULL',
-    adminEmail: ADMIN_EMAIL,
-    match: caller?.email === ADMIN_EMAIL,
-    authError: authError?.message ?? null,
-  })
-
   if (authError || !caller || caller.email !== ADMIN_EMAIL) {
     return NextResponse.json({ error: 'Acesso negado' }, { status: 403 })
   }
@@ -46,14 +38,7 @@ export async function GET(request: NextRequest) {
   const ASAAS_API_KEY = process.env.ASAAS_API_KEY_V2 ?? process.env.ASAAS_API_KEY ?? ''
 
   if (!ASAAS_API_KEY) {
-    return NextResponse.json({
-      error: 'ASAAS_API_KEY não configurada',
-      debug: {
-        ASAAS_API_KEY_V2_present: !!process.env.ASAAS_API_KEY_V2,
-        ASAAS_API_KEY_present: !!process.env.ASAAS_API_KEY,
-        allAsaasEnvs: Object.keys(process.env).filter(k => k.includes('ASAAS')),
-      },
-    }, { status: 500 })
+    return NextResponse.json({ error: 'ASAAS_API_KEY não configurada' }, { status: 500 })
   }
 
   const days = parseInt(request.nextUrl.searchParams.get('days') ?? '30', 10)
@@ -65,7 +50,6 @@ export async function GET(request: NextRequest) {
   const confirmedPayments: any[] = []
   let offset = 0
   const limit = 100
-  const debugFirstRequest: any = {} // Debug temporário
 
   for (let page = 0; page < 10; page++) { // máximo 1000 pagamentos
     const url = new URL(`${ASAAS_BASE_URL}/payments`)
@@ -78,19 +62,9 @@ export async function GET(request: NextRequest) {
       headers: { access_token: ASAAS_API_KEY },
     })
 
-    // Capturar debug da primeira request
-    if (page === 0) {
-      const rawText = await res.clone().text()
-      debugFirstRequest.confirmedUrl = url.toString()
-      debugFirstRequest.confirmedStatus = res.status
-      debugFirstRequest.confirmedBody = rawText.slice(0, 500)
-      debugFirstRequest.ASAAS_BASE_URL_used = ASAAS_BASE_URL
-      debugFirstRequest.ASAAS_API_KEY_first6 = ASAAS_API_KEY.slice(0, 6)
-    }
-
     if (!res.ok) {
       const errText = await res.text()
-      return NextResponse.json({ error: 'Erro ao consultar Asaas', status: res.status, details: errText, debug: debugFirstRequest }, { status: 502 })
+      return NextResponse.json({ error: 'Erro ao consultar Asaas', status: res.status, details: errText }, { status: 502 })
     }
 
     const data = await res.json()
@@ -204,8 +178,6 @@ export async function GET(request: NextRequest) {
       periodDays: days,
       since: sinceStr,
     },
-    // Debug temporário — remover após diagnóstico
-    _debug: debugFirstRequest,
     divergences,
   })
 }
