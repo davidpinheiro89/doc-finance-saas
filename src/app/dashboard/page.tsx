@@ -9,6 +9,7 @@ import DashboardAlerts from '@/components/DashboardAlerts'
 import NotificationPermission from '@/components/NotificationPermission'
 import OnboardingModal from '@/components/OnboardingModal'
 import WhatsNewModal, { useWhatsNew } from '@/components/WhatsNewModal'
+import BetaExpiryModal from '@/components/BetaExpiryModal'
 import { useOnboarding } from '@/hooks/useOnboarding'
 import type { Plantao, LocalFavorito } from '@/types/database'
 import { useAuthGuard } from '@/hooks/useAuthGuard'
@@ -822,6 +823,11 @@ export default function DashboardPage() {
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-slate-50 to-gray-100 w-full overflow-x-hidden">
+      <BetaExpiryModal
+        subscriptionStatus={user?.user_metadata?.subscription_status}
+        subscriptionEndDate={user?.user_metadata?.subscription_end_date}
+        subscriptionPlan={user?.user_metadata?.subscription_plan}
+      />
       {showWhatsNew && <WhatsNewModal onClose={() => setShowWhatsNew(false)} />}
       {onboarding.showOnboarding && (
         <OnboardingModal
