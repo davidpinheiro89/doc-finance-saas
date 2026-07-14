@@ -26,7 +26,7 @@ export default function BetaExpiryModal({
     if (!subscriptionEndDate) return
 
     // Não mostrar para assinantes pagos (quem tem plano definido via Asaas)
-    if (subscriptionPlan) return
+    if (subscriptionPlan && subscriptionPlan !== 'beta') return
 
     const endDate = new Date(subscriptionEndDate)
     if (endDate <= new Date()) return
